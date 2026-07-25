@@ -1,0 +1,140 @@
+/* Schedule Modal Styles */
+.schedule-modal {
+    max-width: 100%;
+}
+
+.schedule-modal.mobile {
+    top: 20px;
+}
+
+.schedule-modal .ant-modal-content {
+    border-radius: 12px;
+}
+
+.schedule-form {
+    width: 100%;
+}
+
+.form-label {
+    font-weight: 500;
+    font-size: 14px;
+    color: #333;
+}
+
+.day-select, .time-range-picker {
+    width: 100%;
+}
+
+.save-btn {
+    height: auto;
+    padding: 8px 16px;
+    font-weight: 500;
+    border-radius: 6px;
+    margin-top: 16px;
+}
+
+/* Mobile specific styles */
+@media (max-width: 767px) {
+    .schedule-modal .ant-modal-body {
+        padding: 12px;
+    }
+    
+    .form-label {
+        font-size: 16px;
+    }
+    
+    .day-select .ant-select-selector,
+    .time-range-picker .ant-picker-input input {
+        height: 48px !important;
+        font-size: 16px;
+    }
+    
+    .save-btn {
+        padding: 12px;
+        font-size: 16px;
+    }
+}
+
+/* Tablet styles */
+@media (min-width: 768px) and (max-width: 991px) {
+    .schedule-modal {
+        max-width: 80%;
+    }
+}
+
+/* Time picker responsive adjustments */
+.ant-picker-panel-container {
+    max-width: 100%;
+}
+
+@media (max-width: 767px) {
+    .ant-picker-panels {
+        flex-direction: column;
+    }
+    
+    .ant-picker-panel {
+        width: 100% !important;
+    }
+    
+    .ant-picker-time-panel {
+        width: 100% !important;
+    }
+    
+    .ant-picker-ranges {
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    
+    .ant-picker-ok {
+        margin-top: 8px;
+    }
+}
+/* Add these to your existing CSS */
+@media (max-width: 768px) {
+    .timetable-container .ant-layout {
+        flex-direction: column;
+    }
+    
+    .section-button {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .teachers-table .ant-table-thead > tr > th,
+    .teachers-table .ant-table-tbody > tr > td {
+        padding: 8px !important;
+    }
+    
+    .teacher-cell {
+        font-size: 14px;
+    }
+    
+    .subject-text {
+        font-size: 12px;
+    }
+}
+
+/* Mobile menu button */
+.mobile-menu-button {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1000;
+}
+
+/* Ensure sidebar doesn't take space on mobile when hidden */
+.ant-drawer-content-wrapper {
+    width: 200px !important;
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .ant-table {
+        font-size: 12px !important;
+    }
+}

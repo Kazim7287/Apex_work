@@ -1,0 +1,42 @@
+/* For mobile devices */
+@media (max-width: 767px) {
+    .ant-layout {
+        flex-direction: column;
+    }
+    
+    .ant-layout-sider {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 100% !important;
+    }
+    
+    .ant-table-thead > tr > th,
+    .ant-table-tbody > tr > td {
+        padding: 8px !important;
+    }
+    
+    .dmc-container {
+        font-size: 14px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .ant-layout-sider,
+    .ant-btn {
+        display: none !important;
+    }
+    
+    .dmc-container {
+        width: 100%;
+        padding: 0;
+    }
+    
+    .ant-modal-footer {
+        display: none !important;
+    }
+    
+    .ant-modal-body {
+        padding: 0 !important;
+    }
+}

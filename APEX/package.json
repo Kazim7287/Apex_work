@@ -1,0 +1,39 @@
+{
+  "name": "apex-school-management",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@reduxjs/toolkit": "^1.9.7",
+    "antd": "^5.12.0",
+    "axios": "^1.6.0",
+    "chart.js": "^4.4.0",
+    "dayjs": "^1.11.10",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "prop-types": "^15.8.1",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-highlight-words": "^0.20.0",
+    "react-icons": "^5.7.0",
+    "react-redux": "^8.1.3",
+    "react-responsive": "^10.0.0",
+    "react-router-dom": "^6.20.0",
+    "rechart": "^0.0.1",
+    "recharts": "^3.10.0",
+    "styled-components": "^5.3.11",
+    "xlsx": "^0.18.5"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.8"
+  }
+}

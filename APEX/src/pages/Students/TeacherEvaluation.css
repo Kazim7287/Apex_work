@@ -1,0 +1,347 @@
+/* TeacherEvaluation.css */
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+}
+
+/* Fix for the main container */
+.evaluation-container-3d {
+  padding: 20px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Fix for the card container */
+.evaluation-card-3d {
+  width: 100%;
+  max-width: 900px;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1; /* Ensure it's above other elements */
+}
+
+.evaluation-card-3d.hovered {
+  transform: translateY(-5px);
+}
+
+/* Fix for the card itself */
+.ant-card-3d {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  overflow: visible; /* Ensure all elements are visible */
+}
+
+.ant-card-3d .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+}
+
+.ant-card-3d .ant-card-body {
+  padding: 24px;
+}
+
+/* Fix for form elements to make them interactive */
+.evaluation-form-3d .ant-form-item {
+  margin-bottom: 16px;
+}
+
+/* CRITICAL FIX: Ensure Rate stars are clickable */
+.evaluation-form-3d .ant-rate {
+  font-size: 20px;
+  pointer-events: auto !important;
+}
+
+.evaluation-form-3d .ant-rate-star {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.evaluation-form-3d .ant-rate-star:hover {
+  transform: scale(1.1);
+}
+
+/* Fix for textareas */
+.textarea-3d {
+  resize: vertical;
+  min-height: 100px;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.textarea-3d:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Fix for checkbox */
+.checkbox-3d .ant-checkbox-wrapper {
+  font-size: 16px;
+  display: block;
+  margin-top: 8px;
+}
+
+.checkbox-3d .ant-checkbox-inner {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.checkbox-3d .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+/* Fix for submit button */
+.submit-button-3d {
+  width: 100%;
+  height: 45px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  margin-top: 16px;
+}
+
+.submit-button-3d:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+/* Teacher selection page styles */
+.teacher-selection-container {
+  padding: 20px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.teacher-selection-card {
+  max-width: 1000px;
+  margin: 0 auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+}
+
+.teacher-selection-card .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+}
+
+.teacher-selection-card .ant-card-body {
+  padding: 24px;
+}
+
+.teacher-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.teacher-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.teacher-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.teacher-card.evaluated {
+  opacity: 0.7;
+  background-color: #f0f0f0;
+}
+
+.teacher-card.evaluated:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.teacher-info {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+}
+
+.teacher-details {
+  flex: 1;
+}
+
+.teacher-details h3 {
+  margin: 0 0 8px 0;
+  color: #262626;
+}
+
+.teacher-details p {
+  margin: 0;
+  color: #8c8c8c;
+}
+
+.evaluated-badge {
+  background-color: #faad14;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.student-info {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #1890ff;
+}
+
+.student-info p {
+  margin: 8px 0;
+  color: #595959;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.loading-container .ant-spin {
+  margin-bottom: 16px;
+}
+
+.no-teachers {
+  text-align: center;
+  padding: 40px 0;
+  color: #999;
+}
+
+/* Success page styles */
+.submission-success-3d {
+  text-align: center;
+  max-width: 600px;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.success-alert-3d {
+  margin-bottom: 30px;
+  border-radius: 8px;
+}
+
+.submit-another-btn-3d {
+  margin-top: 20px;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 6px;
+}
+
+/* Teacher info section */
+.teacher-info-3d {
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #52c41a;
+}
+
+.teacher-info-3d h2 {
+  margin: 0 0 12px 0;
+  color: #262626;
+  display: flex;
+  align-items: center;
+}
+
+.teacher-info-3d p {
+  margin: 8px 0;
+  color: #595959;
+}
+
+.info-icon {
+  margin-right: 10px;
+  color: #1890ff;
+}
+
+.evaluation-warning {
+  margin-top: 15px;
+  border-radius: 6px;
+}
+
+/* Divider style */
+.divider-3d {
+  margin: 24px 0;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Card title style */
+.card-title-3d {
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.card-title-3d .anticon {
+  margin-right: 10px;
+  color: #1890ff;
+}
+
+/* Form labels */
+.evaluation-form-3d .ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
+  font-size: 14px;
+}
+
+/* Ensure all form elements are clickable */
+.evaluation-form-3d .ant-rate,
+.evaluation-form-3d .ant-checkbox-wrapper,
+.evaluation-form-3d .ant-input,
+.evaluation-form-3d .ant-btn {
+  pointer-events: auto !important;
+  z-index: 2;
+  position: relative;
+}
+
+/* Fix for any potential overlay issues */
+.evaluation-card-3d::before {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .evaluation-container-3d {
+    padding: 10px;
+  }
+  
+  .teacher-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .teacher-info {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .teacher-info .anticon {
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+  
+  .evaluation-form-3d .ant-rate {
+    font-size: 18px;
+  }
+  
+  .ant-card-3d .ant-card-body {
+    padding: 16px;
+  }
+}

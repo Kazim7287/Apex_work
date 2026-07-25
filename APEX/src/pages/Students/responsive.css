@@ -1,0 +1,62 @@
+/* responsive.css */
+
+/* For screens smaller than 768px (mobile devices) */
+@media (max-width: 767px) {
+    .profile-container {
+      padding: 12px;
+    }
+    
+    .ant-card {
+      margin-bottom: 16px;
+    }
+    
+    .ant-descriptions-item-label,
+    .ant-descriptions-item-content {
+      padding: 8px 12px !important;
+    }
+    
+    .ant-avatar {
+      width: 96px !important;
+      height: 96px !important;
+      line-height: 96px !important;
+      font-size: 48px !important;
+    }
+  }
+  
+  /* For screens between 768px and 992px (tablets) */
+  @media (min-width: 768px) and (max-width: 991px) {
+    .profile-container {
+      padding: 16px;
+    }
+    
+    .ant-avatar {
+      width: 112px !important;
+      height: 112px !important;
+      line-height: 112px !important;
+      font-size: 56px !important;
+    }
+  }
+  
+  /* For screens larger than 992px (desktops) */
+  @media (min-width: 992px) {
+    .profile-container {
+      padding: 24px;
+    }
+  }
+  
+  /* Sidebar responsive behavior */
+  .ant-layout-sider-zero-width-trigger {
+    top: 12px !important;
+    z-index: 1000;
+  }
+  
+  /* Layout adjustments for mobile */
+  @media (max-width: 991px) {
+    .ant-layout-header {
+      padding: 0 12px !important;
+    }
+    
+    .ant-layout-content {
+      margin: 12px 8px 0 !important;
+    }
+  }
