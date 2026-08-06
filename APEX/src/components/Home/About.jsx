@@ -2,258 +2,365 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { 
-  Layout,
-  Typography,
   Row,
-  Alert,
   Col,
-  Image,
-  Card,
-  Divider,
-  List,
-  Avatar,
-  Space,
+  Tag,
   Button,
   Modal,
-  message,
-  Spin
+  Spin,
+  Typography,
+  Card
 } from 'antd';
 import { 
-  TeamOutlined,
-  BookOutlined,
-  TrophyOutlined,
-  EnvironmentOutlined,
-  ClockCircleOutlined,
   PictureOutlined,
   SyncOutlined,
   UserOutlined,
   MailOutlined,
-  CodeOutlined,
-  LaptopOutlined,
-  FacebookOutlined,
-  InstagramOutlined,
-  TwitterOutlined,
-  PhoneOutlined,
-  EnvironmentFilled
+  CloseOutlined,
+  RightOutlined,
+  CrownOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+import principalImage from '/src/assets/clg4.png';
+import './About.css';
 
-// import drAliAbbasImage from '/Users/farooqahmad/Desktop/gitDemo/Projectonly/managment_sytem_frontend/src/assets/Abs.jpg';
-// import developerImage from '/Users/farooqahmad/Desktop/gitDemo/Projectonly/managment_sytem_frontend/src/assets/mypic.jpeg';
-// import advisorImage from '/Users/farooqahmad/Desktop/gitDemo/Projectonly/managment_sytem_frontend/src/assets/file.jpg';
-import principalImage from '/src/assets/clg.png';
+const { Paragraph } = Typography;
 
-// Styled components
-const AboutCard = styled(Card)`
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  height: 100%;
-  
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  }
-`;
-
-const PrincipalImageContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-`;
-
-const PrincipalImage = styled(Image)`
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+// ==================== STYLED COMPONENTS ====================
+const AboutWrapper = styled.div`
   width: 100%;
-  height: 400px;
-  object-fit: cover;
-  flex: 1;
+  font-family: 'Plus Jakarta Sans', sans-serif;
 `;
 
-const SectionThumbnail = styled(Image)`
-  border-radius: 8px;
-  height: 200px;
-  object-fit: cover;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  
-  &:hover {
-    transform: scale(1.03);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+const SectionHeaderWrapper = styled.div`
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 50px;
+`;
+
+const SectionBadge = styled(Tag)`
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid #d4af37;
+  color: #b8860b;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+`;
+
+const SectionTitle = styled.h2`
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  color: #0b1b3d;
+  font-weight: 700;
+  margin: 0 0 12px;
+`;
+
+const SectionSubtitle = styled.p`
+  color: #64748b;
+  font-size: 1rem;
+  line-height: 1.6;
+`;
+
+// Hero / Heritage Card
+const HeroCard = styled.div`
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 48px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px rgba(11, 27, 61, 0.05);
+
+  @media (max-width: 768px) {
+    padding: 24px;
   }
 `;
 
-const SectionCard = styled(Card)`
-  border-radius: 8px;
-  border: none;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    transform: translateY(-5px);
-  }
-  
-  .ant-card-body {
-    padding: 16px 0;
-  }
+const HighlightText = styled.span`
+  color: #d4af37;
+  font-family: 'Cinzel', serif;
 `;
 
-const FullScreenModal = styled(Modal)`
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100% !important;
-  height: 100vh;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  
-  .ant-modal-content {
-    height: 100%;
+const StatBox = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+
+  .stat-item {
     display: flex;
     flex-direction: column;
   }
-  
-  .ant-modal-body {
-    flex: 1;
-    padding: 0;
-    overflow: hidden;
+
+  .stat-number {
+    font-family: 'Cinzel', serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0b1b3d;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .stat-divider {
+    width: 1px;
+    height: 40px;
+    background: #e2e8f0;
   }
 `;
 
-const ModalContent = styled.div`
+// ==================== PROMINENT PRINCIPAL CARD ====================
+const LeadershipCard = styled.div`
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 16px 36px rgba(11, 27, 61, 0.12);
+  border: 2px solid #d4af37;
   display: flex;
   flex-direction: column;
-  height: 100%;
 `;
 
-const ModalHeader = styled.div`
-  padding: 24px;
-  border-bottom: 1px solid #f0f0f0;
+const LeadershipImageContainer = styled.div`
+  width: 100%;
+  height: 420px;
+  position: relative;
+  background: #0b1b3d;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 8%; /* Shifts the image UP so face is clear */
+    transition: transform 0.5s ease;
+  }
+
+  &:hover img {
+    transform: scale(1.03);
+  }
 `;
 
-const ModalImageContainer = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
+const PrincipalBadgeTag = styled.div`
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: rgba(11, 27, 61, 0.88);
+  border: 1px solid #d4af37;
+  color: #fef08a;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 6px;
 `;
 
-const ModalImage = styled(Image)`
-  max-width: 100%;
-  max-height: none;
-  object-fit: contain;
-  border-radius: 8px;
+const LeadershipDetails = styled.div`
+  padding: 24px;
+  background: #0b1b3d;
+  color: #ffffff;
+`;
+
+const PrincipalName = styled.h3`
+  font-family: 'Cinzel', serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 4px;
+`;
+
+const PrincipalTitle = styled.div`
+  color: #d4af37;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+`;
+
+const QuoteBox = styled.blockquote`
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: #cbd5e1;
+  border-left: 3px solid #d4af37;
+  padding-left: 12px;
+  line-height: 1.5;
+`;
+
+const ContactBadge = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+  .icon {
+    color: #d4af37;
+  }
+`;
+
+// Faculty Cards
+const FacultyCard = styled(Card)`
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.35s ease;
+  height: 100%;
+
+  &:hover {
+    transform: translateY(-6px);
+    border-color: #d4af37;
+    box-shadow: 0 16px 32px rgba(11, 27, 61, 0.08);
+  }
+
+  .ant-card-body {
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+`;
+
+const FacultyAvatarWrapper = styled.div`
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  padding: 4px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  margin-bottom: 16px;
+
+  img, .avatar-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #0b1b3d;
+    color: #d4af37;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+`;
+
+const FacultyName = styled.h3`
+  font-family: 'Cinzel', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0b1b3d;
+  margin: 0 0 4px;
+`;
+
+const FacultyDesignation = styled(Tag)`
+  background: #f1f5f9;
+  color: #0b1b3d;
+  border: none;
+  font-weight: 600;
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+`;
+
+const FacultyQualification = styled.span`
+  color: #b8860b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+`;
+
+// Blog Cards
+const BlogCard = styled(Card)`
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.35s ease;
+  height: 100%;
+
+  &:hover {
+    transform: translateY(-6px);
+    border-color: #d4af37;
+    box-shadow: 0 16px 32px rgba(11, 27, 61, 0.08);
+
+    .blog-img-zoom {
+      transform: scale(1.06);
+    }
+  }
+
+  .ant-card-body {
+    padding: 20px;
+  }
+`;
+
+const BlogImageContainer = styled.div`
+  width: 100%;
+  height: 210px;
+  position: relative;
+  overflow: hidden;
+  background: #0b1b3d;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+  }
+
+  .count-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(11, 27, 61, 0.85);
+    color: #fef08a;
+    border: 1px solid #d4af37;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+  }
+`;
+
+const BlogTitle = styled.h3`
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0b1b3d;
+  margin: 0 0 10px;
+  line-height: 1.35;
+`;
+
+const BlogExcerpt = styled.p`
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   margin-bottom: 16px;
 `;
 
-const Footer = styled.div`
-  text-align: center;
-  padding: 48px 0;
-  background-color: #000;
-  color: white;
-  margin-top: 48px;
-`;
-
-const FooterContent = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-`;
-
-const FooterSection = styled.div`
-  margin-bottom: 24px;
-`;
-
-const SocialIcons = styled.div`
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin: 20px 0;
-  font-size: 24px;
-`;
-
-const ContactInfo = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 20px 0;
-`;
-
-const ContactItem = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-`;
-
-const TeamRow = styled(Row)`
-  margin-top: 32px;
-`;
-
-const TeamMemberCard = styled(Card)`
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  height: 100%;
-  
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-  }
-`;
-
-const TeamMemberImage = styled(Image)`
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin: 0 auto 16px;
-  display: block;
-`;
-
-const TeamMemberInfo = styled.div`
-  text-align: center;
-`;
-
-const TeamMemberContact = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 8px;
-  color: #1890ff;
-`;
-
-const PrincipalInfoCard = styled(Card)`
-  margin-top: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-`;
-
-const { Content } = Layout;
-const { Title, Paragraph, Text } = Typography;
-
-const aboutData = [
-  {
-    title: 'Our Mission',
-    content: 'To provide quality education that transforms students into responsible global citizens.',
-    icon: <TrophyOutlined />
-  },
-  {
-    title: 'Our Vision',
-    content: 'To be a premier institution recognized for academic excellence and innovation.',
-    icon: <BookOutlined />
-  },
-  {
-    title: 'Our Values',
-    content: 'Integrity, Excellence, Diversity, and Community Engagement.',
-    icon: <TeamOutlined />
-  }
-];
-
+// ==================== MAIN COMPONENT ====================
 const About = () => {
   const [visible, setVisible] = useState(false);
   const [currentSection, setCurrentSection] = useState(null);
@@ -271,9 +378,7 @@ const About = () => {
       try {
         setFacultyLoading(true);
         const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/faculty.php');
-        if (!response.ok) {
-          throw new Error('Failed to fetch faculty data');
-        }
+        if (!response.ok) throw new Error('Failed to fetch faculty data');
         const data = await response.json();
         if (data.success) {
           setFaculty(data.data);
@@ -282,7 +387,6 @@ const About = () => {
         }
       } catch (err) {
         setFacultyError(err.message);
-        message.error('Failed to load faculty data: ' + err.message);
       } finally {
         setFacultyLoading(false);
       }
@@ -296,25 +400,17 @@ const About = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch about sections
         const sectionsResponse = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_about_sections.php');
-        if (!sectionsResponse.ok) {
-          throw new Error('Failed to fetch about sections');
-        }
+        if (!sectionsResponse.ok) throw new Error('Failed to fetch about sections');
         const sectionsData = await sectionsResponse.json();
 
-        // Fetch images for each section
         const sectionsWithImagesData = await Promise.all(
           sectionsData.data.map(async (section) => {
             try {
               const imagesResponse = await fetch(
                 `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/imagesread.php?section_id=${section.id}`
               );
-              if (!imagesResponse.ok) {
-                console.error(`Failed to fetch images for section ${section.id}`);
-                return { ...section, images: [] };
-              }
+              if (!imagesResponse.ok) return { ...section, images: [] };
               const imagesData = await imagesResponse.json();
               return { 
                 ...section, 
@@ -322,7 +418,6 @@ const About = () => {
                 content: section.content || section.description || 'No description available'
               };
             } catch (err) {
-              console.error(`Error fetching images for section ${section.id}:`, err);
               return { 
                 ...section, 
                 images: [],
@@ -337,7 +432,6 @@ const About = () => {
       } catch (err) {
         setError(err.message);
         setLoading(false);
-        message.error('Failed to load data: ' + err.message);
       }
     };
 
@@ -351,270 +445,239 @@ const About = () => {
 
   if (loading || facultyLoading) {
     return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <Spin size="large" />
-      </Layout>
-    );
-  }
-
-  if (error || facultyError) {
-    return (
-      <Layout style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <Alert message="Error" description={error || facultyError} type="error" showIcon />
-      </Layout>
+      <div style={{ padding: '80px 0', textAlign: 'center' }}>
+        <Spin size="large" tip="Loading Campus Information..." />
+      </div>
     );
   }
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#fff' }}>
-      <Content style={{ 
-        padding: '0 50px',
-        maxWidth: '1200px',
-        width: '100%',
-        margin: '0 auto'
-      }}>
-        {/* Hero Section - Now perfectly aligned */}
-        <Row 
-          gutter={[48, 48]} 
-          align="stretch"  
-          style={{ margin: '48px 0' }}
-        >
-          <Col xs={24} md={12}>
-            <AboutCard bordered={false}>
-              <Title level={2} style={{ color: '#1890ff' }}>
-                About Apex College Harichand
-              </Title>
-              <Paragraph style={{ fontSize: '16px', lineHeight: '1.8' }}>
-                Apex College Harichand is a prestigious institution in Pakistan, established in 2021. It is one of the  higher education institutions in the country. The college,  played a significant role  in adjoining tribal areas. It is offering a wide range of  programs.
+    <AboutWrapper>
+      {/* ========== HERO / ABOUT HERITAGE SECTION ========== */}
+      <div style={{ marginBottom: 80 }}>
+        <HeroCard>
+          <Row gutter={[48, 48]} align="middle">
+            <Col xs={24} lg={14}>
+              <SectionBadge>ABOUT OUR INSTITUTION</SectionBadge>
+              <h1 style={{ 
+                fontFamily: 'Cinzel, serif', 
+                fontSize: 'clamp(2rem, 3.5vw, 3rem)', 
+                color: '#0b1b3d', 
+                fontWeight: 700, 
+                lineHeight: 1.2,
+                marginBottom: 20
+              }}>
+                About Apex College <HighlightText>Harichand</HighlightText>
+              </h1>
+              <Paragraph style={{ fontSize: '1.05rem', lineHeight: 1.8, color: '#475569', marginBottom: 16 }}>
+                Apex College Harichand is a premier higher secondary education institution in Pakistan, established in 2021. 
+                Founded with a mission to nurture academic brilliance and moral leadership, it serves as a transformative hub 
+                for students across the region.
               </Paragraph>
-              <Paragraph style={{ fontSize: '16px', lineHeight: '1.8' }}>
-                The college is renowned for its academic excellence, distinguished faculty, and vibrant student life. It has produced numerous notable alumni who have contributed to various fields, including politics, education, and science.
+              <Paragraph style={{ fontSize: '1.05rem', lineHeight: 1.8, color: '#475569' }}>
+                Renowned for its rigorous academic curriculum, distinguished faculty, and modern laboratory infrastructure, 
+                Apex College prepares students to excel in competitive board examinations and top university admissions.
               </Paragraph>
-              <Divider />
-              <Space size="large">
-                <Text strong><ClockCircleOutlined /> Established: 2021</Text>
-                <Text strong><EnvironmentOutlined /> Location: Near Harichand Bazar Peshawar Road</Text>
-              </Space>
-            </AboutCard>
-          </Col>
-          
-          <Col xs={24} md={12}>
-            <PrincipalImageContainer>
-              <PrincipalImage
-                src={principalImage}
-                preview={false}
-                alt="MD Apex College Harichand"
-              />
-              <PrincipalInfoCard>
-                <Title level={4}>MD Message</Title>
-                <Paragraph style={{ fontSize: '16px', lineHeight: '1.8' }}>
-                  "Apex College Harichand has a rich legacy of academic excellence and character building. As the Director, I am committed to upholding our tradition of providing quality education while fostering innovation and research. Our institution stands as a beacon of knowledge, shaping future leaders who will contribute positively to society."
-                  <br /><br />
-                  <Text strong>- Eng. Naveed Ahmad , MD</Text>
-                  <br />
-                  <TeamMemberContact>
-                    <MailOutlined style={{ marginRight: 8 }} />
-                    <Text>Email: principalicp@icp.edu.pk</Text>
-                  </TeamMemberContact>
-                </Paragraph>
-              </PrincipalInfoCard>
-            </PrincipalImageContainer>
-          </Col>
-        </Row>
+              
+              <StatBox>
+                <div className="stat-item">
+                  <span className="stat-number">2021</span>
+                  <span className="stat-label">Established</span>
+                </div>
+                <div className="stat-divider" />
+                <div className="stat-item">
+                  <span className="stat-number">10+</span>
+                  <span className="stat-label">Academic Programs</span>
+                </div>
+                <div className="stat-divider" />
+                <div className="stat-item">
+                  <span className="stat-number">1,000+</span>
+                  <span className="stat-label">Graduated Alumni</span>
+                </div>
+              </StatBox>
+            </Col>
 
-        {/* Faculty Section */}
-        <Row style={{ marginBottom: '48px' }}>
-          <Col span={24}>
-            <AboutCard>
-              <Title level={3} style={{ textAlign: 'center', marginBottom: '24px' }}>
-                Meet Our Faculty
-                <Button 
-                  type="text" 
-                  icon={<SyncOutlined />} 
-                  onClick={() => setRefreshKey(prev => prev + 1)}
-                  style={{ marginLeft: 16 }}
-                />
-              </Title>
-              <List
-                itemLayout="horizontal"
-                dataSource={faculty}
-                renderItem={(teacher) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      avatar={
-                        teacher.image ? (
-                          <Avatar 
-                            size="large" 
-                            src={<img src={teacher.image} alt={teacher.name} style={{ width: '100%' }} />}
-                          />
-                        ) : (
-                          <Avatar size="large" icon={<UserOutlined />} />
-                        )
-                      }
-                      title={<Text strong>{teacher.name}</Text>}
-                      description={
-                        <>
-                          <Text>{teacher.designation}</Text><br />
-                          <Text type="secondary">{teacher.qualification}</Text>
-                          {teacher.description && (
-                            <>
-                              <br />
-                              <Text type="secondary">{teacher.description}</Text>
-                            </>
-                          )}
-                        </>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            </AboutCard>
-          </Col>
-        </Row>
-
-        {/* Sections with Thumbnails */}
-        <Row gutter={[24, 24]} style={{ marginBottom: '48px' }}>
-          {sectionsWithImages.map((section) => (
-            <Col xs={24} sm={12} md={8} key={section.id}>
-              <SectionCard 
-                hoverable
-                onClick={() => showSectionModal(section)}
-              >
-                {section.images?.length > 0 ? (
-                  <SectionThumbnail
-                    src={`https://white-trout-460511.hostingersite.com/APEX/${section.images[0].image_path}`}
-                    alt={section.title}
-                    preview={false}
+            {/* ========== UN-OBSCURED PRINCIPAL PICTURE CARD ========== */}
+            <Col xs={24} lg={10}>
+              <LeadershipCard>
+                <LeadershipImageContainer>
+                  <PrincipalBadgeTag>
+                    <CrownOutlined /> Leadership
+                  </PrincipalBadgeTag>
+                  <img 
+                    src={principalImage} 
+                    alt="Eng. Naveed Ahmad, MD Apex College Harichand" 
                   />
-                ) : (
-                  <div style={{
-                    height: '200px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#f0f0f0',
-                    borderRadius: '8px'
-                  }}>
-                    <PictureOutlined style={{ fontSize: '48px', color: '#999' }} />
-                  </div>
+                </LeadershipImageContainer>
+                
+                <LeadershipDetails>
+                  <PrincipalName>Eng. Naveed Ahmad</PrincipalName>
+                  <PrincipalTitle>Managing Director (MD)</PrincipalTitle>
+                  <QuoteBox>
+                    "Shaping future academic leaders through quality education, discipline, and moral integrity."
+                  </QuoteBox>
+                  <ContactBadge>
+                    <MailOutlined className="icon" />
+                    <span>principal@apexcollege.edu.pk</span>
+                  </ContactBadge>
+                </LeadershipDetails>
+              </LeadershipCard>
+            </Col>
+          </Row>
+        </HeroCard>
+      </div>
+
+      {/* ========== FACULTY SECTION ========== */}
+      <div style={{ marginBottom: 80 }}>
+        <SectionHeaderWrapper>
+          <SectionBadge>DISTINGUISHED EDUCATORS</SectionBadge>
+          <SectionTitle>Meet Our Faculty</SectionTitle>
+          <SectionSubtitle>
+            Dedicated academic experts committed to excellence in teaching, research, and student mentorship.
+          </SectionSubtitle>
+        </SectionHeaderWrapper>
+
+        <Row gutter={[24, 24]}>
+          {faculty.map((teacher, index) => (
+            <Col xs={24} sm={12} lg={6} key={index}>
+              <FacultyCard>
+                <FacultyAvatarWrapper>
+                  {teacher.image ? (
+                    <img src={teacher.image} alt={teacher.name} />
+                  ) : (
+                    <div className="avatar-fallback"><UserOutlined /></div>
+                  )}
+                </FacultyAvatarWrapper>
+                <FacultyName>{teacher.name}</FacultyName>
+                <FacultyDesignation>{teacher.designation || 'Lecturer'}</FacultyDesignation>
+                <FacultyQualification>{teacher.qualification || 'M.Sc / M.Phil'}</FacultyQualification>
+                {teacher.description && (
+                  <p style={{ color: '#64748b', fontSize: '0.88rem', lineHeight: 1.5, margin: 0 }}>
+                    {teacher.description}
+                  </p>
                 )}
-                <Card.Meta
-                  title={section.title}
-                  description={
-                    <Text ellipsis={{ tooltip: section.content }}>
-                      {section.content}
-                    </Text>
-                  }
-                  style={{ padding: '16px' }}
-                />
-                {section.images?.length > 0 && (
-                  <div style={{ padding: '0 16px 16px', color: '#1890ff' }}>
-                    <Text type="secondary">
-                      {section.images.length} {section.images.length === 1 ? 'photo' : 'photos'}
-                    </Text>
-                  </div>
-                )}
-              </SectionCard>
+              </FacultyCard>
             </Col>
           ))}
         </Row>
 
-        {/* Section Images Modal */}
-        <FullScreenModal
-          visible={visible}
-          onCancel={() => setVisible(false)}
-          footer={null}
-          closable={true}
-          bodyStyle={{ 
-            padding: 0,
-            height: '100%'
-          }}
-        >
-          {currentSection && (
-            <ModalContent>
-              <ModalHeader>
-                <Title level={3}>{currentSection.title}</Title>
-                <Paragraph>{currentSection.content}</Paragraph>
-              </ModalHeader>
-              
-              <ModalImageContainer>
-                {currentSection.images?.length > 0 ? (
-                  currentSection.images.map((image, index) => (
-                    <React.Fragment key={index}>
-                      <ModalImage
+        <div style={{ textAlign: 'center', marginTop: 32 }}>
+          <Button 
+            type="outlined" 
+            icon={<SyncOutlined />} 
+            style={{ borderColor: '#0b1b3d', color: '#0b1b3d', borderRadius: 6 }}
+            onClick={() => setRefreshKey(prev => prev + 1)}
+          >
+            Refresh Faculty List
+          </Button>
+        </div>
+      </div>
+
+      {/* ========== BLOG / CAMPUS LIFE SECTION ========== */}
+      <div id="blog-section">
+        <SectionHeaderWrapper>
+          <SectionBadge>CAMPUS UPDATES & BLOG</SectionBadge>
+          <SectionTitle>Latest News & Highlights</SectionTitle>
+          <SectionSubtitle>
+            Explore recent events, academic achievements, and campus activities at Apex College.
+          </SectionSubtitle>
+        </SectionHeaderWrapper>
+
+        <Row gutter={[24, 24]}>
+          {sectionsWithImages.map((section) => (
+            <Col xs={24} sm={12} lg={8} key={section.id}>
+              <BlogCard onClick={() => showSectionModal(section)}>
+                <BlogImageContainer>
+                  {section.images?.length > 0 ? (
+                    <img 
+                      className="blog-img-zoom"
+                      src={`https://white-trout-460511.hostingersite.com/APEX/${section.images[0].image_path}`}
+                      alt={section.title}
+                    />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4af37', fontSize: 36 }}>
+                      <PictureOutlined />
+                    </div>
+                  )}
+                  {section.images?.length > 0 && (
+                    <span className="count-badge">
+                      <PictureOutlined /> {section.images.length} Photos
+                    </span>
+                  )}
+                </BlogImageContainer>
+
+                <BlogTitle>{section.title}</BlogTitle>
+                <BlogExcerpt>{section.content}</BlogExcerpt>
+                
+                <div style={{ display: 'flex', alignItems: 'center', color: '#b8860b', fontWeight: 700, fontSize: '0.9rem' }}>
+                  <span>Read Full Article</span>
+                  <RightOutlined style={{ marginLeft: 6, fontSize: 12 }} />
+                </div>
+              </BlogCard>
+            </Col>
+          ))}
+        </Row>
+      </div>
+
+      {/* ========== IMAGE & DETAILS MODAL ========== */}
+      <Modal
+        open={visible}
+        onCancel={() => setVisible(false)}
+        footer={null}
+        closable={true}
+        closeIcon={<CloseOutlined style={{ color: '#fff', fontSize: 18 }} />}
+        width={850}
+        centered
+        styles={{
+          header: { background: '#0b1b3d', padding: '16px 24px', borderBottom: '2px solid #d4af37' },
+          body: { padding: '24px', maxHeight: '80vh', overflowY: 'auto' }
+        }}
+        destroyOnClose
+      >
+        {currentSection && (
+          <div>
+            <div style={{ marginBottom: 24, borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
+              <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: '1.6rem', color: '#0b1b3d', margin: '0 0 8px', fontWeight: 700 }}>
+                {currentSection.title}
+              </h2>
+              <p style={{ fontSize: '1rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                {currentSection.content}
+              </p>
+            </div>
+
+            {currentSection.images?.length > 0 ? (
+              <Row gutter={[16, 16]}>
+                {currentSection.images.map((image, index) => (
+                  <Col span={24} key={index}>
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, border: '1px solid #e2e8f0' }}>
+                      <img 
                         src={`https://white-trout-460511.hostingersite.com/APEX/${image.image_path}`}
                         alt={image.title || currentSection.title}
-                        preview={false}
+                        style={{ width: '100%', height: 'auto', borderRadius: 6, display: 'block' }}
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/800x500/0b1b3d/ffffff?text=Image+Unavailable';
+                        }}
                       />
                       {(image.title || image.description) && (
-                        <div style={{ 
-                          width: '100%', 
-                          maxWidth: '800px',
-                          padding: '0 16px 16px',
-                          textAlign: 'center'
-                        }}>
-                          {image.title && <Title level={5}>{image.title}</Title>}
-                          {image.description && <Paragraph>{image.description}</Paragraph>}
+                        <div style={{ marginTop: 12, padding: '8px 4px' }}>
+                          {image.title && <h4 style={{ color: '#0b1b3d', margin: '0 0 4px', fontWeight: 700 }}>{image.title}</h4>}
+                          {image.description && <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>{image.description}</p>}
                         </div>
                       )}
-                    </React.Fragment>
-                  ))
-                ) : (
-                    <div style={{ 
-                    flex: 1,
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    padding: '24px'
-                  }}>
-                    <Text type="secondary">No images available for this section</Text>
-                  </div>
-                )}
-              </ModalImageContainer>
-            </ModalContent>
-          )}
-        </FullScreenModal>
-      </Content>
-
-      {/* Footer with Contact Information */}
-      <Footer>
-        <FooterContent>
-          <FooterSection>
-            <Title level={3} style={{ color: 'white' }}>Apex College Harichand</Title>
-            <Paragraph style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-              Providing quality education since 2021
-            </Paragraph>
-          </FooterSection>
-
-          <SocialIcons>
-            <a href="#" style={{ color: 'white' }}><FacebookOutlined /></a>
-            <a href="#" style={{ color: 'white' }}><InstagramOutlined /></a>
-            <a href="#" style={{ color: 'white' }}><TwitterOutlined /></a>
-          </SocialIcons>
-
-          <ContactInfo>
-            <ContactItem>
-              <PhoneOutlined style={{ color: 'white' }} />
-              <span style={{ color: 'white' }}>+92 123 4567890</span>
-            </ContactItem>
-            <ContactItem>
-              <MailOutlined style={{ color: 'white' }} />
-              {/* <span style={{ color: 'white' }}>info@apexcollege.edu.pk</span> */}
-            </ContactItem>
-            <ContactItem>
-              <EnvironmentFilled style={{ color: 'white' }} />
-              <span style={{ color: 'white' }}>Near Harichand Bazar Peshawar Road, Pakistan</span>
-            </ContactItem>
-          </ContactInfo>
-
-          <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.3)' }} />
-
-          <Paragraph style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-            © {new Date().getFullYear()} Apex College Harichand. All rights reserved.
-          </Paragraph>
-        </FooterContent>
-      </Footer>
-    </Layout>
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8' }}>
+                <PictureOutlined style={{ fontSize: 40, marginBottom: 12 }} />
+                <p>No images available for this section.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+    </AboutWrapper>
   );
 };
 

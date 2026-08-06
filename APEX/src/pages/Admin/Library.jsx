@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 import { 
   Table, Card, Typography, Button, Space, Tag, DatePicker, 
   Select, Input, message, Modal, Form, InputNumber, Row, Col, Spin, Empty,
-  Grid, Dropdown, Menu
+  Grid, Dropdown, Menu, Popconfirm
 } from "antd";
 import moment from "moment";
 import axios from "axios";
 import { 
   SearchOutlined, EditOutlined, DeleteOutlined, 
   DollarOutlined, PlusOutlined, FilterOutlined,
-  MoreOutlined, PrinterOutlined
+  MoreOutlined, PrinterOutlined, DeleteFilled
 } from '@ant-design/icons';
 import { useNavigate } from "react-router-dom";
 import PaymentModal from "./PaymentModal";
@@ -52,6 +52,10 @@ const DuesListing = () => {
   const [editingStatus, setEditingStatus] = useState({});
   const [amountValue, setAmountValue] = useState('');
 
+  // State for bulk selection
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [isBulkDeleteModalVisible, setIsBulkDeleteModalVisible] = useState(false);
+
   // Payment modal state
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedDue, setSelectedDue] = useState(null);
@@ -71,8 +75,22 @@ const DuesListing = () => {
     "Other"
   ];
 
-  // Configure axios to include credentials
-  axios.defaults.withCredentials = true;
+  // Create axios instances
+  const publicApi = axios.create({
+    baseURL: 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/',
+    withCredentials: false,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+
+  const authApi = axios.create({
+    baseURL: 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/',
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
 
   // Fetch initial data
   useEffect(() => {
@@ -97,10 +115,7 @@ const DuesListing = () => {
         params.dateTo = filters.dateRange[1].format('YYYY-MM-DD');
       }
 
-      const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_deus.php', { 
-        params,
-        withCredentials: true
-      });
+      const response = await publicApi.get('get_deus.php', { params });
       
       // Transform the data to match expected format
       const formattedDues = response.data.map(due => ({
@@ -119,6 +134,9 @@ const DuesListing = () => {
         ...pagination,
         total: formattedDues.length
       });
+      
+      // Clear selection when data changes
+      setSelectedRowKeys([]);
     } catch (error) {
       if (error.response?.status === 401) {
         navigate('/admin-signin');
@@ -134,9 +152,7 @@ const DuesListing = () => {
   const fetchSections = async () => {
     setSectionsLoading(true);
     try {
-      const response = await axios.get("https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_read.php", {
-        withCredentials: true
-      });
+      const response = await publicApi.get("Sec_Read.php");
       
       if (response.status === 401) {
         navigate('/admin-signin');
@@ -165,15 +181,9 @@ const DuesListing = () => {
     
     setStudentsLoading(true);
     try {
-      const response = await axios.post(
-        "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/secAdStudents.php",
-        { section_id: sectionId },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          withCredentials: true
-        }
+      const response = await publicApi.post(
+        "secAdStudents.php",
+        { section_id: sectionId }
       );
 
       if (response.status === 401) {
@@ -204,7 +214,6 @@ const DuesListing = () => {
   const calculateTotals = () => {
     const totalAmount = dues.reduce((sum, due) => sum + (due.amount || 0), 0);
     
-    // Normalize status to handle case differences
     const pendingAmount = dues
       .filter(due => due.status && due.status.toLowerCase() === 'pending')
       .reduce((sum, due) => sum + (due.amount || 0), 0);
@@ -221,6 +230,39 @@ const DuesListing = () => {
       paidCount: dues.filter(due => due.status && due.status.toLowerCase() === 'paid').length,
       cancelledCount: dues.filter(due => due.status && due.status.toLowerCase() === 'cancelled').length
     };
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Please select at least one due to delete');
+      return;
+    }
+    setIsBulkDeleteModalVisible(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      setLoading(true);
+      setIsBulkDeleteModalVisible(false);
+      
+      const response = await authApi.delete('delete_deus.php', {
+        data: { ids: selectedRowKeys }
+      });
+
+      if (response.data.success) {
+        message.success(response.data.message);
+        setSelectedRowKeys([]);
+        fetchDues();
+      } else {
+        throw new Error(response.data.error || 'Bulk delete failed');
+      }
+    } catch (error) {
+      message.error(error.response?.data?.error || error.message || 'Error performing bulk delete');
+      console.error('Bulk delete error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Print functionality
@@ -333,11 +375,9 @@ const DuesListing = () => {
 
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await axios.put('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/update_deus.php', {
+      await authApi.put('update_deus.php', {
         id,
         status: newStatus
-      }, {
-        withCredentials: true
       });
       message.success('Status updated successfully');
       setEditingStatus(prev => ({ ...prev, [id]: false }));
@@ -361,12 +401,13 @@ const DuesListing = () => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          await axios.delete('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/delete_deus.php', {
-            data: { id },
-            withCredentials: true
+          const response = await authApi.delete('delete_deus.php', {
+            data: { id }
           });
-          message.success('Due deleted successfully');
-          fetchDues();
+          if (response.data.success) {
+            message.success(response.data.message);
+            fetchDues();
+          }
         } catch (error) {
           if (error.response?.status === 401) {
             navigate('/admin-signin');
@@ -386,7 +427,7 @@ const DuesListing = () => {
   };
 
   const handlePaymentSuccess = () => {
-    fetchDues(); // Refresh the dues list
+    fetchDues();
     message.success('Payment processed successfully!');
   };
 
@@ -420,16 +461,7 @@ const DuesListing = () => {
         description: values.description || null
       };
 
-      const response = await axios.post(
-        "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/inser_deus.php", 
-        formattedValues,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          withCredentials: true
-        }
-      );
+      const response = await authApi.post("inser_deus.php", formattedValues);
 
       if (response.status === 401) {
         navigate('/admin-signin');
@@ -475,6 +507,19 @@ const DuesListing = () => {
   const parseAmount = (value) => {
     if (!value) return '';
     return value.replace(/Rs\s?|(,*)/g, '');
+  };
+
+  // Row selection configuration
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (selectedKeys) => {
+      setSelectedRowKeys(selectedKeys);
+    },
+    selections: [
+      Table.SELECTION_ALL,
+      Table.SELECTION_INVERT,
+      Table.SELECTION_NONE,
+    ],
   };
 
   // Table columns
@@ -540,7 +585,6 @@ const DuesListing = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status, record) => {
-        // Normalize status for display
         const normalizedStatus = status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : 'Pending';
         const statusColor = statusColors[normalizedStatus] || 'default';
         
@@ -599,13 +643,6 @@ const DuesListing = () => {
                     Change Status
                   </Menu.Item>
                   <Menu.Item 
-                    key="edit" 
-                    icon={<EditOutlined />}
-                    onClick={() => {/* Implement edit functionality */}}
-                  >
-                    Edit
-                  </Menu.Item>
-                  <Menu.Item 
                     key="delete" 
                     icon={<DeleteOutlined />}
                     danger
@@ -642,11 +679,6 @@ const DuesListing = () => {
               >
                 Status
               </Button>
-              <Button 
-                icon={<EditOutlined />} 
-                size="small"
-                onClick={() => {/* Implement edit functionality */}}
-              />
               <Button 
                 danger 
                 icon={<DeleteOutlined />} 
@@ -729,7 +761,18 @@ const DuesListing = () => {
         }
         bordered={false}
         extra={
-          <Space>
+          <Space wrap>
+            {selectedRowKeys.length > 0 && (
+              <Button 
+                danger
+                icon={<DeleteFilled />}
+                onClick={handleBulkDelete}
+                loading={loading}
+                size={isSmallMobile ? 'small' : 'middle'}
+              >
+                Delete Selected ({selectedRowKeys.length})
+              </Button>
+            )}
             <Button 
               icon={<PrinterOutlined />}
               onClick={handlePrint}
@@ -829,10 +872,20 @@ const DuesListing = () => {
           <FilterSection />
         )}
         
+        {/* Selected count indicator */}
+        {selectedRowKeys.length > 0 && (
+          <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
+            <Text>
+              Selected <strong>{selectedRowKeys.length}</strong> due(s)
+            </Text>
+          </div>
+        )}
+        
         <Table
           columns={columns}
           dataSource={dues}
           rowKey="id"
+          rowSelection={rowSelection}
           loading={loading}
           pagination={{
             ...pagination,
@@ -848,6 +901,35 @@ const DuesListing = () => {
         />
       </Card>
 
+      {/* Bulk Delete Confirmation Modal */}
+      <Modal
+        title="Confirm Bulk Delete"
+        open={isBulkDeleteModalVisible}
+        onOk={confirmBulkDelete}
+        onCancel={() => setIsBulkDeleteModalVisible(false)}
+        okText="Yes, Delete All"
+        cancelText="Cancel"
+        okButtonProps={{ danger: true, loading: loading }}
+      >
+        <p>
+          Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected due(s)?
+        </p>
+        <p style={{ color: '#ff4d4f' }}>
+          This action cannot be undone.
+        </p>
+        <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
+          {dues
+            .filter(d => selectedRowKeys.includes(d.id))
+            .map(d => (
+              <div key={d.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <Text>ID: {d.id} - {d.student_name} (Rs. {d.amount.toLocaleString()})</Text>
+              </div>
+            ))
+          }
+        </div>
+      </Modal>
+
+      {/* Issue New Dues Modal */}
       <Modal
         title={
           <Space>
@@ -1055,6 +1137,7 @@ const DuesListing = () => {
         onCancel={() => setPaymentModalVisible(false)}
         due={selectedDue}
         onPaymentSuccess={handlePaymentSuccess}
+        refreshDues={fetchDues}
       />
     </div>
   );

@@ -1,14 +1,15 @@
+// src/App.jsx
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { setSession, clearSession } from "./pages/Teachers/sessionSlice";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
+import { PermissionProvider } from "./contexts/PermissionContext";
 
 function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // Check for existing session in localStorage or just clear it
     const storedSession = localStorage.getItem("userSession");
     
     if (storedSession) {
@@ -16,6 +17,7 @@ function App() {
         const sessionData = JSON.parse(storedSession);
         dispatch(setSession(sessionData));
       } catch (error) {
+        console.error("Error parsing session data:", error);
         localStorage.removeItem("userSession");
         dispatch(clearSession());
       }
@@ -24,7 +26,11 @@ function App() {
     }
   }, [dispatch]);
 
-  return <RouterProvider router={router} />;
+  return (
+    <PermissionProvider>
+      <RouterProvider router={router} />
+    </PermissionProvider>
+  );
 }
 
 export default App;

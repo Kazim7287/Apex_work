@@ -12,7 +12,8 @@ import {
   Typography,
   Empty,
   Spin,
-  Tooltip
+  Tooltip,
+  Result
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -21,12 +22,15 @@ import {
   SearchOutlined,
   ExclamationCircleOutlined 
 } from '@ant-design/icons';
+import PermissionGuard from '../../components/PermissionGuard';
+import { usePermissions } from '../../contexts/PermissionContext';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
 const { confirm } = Modal;
 
-const BookList = () => {
+// Main Content Component
+const BookListContent = () => {
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [newBookName, setNewBookName] = useState('');
@@ -37,8 +41,22 @@ const BookList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
+  // Permissions
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canViewBooks = hasPermission('books_view') || isSuperAdmin;
+  const canManageBooks = hasPermission('books_manage') || isSuperAdmin;
+  const canDeleteBooks = hasPermission('books_delete') || isSuperAdmin;
+
   // Fetch books from the API
   const fetchBooks = async () => {
+    if (!canViewBooks) {
+      notification.error({
+        message: 'Access Denied',
+        description: 'You do not have permission to view books.',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Book_read.php', {
@@ -70,8 +88,10 @@ const BookList = () => {
   };
 
   useEffect(() => {
-    fetchBooks();
-  }, []);
+    if (canViewBooks) {
+      fetchBooks();
+    }
+  }, [canViewBooks]);
 
   // Filter books based on search query
   useEffect(() => {
@@ -87,6 +107,14 @@ const BookList = () => {
 
   // Function to add a new book via API
   const addBook = async () => {
+    if (!canManageBooks) {
+      notification.error({
+        message: 'Access Denied',
+        description: 'You do not have permission to add books.',
+      });
+      return;
+    }
+
     if (!newBookName.trim()) {
       notification.error({
         message: 'Error',
@@ -132,6 +160,14 @@ const BookList = () => {
 
   // Function to handle updating a book
   const updateBook = async () => {
+    if (!canManageBooks) {
+      notification.error({
+        message: 'Access Denied',
+        description: 'You do not have permission to update books.',
+      });
+      return;
+    }
+
     if (!updatedBookName.trim()) {
       notification.error({
         message: 'Error',
@@ -181,6 +217,14 @@ const BookList = () => {
 
   // Function to delete a book via API
   const deleteBook = async (id, name) => {
+    if (!canDeleteBooks) {
+      notification.error({
+        message: 'Access Denied',
+        description: 'You do not have permission to delete books.',
+      });
+      return;
+    }
+
     confirm({
       title: 'Are you sure you want to delete this book?',
       icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
@@ -226,6 +270,13 @@ const BookList = () => {
 
   // Show modal for editing a book
   const showEditModal = (book) => {
+    if (!canManageBooks) {
+      notification.error({
+        message: 'Access Denied',
+        description: 'You do not have permission to edit books.',
+      });
+      return;
+    }
     setEditingBook(book);
     setUpdatedBookName(book.name);
     setIsModalVisible(true);
@@ -237,6 +288,22 @@ const BookList = () => {
     setEditingBook(null);
     setUpdatedBookName('');
   };
+
+  // If user doesn't have permission to view books
+  if (!canViewBooks) {
+    return (
+      <Result
+        status="403"
+        title="403"
+        subTitle="Sorry, you do not have permission to view books."
+        extra={
+          <Button type="primary" onClick={() => window.location.href = '/admin/dashboard'}>
+            Go to Dashboard
+          </Button>
+        }
+      />
+    );
+  }
 
   // Container styles
   const containerStyle = {
@@ -264,11 +331,6 @@ const BookList = () => {
     display: 'flex',
     flexDirection: 'column',
     transition: 'box-shadow 0.3s, transform 0.3s'
-  };
-
-  const cardHoverStyle = {
-    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)',
-    transform: 'translateY(-4px)'
   };
 
   return (
@@ -319,9 +381,10 @@ const BookList = () => {
               <Input
                 value={newBookName}
                 onChange={(e) => setNewBookName(e.target.value)}
-                placeholder="Enter book name"
+                placeholder={canManageBooks ? "Enter book name" : "No permission to add books"}
                 size="large"
                 onPressEnter={addBook}
+                disabled={!canManageBooks}
               />
               <Button 
                 type="primary" 
@@ -329,6 +392,7 @@ const BookList = () => {
                 onClick={addBook}
                 size="large"
                 loading={isAdding}
+                disabled={!canManageBooks}
                 style={{ minWidth: 110 }}
               >
                 Add Book
@@ -336,6 +400,13 @@ const BookList = () => {
             </Space.Compact>
           </Col>
         </Row>
+        {!canManageBooks && (
+          <div style={{ marginTop: 8 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              🔒 You don't have permission to add or edit books
+            </Text>
+          </div>
+        )}
       </Card>
 
       {/* Book List Section */}
@@ -397,6 +468,7 @@ const BookList = () => {
                         type="default"
                         icon={<EditOutlined />}
                         onClick={() => showEditModal(book)}
+                        disabled={!canManageBooks}
                       >
                         Edit
                       </Button>
@@ -406,6 +478,7 @@ const BookList = () => {
                         danger
                         icon={<DeleteOutlined />}
                         onClick={() => deleteBook(book.id, book.name)}
+                        disabled={!canDeleteBooks}
                       >
                         Delete
                       </Button>
@@ -424,10 +497,13 @@ const BookList = () => {
               </Text>
             }
           >
-            {!searchQuery && (
+            {!searchQuery && canManageBooks && (
               <Button type="primary" onClick={addBook}>
                 Add Your First Book
               </Button>
+            )}
+            {!searchQuery && !canManageBooks && (
+              <Text type="secondary">Contact administrator to add books</Text>
             )}
           </Empty>
         )}
@@ -479,6 +555,15 @@ const BookList = () => {
         `}
       </style>
     </div>
+  );
+};
+
+// Export with Permission Guard
+const BookList = () => {
+  return (
+    <PermissionGuard requiredPermission="books_view">
+      <BookListContent />
+    </PermissionGuard>
   );
 };
 

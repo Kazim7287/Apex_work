@@ -12,7 +12,10 @@ import {
   Space,
   Grid,
   Spin,
-  Alert
+  Carousel,
+  Tag,
+  Card,
+  Drawer
 } from 'antd';
 import { 
   LoginOutlined, 
@@ -32,941 +35,959 @@ import {
   PhoneOutlined,
   MailOutlined,
   EnvironmentFilled,
-  ReloadOutlined
+  PictureOutlined,
+  MenuOutlined,
+  RightOutlined,
+  LeftOutlined,
+  ExperimentOutlined,
+  SafetyCertificateOutlined,
+  CalendarOutlined,
+  ReadOutlined
 } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
-import styled, { keyframes } from 'styled-components';
+import { useNavigate } from 'react-router-dom';
+import styled, { keyframes, createGlobalStyle } from 'styled-components';
 import logo from '../assets/images.png';
-// import backgroundImage from '../assets/img3.jpg';
-import clgImage from '../assets/clg.png'; // Import the principal college image
 
-const { Text, Title, Paragraph } = Typography;
+// Import the About and Contact components
+import About from './Home/About';
+import Contact from './Home/FeedBack';
+
+const { Title, Paragraph } = Typography;
 const { Header, Content, Footer } = Layout;
 const { useBreakpoint } = Grid;
 
-// Animations
-const slideInFromBottom = keyframes`
-  from {
-    transform: translateY(30px);
-    opacity: 0;
+// ==================== GLOBAL STYLES ====================
+const GlobalStyle = createGlobalStyle`
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+  
+  html {
+    scroll-behavior: smooth;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1e293b;
+    background-color: #0b1b3d;
   }
 `;
 
-const fadeIn = keyframes`
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+// ==================== ANIMATIONS ====================
+const zoomSlow = keyframes`
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
 `;
 
-const gradientBackground = keyframes`
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-`;
-
-// Enhanced Typing Animation with Erasing
-const typing = keyframes`
-  from { width: 0 }
-  to { width: 100% }
-`;
-
-const erasing = keyframes`
-  from { width: 100% }
-  to { width: 0% }
-`;
-
-const blinkCaret = keyframes`
-  from, to { border-color: transparent }
-  50% { border-color: #1890ff }
-`;
-
-// Slide in animations for student images
-const slideInFromLeft = keyframes`
-  from {
-    transform: translateX(-100px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-`;
-
-const slideInFromRight = keyframes`
-  from {
-    transform: translateX(100px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-`;
-
-// Styled Components
+// ==================== STYLED COMPONENTS ====================
 const StyledLayout = styled(Layout)`
   min-height: 100vh;
-  background: linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.95)), 
-              // 
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background: #f8fafc;
 `;
 
-const StyledHeader = styled(Header)`
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-  padding: 0;
-  transition: all 0.3s ease;
-
-  @media (max-width: 768px) {
-    padding: 0 16px;
-  }
-`;
-
-const HeaderContainer = styled.div`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-
-  @media (max-width: 768px) {
-    padding: 0 16px;
-  }
-`;
-
-const LogoImage = styled(Image)`
-  margin-right: 24px;
-  object-fit: contain;
-  transition: transform 0.3s ease;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-
-  @media (max-width: 768px) {
-    width: 48px !important;
-    margin-right: 12px;
-  }
-`;
-
-const StyledMenu = styled(Menu)`
-  flex: 1;
-  border-bottom: none !important;
-  line-height: 64px;
-  background: transparent !important;
-
-  .ant-menu-item {
-    padding: 0 12px;
-    margin: 0 4px !important;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-
-    &:hover {
-      background: rgba(24, 144, 255, 0.1) !important;
-    }
-  }
-
-  .ant-menu-item-selected {
-    background: rgba(24, 144, 255, 0.1) !important;
-    color: #1890ff !important;
-  }
+// Top Bar
+const TopBar = styled.div`
+  background: #061129;
+  color: #cbd5e1;
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
 
   @media (max-width: 768px) {
     display: none;
   }
 `;
 
-const MobileMenuButton = styled(Button)`
-  display: none;
-  margin-left: auto;
-
-  @media (max-width: 768px) {
-    display: block;
-  }
-`;
-
-const StyledContent = styled(Content)`
-  width: 100%;
+const TopBarContainer = styled.div`
+  max-width: 1280px;
   margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
 
-const HeroSection = styled.div`
-  width: 100%;
-  padding: 60px 0;
+const TopContactInfo = styled.div`
   display: flex;
-  justify-content: center;
+  gap: 20px;
   align-items: center;
-  min-height: 90vh;
 
-  @media (max-width: 992px) {
-    padding: 40px 0;
-    min-height: auto;
+  a {
+    color: #cbd5e1;
+    transition: color 0.3s;
+    &:hover { color: #d4af37; }
   }
 `;
 
-const HeroContainer = styled.div`
-  max-width: 1200px;
+// Header
+const StyledHeader = styled(Header)`
+  position: sticky;
+  top: 0;
+  z-index: 1000;
   width: 100%;
-  padding: 0 24px;
+  height: 76px;
+  line-height: 76px;
+  background: rgba(11, 27, 61, 0.94) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  padding: 0;
+`;
+
+const HeaderContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1280px;
   margin: 0 auto;
-
-  @media (max-width: 768px) {
-    padding: 0 16px;
-  }
-`;
-
-const CircularImage = styled(Image)`
-  border-radius: 50%;
-  width: 100%;
-  max-width: 400px;
-  height: 400px;
-  object-fit: cover;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: ${slideInFromBottom} 0.8s ease-out forwards;
-  margin-left: auto;
-  display: block;
-  
-  &:hover {
-    transform: scale(1.05) rotate(2deg);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
-  }
-
-  @media (max-width: 992px) {
-    max-width: 320px;
-    height: 320px;
-  }
-
-  @media (max-width: 768px) {
-    max-width: 280px;
-    height: 280px;
-    margin: 32px auto 0;
-  }
-`;
-
-const ImageContainer = styled(Col)`
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  
-  @media (max-width: 768px) {
-    justify-content: center;
-  }
-`;
-
-const TypingContainer = styled.div`
-  position: relative;
-  min-height: 120px;
-  margin-bottom: 24px;
-  width: 100%;
-  overflow: visible;
-`;
-
-const MainTitle = styled(Title)`
-  font-size: 2.8rem !important;
-  font-weight: 800 !important;
-  margin-bottom: 16px !important;
-  color: #1a1a1a !important;
-  line-height: 1.2 !important;
-  background: linear-gradient(-45deg, #1890ff, #722ed1, #13c2c2);
-  background-size: 300% 300%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: ${gradientBackground} 8s ease infinite;
-  overflow: visible;
-  white-space: nowrap;
-  border-right: 0.15em solid #1890ff;
-  width: 0;
-  
-  &.typing {
-    animation: 
-      ${gradientBackground} 8s ease infinite,
-      ${typing} 1.5s steps(30, end) forwards,
-      ${blinkCaret} 0.75s step-end infinite;
-  }
-
-  &.erasing {
-    animation: 
-      ${gradientBackground} 8s ease infinite,
-      ${erasing} 1s steps(30, end) forwards,
-      ${blinkCaret} 0.75s step-end infinite;
-  }
-
-  @media (max-width: 992px) {
-    font-size: 2.4rem !important;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 2rem !important;
-    white-space: normal;
-    border-right: none;
-  }
-`;
-
-const SubTitle = styled(Title)`
-  font-size: 1.5rem !important;
-  font-weight: 500 !important;
-  color: #4a4a4a !important;
-  overflow: visible;
-  white-space: nowrap;
-  border-right: 0.15em solid #1890ff;
-  width: 0;
-  
-  &.typing {
-    animation: 
-      ${typing} 2s steps(40, end) forwards,
-      ${blinkCaret} 0.75s step-end infinite;
-  }
-
-  &.erasing {
-    animation: 
-      ${erasing} 1.5s steps(40, end) forwards,
-      ${blinkCaret} 0.75s step-end infinite;
-  }
-
-  @media (max-width: 992px) {
-    font-size: 1.3rem !important;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 1.1rem !important;
-    white-space: normal;
-    border-right: none;
-  }
-`;
-
-const HeroParagraph = styled(Paragraph)`
-  font-size: 1.1rem;
-  line-height: 1.8;
-  margin-bottom: 24px;
-  color: #4a4a4a;
-  text-align: justify;
-  width: 100%;
-
-  @media (max-width: 768px) {
-    font-size: 1rem;
-  }
-`;
-
-const StyledButton = styled(Button)`
-  height: 48px;
   padding: 0 24px;
-  font-weight: 500;
+`;
+
+const BrandWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+`;
+
+const LogoImage = styled(Image)`
+  object-fit: contain;
   border-radius: 8px;
-  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+`;
 
-  &.primary-btn {
-    background: linear-gradient(45deg, #1890ff, #096dd9);
-    border: none;
-    color: white;
-    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+const BrandTitle = styled.div`
+  display: flex;
+  flex-direction: column;
 
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(24, 144, 255, 0.4);
-      background: linear-gradient(45deg, #1890ff, #1890ff);
+  .name {
+    font-family: 'Cinzel', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+  }
+
+  .tagline {
+    font-size: 0.72rem;
+    color: #d4af37;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+`;
+
+const StyledMenu = styled(Menu)`
+  background: transparent !important;
+  border-bottom: none !important;
+  flex: 1;
+  justify-content: flex-end;
+  margin-right: 20px;
+
+  .ant-menu-item {
+    color: #e2e8f0 !important;
+    font-weight: 500;
+    font-size: 0.95rem;
+    padding: 0 16px !important;
+
+    &:hover, &.ant-menu-item-selected {
+      color: #d4af37 !important;
+      background: transparent !important;
+      &::after {
+        border-bottom-color: #d4af37 !important;
+        border-bottom-width: 3px !important;
+      }
     }
   }
 
-  &.secondary-btn {
-    border-color: #1890ff;
-    color: #1890ff;
+  @media (max-width: 992px) {
+    display: none;
+  }
+`;
 
-    &:hover {
-      color: white;
-      background: #1890ff;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(24, 144, 255, 0.2);
+const SignInButton = styled(Button)`
+  height: 42px;
+  padding: 0 24px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  border: none;
+  color: #0b1b3d;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+
+  &:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #f39c12 0%, #d4af37 100%) !important;
+    color: #0b1b3d !important;
+  }
+`;
+
+// ==================== CLEAN PICTURE HERO SECTION ====================
+const HeroSection = styled.section`
+  position: relative;
+  background: #061129;
+  width: 100%;
+  min-height: 480px;
+  height: clamp(480px, 75vh, 720px);
+  overflow: hidden;
+`;
+
+const ArrowButton = styled.div`
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 35;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(11, 27, 61, 0.65);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #d4af37;
+    color: #0b1b3d;
+    border-color: #d4af37;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+  }
+
+  &.prev-arrow { left: 24px; }
+  &.next-arrow { right: 24px; }
+
+  @media (max-width: 768px) {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+    &.prev-arrow { left: 10px; }
+    &.next-arrow { right: 10px; }
+  }
+`;
+
+const StyledCarousel = styled(Carousel)`
+  height: 100%;
+  
+  .slick-list, .slick-track {
+    height: 100%;
+  }
+
+  .slick-slide {
+    height: clamp(480px, 75vh, 720px);
+    position: relative;
+  }
+
+  .slick-dots {
+    bottom: 24px;
+    z-index: 30;
+
+    li button {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.5) !important;
+      transition: all 0.3s ease;
+    }
+
+    li.slick-active button {
+      width: 36px;
+      border-radius: 6px;
+      background: #d4af37 !important;
+      box-shadow: 0 0 10px rgba(212, 175, 55, 0.8);
     }
   }
+`;
+
+const SlideWrapper = styled.div`
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+`;
+
+const SlideImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  animation: ${zoomSlow} 12s ease-in-out infinite alternate;
+  display: block;
+`;
+
+// Quick Highlight Banner below Hero
+const HeroHighlightBar = styled.div`
+  background: #061129;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px 0;
+  color: #cbd5e1;
+`;
+
+const HighlightItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.92rem;
+  font-weight: 600;
+
+  .icon {
+    color: #d4af37;
+    font-size: 20px;
+  }
+`;
+
+// Welcome & Content Sections
+const WelcomeSection = styled.section`
+  padding: 80px 0 60px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+`;
+
+const WelcomeContainer = styled.div`
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+`;
+
+const SectionSubhead = styled.span`
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #b8860b;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  display: block;
+  margin-bottom: 8px;
+`;
+
+const AcademicTitle = styled(Title)`
+  font-family: 'Cinzel', serif !important;
+  font-size: clamp(2rem, 3.5vw, 3.2rem) !important;
+  color: #0b1b3d !important;
+  font-weight: 700 !important;
+  margin-bottom: 20px !important;
+`;
+
+const AcademicParagraph = styled(Paragraph)`
+  font-size: 1.1rem;
+  line-height: 1.85;
+  color: #475569;
+  max-width: 860px;
+  margin: 0 auto 32px;
+`;
+
+const PillarsSection = styled.section`
+  padding: 80px 0;
+  background: #f8fafc;
+`;
+
+const PillarCard = styled(Card)`
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  height: 100%;
+  transition: all 0.35s ease;
+
+  &:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 16px 32px rgba(11, 27, 61, 0.1);
+    border-color: #d4af37;
+  }
+
+  .ant-card-body {
+    padding: 32px 24px;
+  }
+
+  .pillar-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%);
+    color: #d4af37;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .pillar-title {
+    font-family: 'Cinzel', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0b1b3d;
+    margin-bottom: 10px;
+  }
+
+  .pillar-desc {
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+  }
+`;
+
+const StatsSection = styled.section`
+  background: linear-gradient(135deg, #0b1b3d 0%, #061129 100%);
+  color: #fff;
+  padding: 70px 0;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #d4af37, transparent);
+  }
+`;
+
+const StatCard = styled.div`
+  text-align: center;
+  padding: 16px;
+
+  .stat-icon {
+    font-size: 2.2rem;
+    color: #d4af37;
+    margin-bottom: 12px;
+  }
+
+  .stat-number {
+    font-family: 'Cinzel', serif;
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-label {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+  }
+`;
+
+const ContentSection = styled.section`
+  padding: 80px 0;
+  background: ${props => props.bg || '#ffffff'};
 `;
 
 const StyledFooter = styled(Footer)`
-  text-align: center;
-  background: #000;
-  color: white;
-  padding: 48px 0;
+  background: #040c1e;
+  color: #94a3b8;
+  padding: 70px 0 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 `;
 
-const FooterContent = styled.div`
-  max-width: 1200px;
+const FooterContainer = styled.div`
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
 `;
 
-const FooterSection = styled.div`
+const FooterColTitle = styled.h4`
+  font-family: 'Cinzel', serif;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 700;
   margin-bottom: 24px;
+  position: relative;
+  padding-bottom: 10px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 36px; height: 2px;
+    background: #d4af37;
+  }
 `;
 
-const SocialIcons = styled.div`
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin: 20px 0;
-  font-size: 24px;
+const FooterLink = styled.a`
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: #d4af37;
+    padding-left: 6px;
+  }
 `;
 
-const ContactInfo = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 20px 0;
-`;
-
-const ContactItem = styled.div`
-  display: flex;
+const SocialIconBox = styled.a`
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-`;
+  font-size: 18px;
+  margin-right: 12px;
+  transition: all 0.3s ease;
 
-const MobileMenu = styled.div`
-  display: none;
-  width: 100%;
-  background: white;
-  padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 0 0 8px 8px;
-  animation: ${fadeIn} 0.3s ease-out;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 999;
-
-  @media (max-width: 768px) {
-    display: ${props => (props.visible ? 'block' : 'none')};
-  }
-`;
-
-const WelcomeText = styled.div`
-  position: relative;
-  padding-left: 24px;
-  border-left: 3px solid #1890ff;
-  margin-bottom: 32px;
-  width: 100%;
-  animation: ${fadeIn} 0.8s ease-out forwards;
-  opacity: 0;
-  animation-delay: 0.5s;
-
-  &::before {
-    content: "❝";
-    position: absolute;
-    left: -10px;
-    top: -20px;
-    font-size: 48px;
-    color: rgba(24, 144, 255, 0.2);
-  }
-
-  @media (max-width: 768px) {
-    width: 100%;
-    padding-left: 16px;
-  }
-`;
-
-const StatsSection = styled.div`
-  width: 100%;
-  padding: 80px 0;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-`;
-
-const StatsContainer = styled.div`
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 0 24px;
-
-  @media (max-width: 768px) {
-    padding: 0 16px;
-  }
-`;
-
-const StatCard = styled(Col)`
-  text-align: center;
-  padding: 24px;
-  
-  .stat-icon {
-    font-size: 2.5rem;
-    margin-bottom: 16px;
-    color: #1890ff;
-  }
-  
-  .stat-number {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #1890ff;
-    margin-bottom: 8px;
-  }
-  
-  .stat-label {
-    font-size: 1rem;
-    color: #595959;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  @media (max-width: 768px) {
-    padding: 16px;
-    
-    .stat-icon {
-      font-size: 2rem;
-    }
-    
-    .stat-number {
-      font-size: 2rem;
-    }
-  }
-`;
-
-const ContentSection = styled.div`
-  width: 100%;
-  padding: 40px 0;
-  animation: ${fadeIn} 0.8s ease-out forwards;
-  opacity: 0;
-  animation-delay: 0.7s;
-`;
-
-// Student Gallery Section
-
-
-
-
-const StudentImageWrapper = styled.div`
-  position: relative;
-  width: 250px;
-  height: 300px;
-  overflow: hidden;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  transition: all 0.4s ease;
-  opacity: 0;
-  transform: ${props => props.side === 'left' ? 'translateX(-100px)' : 'translateX(100px)'};
-  
-  &.visible {
-    opacity: 1;
-    transform: translateX(0);
-    animation: ${props => props.side === 'left' ? slideInFromLeft : slideInFromRight} 0.8s ease-out forwards;
-  }
-  
   &:hover {
-    transform: translateY(-8px) scale(1.03);
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
+    background: #d4af37;
+    color: #0b1b3d;
   }
 `;
 
-
-
+// ==================== MAIN COMPONENT ====================
 const Home = () => {
   const navigate = useNavigate();
   const screens = useBreakpoint();
-  const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
-  const [typingComplete, setTypingComplete] = useState(false);
-  const [currentTitle, setCurrentTitle] = useState("Welcome to Apex College");
-  const [currentSubtitle, setCurrentSubtitle] = useState("Where dreams touch reality");
-  const [showContent, setShowContent] = useState(false);
-  const [, setVisibleImages] = useState([]);
-  const [imagesLoading, setImagesLoading] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [studentImages, setStudentImages] = useState([]);
-  
-  const studentImagesRef = useRef(null);
-  
-  // College and student images
-  const collegeMainImage = {
-    src: clgImage, // Use the imported clg.png image
-    title: "Apex College Campus",
-    description: "Beautiful campus of Apex College Harichand",
-    credit: "College Administration",
-    creditLink: "#"
-  };
+  const carouselRef = useRef(null);
 
-  // Initialize student images with placeholders
+  const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);
+  const [blogImages, setBlogImages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch blog images from API
   useEffect(() => {
-    const initialStudentImages = [
-      {
-        src: "https://via.placeholder.com/400x500/1890ff/ffffff?text=Academic+Excellence",
-        title: "Academic Excellence",
-        description: "Students achieving academic success",
-        credit: "College Administration",
-        creditLink: "#"
-      },
-      {
-        src: "https://via.placeholder.com/400x500/722ed1/ffffff?text=Science+Laboratory",
-        title: "Science Laboratory",
-        description: "Students conducting experiments",
-        credit: "College Administration",
-        creditLink: "#"
-      },
-      {
-        src: "https://via.placeholder.com/400x500/13c2c2/ffffff?text=Student+Life",
-        title: "Student Life",
-        description: "Vibrant campus community activities",
-        credit: "College Administration",
-        creditLink: "#"
-      },
-      {
-        src: "https://via.placeholder.com/400x500/52c41a/ffffff?text=College+Sports",
-        title: "College Sports",
-        description: "Athletic achievements and competitions",
-        credit: "College Administration",
-        creditLink: "#"
-      }
-    ];
-    setStudentImages(initialStudentImages);
-  }, []);
-
-  // Function to refresh images (just a simple rotation of images)
-  
-
-  useEffect(() => {
-    let currentIndex = 0;
-    const totalTitles = titles.length;
-
-    // Initial typing animation
-    const initialTyping = setTimeout(() => {
-      const mainTitle = document.querySelector('.main-title');
-      if (mainTitle) mainTitle.classList.add('typing');
-    }, 500);
-
-    const initialSubtitleTyping = setTimeout(() => {
-      const subTitle = document.querySelector('.sub-title');
-      if (subTitle) subTitle.classList.add('typing');
-    }, 2000);
-
-    const showAllContent = setTimeout(() => {
-      setTypingComplete(true);
-      setShowContent(true);
-    }, 4000);
-
-    // Cycle through titles and subtitles
-    const cycleInterval = setInterval(() => {
-      const mainTitle = document.querySelector('.main-title');
-      const subTitle = document.querySelector('.sub-title');
-      
-      if (mainTitle && subTitle) {
-        // First erase current text
-        mainTitle.classList.remove('typing');
-        mainTitle.classList.add('erasing');
-        subTitle.classList.remove('typing');
-        subTitle.classList.add('erasing');
-
-        // After erasing, update text and type again
-        setTimeout(() => {
-          currentIndex = (currentIndex + 1) % totalTitles;
-          setCurrentTitle(titles[currentIndex]);
-          setCurrentSubtitle(subtitles[currentIndex]);
-
-          mainTitle.classList.remove('erasing');
-          subTitle.classList.remove('erasing');
-
-          setTimeout(() => {
-            mainTitle.classList.add('typing');
-            setTimeout(() => {
-              subTitle.classList.add('typing');
-            }, 1000);
-          }, 500);
-        }, 1500);
-      }
-    }, 8000); // Change every 8 seconds
-
-    // Intersection Observer for student images animation
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const index = parseInt(entry.target.dataset.index);
-            setTimeout(() => {
-              setVisibleImages(prev => [...prev, index]);
-            }, index * 200); // Stagger the animation
+    const fetchBlogImages = async () => {
+      try {
+        const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_about_sections.php');
+        if (!response.ok) throw new Error('Failed to fetch blog data');
+        const data = await response.json();
+        
+        if (data.data && data.data.length > 0) {
+          const images = [];
+          for (const section of data.data) {
+            try {
+              const imagesResponse = await fetch(
+                `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/imagesread.php?section_id=${section.id}`
+              );
+              if (imagesResponse.ok) {
+                const imagesData = await imagesResponse.json();
+                if (imagesData.data && imagesData.data.length > 0) {
+                  images.push({
+                    image: `https://white-trout-460511.hostingersite.com/APEX/${imagesData.data[0].image_path}`,
+                    title: section.title
+                  });
+                }
+              }
+            } catch (err) {
+              console.error(`Error fetching section ${section.id}:`, err);
+            }
           }
-        });
-      },
-      { threshold: 0.3 }
-    );
-
-    // Observe student images container
-    if (studentImagesRef.current) {
-      const imageWrappers = studentImagesRef.current.querySelectorAll('.student-image-wrapper');
-      imageWrappers.forEach(wrapper => {
-        observer.observe(wrapper);
-      });
-    }
-
-    return () => {
-      clearTimeout(initialTyping);
-      clearTimeout(initialSubtitleTyping);
-      clearTimeout(showAllContent);
-      clearInterval(cycleInterval);
-      observer.disconnect();
+          setBlogImages(images);
+        }
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching blog images:', err);
+        setLoading(false);
+      }
     };
+
+    fetchBlogImages();
   }, []);
-
-  const titles = [
-    "Welcome to Apex College",
-    "A Legacy of Excellence",
-    "Since 2021",
-    "Center of Academic Excellence"
-  ];
-
-  const subtitles = [
-    "Where Tradition Meets Innovation",
-    "Shaping Future Leaders",
-    "Nurturing Minds, Building Character",
-    "Pioneering Education in Pakistan"
-  ];
 
   const handleLoginClick = () => {
     navigate('/choose-user');
   };
 
-  const toggleMobileMenu = () => {
-    setMobileMenuVisible(!mobileMenuVisible);
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+    setMobileDrawerVisible(false);
+  };
+
+  const carouselSettings = {
+    dots: true,
+    infinite: true,
+    speed: 900,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    autoplay: true,
+    autoplaySpeed: 5500,
+    pauseOnHover: true,
+    arrows: false,
+    fade: true
   };
 
   return (
-    <StyledLayout>
-      <StyledHeader>
-        <HeaderContainer>
-          <LogoImage
-            width={60}
-            src={logo}
-            preview={false}
-          />
-          
-          {screens.md ? (
-            <StyledMenu
-              theme="light"
-              mode="horizontal"
-              defaultSelectedKeys={['1']}
-            >
-              <Menu.Item key="1" icon={<HomeOutlined />}>
-                <Link to="/">Home</Link>
-              </Menu.Item>
-              <Menu.Item key="2" icon={<InfoCircleOutlined />}>
-                <Link to="/about">Blog</Link>
-              </Menu.Item>
-              <Menu.Item key="3" icon={<ContactsOutlined />}>
-                <Link to="/contact">Feedback</Link>
-              </Menu.Item>
-            </StyledMenu>
-          ) : (
-            <MobileMenuButton 
-              icon={<UserOutlined />} 
-              onClick={toggleMobileMenu}
-            />
-          )}
+    <>
+      <GlobalStyle />
+      <StyledLayout>
+        {/* ==================== TOP ANNOUNCEMENT BAR ==================== */}
+        <TopBar>
+          <TopBarContainer>
+            <Space size="large">
+              <Tag color="#d4af37" style={{ color: '#0b1b3d', fontWeight: 700, borderRadius: 4 }}>
+                ADMISSIONS 2026
+              </Tag>
+              <span><CalendarOutlined /> Admissions are open for F.Sc, ICS & FA Programs</span>
+            </Space>
+            <TopContactInfo>
+              <a href="tel:+921234567890"><PhoneOutlined /> +92 123 4567890</a>
+              <a href="mailto:info@apexcollege.edu.pk"><MailOutlined /> info@apexcollege.edu.pk</a>
+              <span style={{ cursor: 'pointer', color: '#d4af37' }} onClick={handleLoginClick}>
+                <UserOutlined /> Student & Faculty Portal
+              </span>
+            </TopContactInfo>
+          </TopBarContainer>
+        </TopBar>
 
-          <Space>
-            <StyledButton 
-              type="primary" 
-              icon={<LoginOutlined />}
-              onClick={handleLoginClick}
-              className="primary-btn"
-              style={{ marginLeft: '16px' }}
-            >
-              {screens.sm ? 'Sign In' : <LoginOutlined />}
-            </StyledButton>
-          </Space>
-        </HeaderContainer>
-      </StyledHeader>
+        {/* ==================== HEADER ==================== */}
+        <StyledHeader>
+          <HeaderContainer>
+            <BrandWrapper onClick={() => scrollToSection('home')}>
+              <LogoImage
+                width={48}
+                height={48}
+                src={logo}
+                preview={false}
+                alt="Apex Logo"
+              />
+              <BrandTitle>
+                <span className="name">Apex College</span>
+                <span className="tagline">Harichand • Higher Education</span>
+              </BrandTitle>
+            </BrandWrapper>
 
-      <MobileMenu visible={mobileMenuVisible}>
-        <Menu
-          mode="vertical"
-          style={{ borderRight: 'none' }}
-        >
-          <Menu.Item key="1" icon={<HomeOutlined />}>
-            <Link to="/" onClick={() => setMobileMenuVisible(false)}>Home</Link>
-          </Menu.Item>
-          <Menu.Item key="2" icon={<InfoCircleOutlined />}>
-            <Link to="/about" onClick={() => setMobileMenuVisible(false)}>Blog</Link>
-          </Menu.Item>
-          <Menu.Item key="3" icon={<ContactsOutlined />}>
-            <Link to="/contact" onClick={() => setMobileMenuVisible(false)}>Feedback</Link>
-          </Menu.Item>
-        </Menu>
-      </MobileMenu>
+            {screens.lg ? (
+              <StyledMenu mode="horizontal" defaultSelectedKeys={['1']}>
+                <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => scrollToSection('home')}>
+                  Home
+                </Menu.Item>
+                <Menu.Item key="2" icon={<InfoCircleOutlined />} onClick={() => scrollToSection('about')}>
+                  About Apex
+                </Menu.Item>
+                <Menu.Item key="3" icon={<PictureOutlined />} onClick={() => scrollToSection('about')}>
+                  Campus Life
+                </Menu.Item>
+                <Menu.Item key="4" icon={<ContactsOutlined />} onClick={() => scrollToSection('contact')}>
+                  Contact
+                </Menu.Item>
+              </StyledMenu>
+            ) : null}
 
-      <StyledContent>
-        <HeroSection>
-          <HeroContainer>
-            <Row gutter={[48, 48]} align="middle">
-              <Col xs={24} md={14}>
-                <TypingContainer>
-                  <MainTitle level={1} className="main-title">
-                    {currentTitle}
-                  </MainTitle>
-                  <SubTitle level={2} className="sub-title">
-                    {currentSubtitle}
-                  </SubTitle>
-                </TypingContainer>
-                
-                {showContent && (
-                  <ContentSection>
-                    <WelcomeText>
-                      <HeroParagraph>
-                        Established in 2021, Apex College Harichand stands as a beacon of knowledge and tradition. Our institution has shaped generations of leaders, thinkers, and innovators who have made significant contributions to society.
-                      </HeroParagraph>
-                      <HeroParagraph>
-                        With our rich heritage, state-of-the-art facilities, and commitment to academic excellence, we provide an environment where students can thrive intellectually, socially, and spiritually.
-                      </HeroParagraph>
-                    </WelcomeText>
-                    
-                    <Divider />
-                    <Space size="middle">
-                      <StyledButton 
-                        type="primary" 
-                        className="primary-btn"
-                        icon={<HistoryOutlined />}
-                      >
-                        <Link to="/about">Explore History</Link>
-                      </StyledButton>
-                      <StyledButton 
-                        className="secondary-btn"
-                        icon={<EnvironmentOutlined />}
-                      >
-                        <Link to="/contact">Visit Us</Link>
-                      </StyledButton>
-                    </Space>
-                  </ContentSection>
-                )}
-              </Col>
-              
-              <ImageContainer xs={24} md={10}>
-                <CircularImage
-                  src={collegeMainImage.src}
-                  preview={false}
-                  alt={collegeMainImage.description}
+            <Space>
+              <SignInButton icon={<LoginOutlined />} onClick={handleLoginClick}>
+                {screens.sm ? 'Portal Login' : ''}
+              </SignInButton>
+
+              {!screens.lg && (
+                <Button 
+                  type="text" 
+                  icon={<MenuOutlined style={{ color: '#fff', fontSize: '20px' }} />}
+                  onClick={() => setMobileDrawerVisible(true)}
                 />
-              </ImageContainer>
+              )}
+            </Space>
+          </HeaderContainer>
+        </StyledHeader>
+
+        {/* ==================== MOBILE NAVIGATION DRAWER ==================== */}
+        <Drawer
+          title="Apex College Menu"
+          placement="right"
+          onClose={() => setMobileDrawerVisible(false)}
+          open={mobileDrawerVisible}
+          bodyStyle={{ padding: 0 }}
+        >
+          <Menu mode="inline" style={{ borderRight: 'none' }}>
+            <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => scrollToSection('home')}>
+              Home
+            </Menu.Item>
+            <Menu.Item key="2" icon={<InfoCircleOutlined />} onClick={() => scrollToSection('about')}>
+              About Apex
+            </Menu.Item>
+            <Menu.Item key="3" icon={<PictureOutlined />} onClick={() => scrollToSection('about')}>
+              Campus Life
+            </Menu.Item>
+            <Menu.Item key="4" icon={<ContactsOutlined />} onClick={() => scrollToSection('contact')}>
+              Contact Us
+            </Menu.Item>
+          </Menu>
+        </Drawer>
+
+        <Content>
+          {/* ==================== CLEAN PICTURE HERO SLIDESHOW ==================== */}
+          <HeroSection id="home">
+            {/* Custom Carousel Arrows */}
+            <ArrowButton className="prev-arrow" onClick={() => carouselRef.current?.prev()}>
+              <LeftOutlined />
+            </ArrowButton>
+            <ArrowButton className="next-arrow" onClick={() => carouselRef.current?.next()}>
+              <RightOutlined />
+            </ArrowButton>
+
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <Spin size="large" tip="Loading Campus Showcase..." />
+              </div>
+            ) : blogImages.length > 0 ? (
+              <StyledCarousel ref={carouselRef} {...carouselSettings}>
+                {blogImages.map((item, index) => (
+                  <div key={index}>
+                    <SlideWrapper>
+                      <SlideImage src={item.image} alt={item.title || 'Apex Campus Slide'} />
+                    </SlideWrapper>
+                  </div>
+                ))}
+              </StyledCarousel>
+            ) : (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100%',
+                background: 'linear-gradient(135deg, #0b1b3d 0%, #061129 100%)',
+                color: '#fff'
+              }}>
+                <Spin size="large" />
+              </div>
+            )}
+          </HeroSection>
+
+          {/* ==================== HERO HIGHLIGHT BAR ==================== */}
+          <HeroHighlightBar>
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+              <Row gutter={[24, 16]} justify="space-around" align="middle">
+                <Col xs={24} sm={8}>
+                  <HighlightItem>
+                    <SafetyCertificateOutlined className="icon" />
+                    <span>Board & BISE Recognized Institution</span>
+                  </HighlightItem>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <HighlightItem>
+                    <ExperimentOutlined className="icon" />
+                    <span>State-of-the-Art Science & IT Labs</span>
+                  </HighlightItem>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <HighlightItem>
+                    <ReadOutlined className="icon" />
+                    <span>100% Qualified Professional Faculty</span>
+                  </HighlightItem>
+                </Col>
+              </Row>
+            </div>
+          </HeroHighlightBar>
+
+          {/* ==================== WELCOME & MISSION SECTION ==================== */}
+          <WelcomeSection>
+            <WelcomeContainer>
+              <SectionSubhead>Premier Educational Institution</SectionSubhead>
+              <AcademicTitle level={2}>Welcome to Apex College Harichand</AcademicTitle>
+              <AcademicParagraph>
+                Established in 2021, Apex College Harichand stands as a beacon of academic distinction and personal growth. 
+                Our college combines rigorous curriculum standards with modern educational infrastructure to foster 
+                intellectual curiosity, moral leadership, and professional competence in every student.
+              </AcademicParagraph>
+              
+              <Space size="large" wrap justify="center">
+                <Button 
+                  type="primary" 
+                  size="large"
+                  style={{ background: '#0b1b3d', borderColor: '#0b1b3d', height: 48, borderRadius: 6, padding: '0 32px' }}
+                  icon={<HistoryOutlined />}
+                  onClick={() => scrollToSection('about')}
+                >
+                  Our Heritage
+                </Button>
+                <Button 
+                  size="large"
+                  style={{ borderColor: '#0b1b3d', color: '#0b1b3d', height: 48, borderRadius: 6, padding: '0 32px' }}
+                  icon={<RightOutlined />}
+                  onClick={() => scrollToSection('contact')}
+                >
+                  Admissions Inquiry
+                </Button>
+              </Space>
+            </WelcomeContainer>
+          </WelcomeSection>
+
+          {/* ==================== ACADEMIC PILLARS SECTION ==================== */}
+          <PillarsSection>
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+              <div style={{ textAlign: 'center', marginBottom: 48 }}>
+                <SectionSubhead>Why Choose Apex</SectionSubhead>
+                <AcademicTitle level={2} style={{ fontSize: '2.2rem' }}>Pillars of Academic Excellence</AcademicTitle>
+              </div>
+
+              <Row gutter={[24, 24]}>
+                <Col xs={24} sm={12} lg={6}>
+                  <PillarCard>
+                    <div className="pillar-icon"><BookOutlined /></div>
+                    <div className="pillar-title">Rigorous Curriculum</div>
+                    <p className="pillar-desc">
+                      Comprehensive academic tracks in Pre-Medical, Pre-Engineering, Computer Science, and General Science.
+                    </p>
+                  </PillarCard>
+                </Col>
+
+                <Col xs={24} sm={12} lg={6}>
+                  <PillarCard>
+                    <div className="pillar-icon"><ExperimentOutlined /></div>
+                    <div className="pillar-title">Modern Science Labs</div>
+                    <p className="pillar-desc">
+                      Fully-equipped physics, chemistry, biology, and computer science facilities designed for hands-on experimentation.
+                    </p>
+                  </PillarCard>
+                </Col>
+
+                <Col xs={24} sm={12} lg={6}>
+                  <PillarCard>
+                    <div className="pillar-icon"><TeamOutlined /></div>
+                    <div className="pillar-title">Distinguished Faculty</div>
+                    <p className="pillar-desc">
+                      Learn from highly qualified educators committed to individual mentoring and academic growth.
+                    </p>
+                  </PillarCard>
+                </Col>
+
+                <Col xs={24} sm={12} lg={6}>
+                  <PillarCard>
+                    <div className="pillar-icon"><TrophyOutlined /></div>
+                    <div className="pillar-title">Proven Board Results</div>
+                    <p className="pillar-desc">
+                      Consistently achieving top merit positions in board examinations with high university placement rates.
+                    </p>
+                  </PillarCard>
+                </Col>
+              </Row>
+            </div>
+          </PillarsSection>
+
+          {/* ==================== STATISTICS COUNTER SECTION ==================== */}
+          <StatsSection>
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+              <Row gutter={[32, 32]} justify="space-around">
+                <Col xs={12} sm={6}>
+                  <StatCard>
+                    <CrownOutlined className="stat-icon" />
+                    <div className="stat-number">4+</div>
+                    <div className="stat-label">Years of Distinction</div>
+                  </StatCard>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <StatCard>
+                    <BookOutlined className="stat-icon" />
+                    <div className="stat-number">10+</div>
+                    <div className="stat-label">Academic Programs</div>
+                  </StatCard>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <StatCard>
+                    <TeamOutlined className="stat-icon" />
+                    <div className="stat-number">1,000+</div>
+                    <div className="stat-label">Graduated Alumni</div>
+                  </StatCard>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <StatCard>
+                    <SafetyCertificateOutlined className="stat-icon" />
+                    <div className="stat-number">100%</div>
+                    <div className="stat-label">Board Accreditation</div>
+                  </StatCard>
+                </Col>
+              </Row>
+            </div>
+          </StatsSection>
+
+          {/* ==================== ABOUT SECTION ==================== */}
+          <ContentSection id="about" bg="#ffffff">
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+              <About />
+            </div>
+          </ContentSection>
+
+          {/* ==================== CONTACT SECTION ==================== */}
+          <ContentSection id="contact" bg="#f8fafc">
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+              <Contact />
+            </div>
+          </ContentSection>
+        </Content>
+
+        {/* ==================== FOOTER ==================== */}
+        <StyledFooter>
+          <FooterContainer>
+            <Row gutter={[40, 40]}>
+              <Col xs={24} sm={12} lg={8}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  <img src={logo} alt="Logo" style={{ width: 40, height: 40, background: '#fff', padding: 2, borderRadius: 6 }} />
+                  <span style={{ fontFamily: 'Cinzel, serif', color: '#fff', fontSize: '1.3rem', fontWeight: 700 }}>
+                    Apex College
+                  </span>
+                </div>
+                <p style={{ color: '#94a3b8', lineHeight: 1.7, fontSize: '0.92rem' }}>
+                  Apex College Harichand is dedicated to fostering academic rigor, moral integrity, and modern technological competency for tomorrow's leaders.
+                </p>
+                <div style={{ marginTop: 20 }}>
+                  <SocialIconBox href="#" aria-label="Facebook"><FacebookOutlined /></SocialIconBox>
+                  <SocialIconBox href="#" aria-label="Instagram"><InstagramOutlined /></SocialIconBox>
+                  <SocialIconBox href="#" aria-label="Twitter"><TwitterOutlined /></SocialIconBox>
+                </div>
+              </Col>
+
+              <Col xs={24} sm={12} lg={5}>
+                <FooterColTitle>Quick Navigation</FooterColTitle>
+                <FooterLink onClick={() => scrollToSection('home')}>Home Page</FooterLink>
+                <FooterLink onClick={() => scrollToSection('about')}>About Institution</FooterLink>
+                <FooterLink onClick={() => scrollToSection('about')}>Campus Life & Blog</FooterLink>
+                <FooterLink onClick={() => scrollToSection('contact')}>Contact & Admissions</FooterLink>
+                <FooterLink onClick={handleLoginClick}>Portal Sign In</FooterLink>
+              </Col>
+
+              <Col xs={24} sm={12} lg={5}>
+                <FooterColTitle>Academics</FooterColTitle>
+                <FooterLink href="#">F.Sc Pre-Medical</FooterLink>
+                <FooterLink href="#">F.Sc Pre-Engineering</FooterLink>
+                <FooterLink href="#">ICS (Computer Science)</FooterLink>
+                <FooterLink href="#">F.A. General Science</FooterLink>
+                <FooterLink href="#">Scholarship Programs</FooterLink>
+              </Col>
+
+              <Col xs={24} sm={12} lg={6}>
+                <FooterColTitle>Contact Information</FooterColTitle>
+                <p style={{ color: '#cbd5e1', marginBottom: 12, fontSize: '0.92rem' }}>
+                  <EnvironmentFilled style={{ color: '#d4af37', marginRight: 10 }} />
+                  Near Harichand Bazar, Peshawar Road, Pakistan
+                </p>
+                <p style={{ color: '#cbd5e1', marginBottom: 12, fontSize: '0.92rem' }}>
+                  <PhoneOutlined style={{ color: '#d4af37', marginRight: 10 }} />
+                  +92 123 4567890
+                </p>
+                <p style={{ color: '#cbd5e1', marginBottom: 12, fontSize: '0.92rem' }}>
+                  <MailOutlined style={{ color: '#d4af37', marginRight: 10 }} />
+                  info@apexcollege.edu.pk
+                </p>
+              </Col>
             </Row>
-          </HeroContainer>
-        </HeroSection>
 
-        {/* Statistics Section */}
-        <StatsSection>
-          <StatsContainer>
-            <Row gutter={[24, 24]} justify="space-around">
-              <StatCard xs={12} sm={6}>
-                <CrownOutlined className="stat-icon" />
-                <div className="stat-number">4+</div>
-                <div className="stat-label">Years of Excellence</div>
-              </StatCard>
-              <StatCard xs={12} sm={6}>
-                <BookOutlined className="stat-icon" />
-                <div className="stat-number">10+</div>
-                <div className="stat-label">Programs</div>
-              </StatCard>
-              <StatCard xs={12} sm={6}>
-                <TeamOutlined className="stat-icon" />
-                <div className="stat-number">1000+</div>
-                <div className="stat-label">Alumni</div>
-              </StatCard>
-              <StatCard xs={12} sm={6}>
-                <TrophyOutlined className="stat-icon" />
-                <div className="stat-number">100+</div>
-                <div className="stat-label">Awards</div>
-              </StatCard>
+            <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.1)', margin: '40px 0 24px' }} />
+
+            <Row justify="space-between" align="middle">
+              <Col xs={24} sm={12}>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>
+                  © {new Date().getFullYear()} Apex College Harichand. All rights reserved.
+                </p>
+              </Col>
+              <Col xs={24} sm={12} style={{ textAlign: screens.sm ? 'right' : 'left', marginTop: screens.sm ? 0 : 12 }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                  Recognized Educational Board Affiliate
+                </span>
+              </Col>
             </Row>
-          </StatsContainer>
-        </StatsSection>
-
-        {/* Student Gallery Section */}
-        {/* <StudentGallerySection> */}
-      </StyledContent>
-
-      <StyledFooter>
-        <FooterContent>
-          <Row gutter={[24, 24]}>
-            <Col xs={24} md={8}>
-              <FooterSection>
-                <Title level={4} style={{ color: 'white' }}>Apex College Harichand</Title>
-                <Paragraph style={{ color: '#ccc' }}>
-                  Committed to excellence in education since 2021. Shaping the future leaders of tomorrow.
-                </Paragraph>
-              </FooterSection>
-            </Col>
-            <Col xs={24} md={8}>
-              <FooterSection>
-                <Title level={4} style={{ color: 'white' }}>Quick Links</Title>
-                <Menu theme="dark" mode="vertical" style={{ background: 'transparent', border: 'none' }}>
-                  <Menu.Item key="1">
-                    <Link to="/" style={{ color: '#ccc' }}>Home</Link>
-                  </Menu.Item>
-                  <Menu.Item key="2">
-                    <Link to="/about" style={{ color: '#ccc' }}>Blog</Link>
-                  </Menu.Item>
-                  <Menu.Item key="3">
-                    <Link to="/contact" style={{ color: '#ccc' }}>Feedback</Link>
-                  </Menu.Item>
-                </Menu>
-              </FooterSection>
-            </Col>
-            <Col xs={24} md={8}>
-              <FooterSection>
-                <Title level={4} style={{ color: 'white' }}>Contact Us</Title>
-                <ContactInfo>
-                  <ContactItem>
-                    <EnvironmentFilled style={{ color: '#1890ff' }} />
-                    <Text style={{ color: '#ccc' }}>Harichand, KP, Pakistan</Text>
-                  </ContactItem>
-                  <ContactItem>
-                    <PhoneOutlined style={{ color: '#1890ff' }} />
-                    <Text style={{ color: '#ccc' }}>+92 346 9717399</Text>
-                  </ContactItem>
-                  <ContactItem>
-                    <MailOutlined style={{ color: '#1890ff' }} />
-                    <Text style={{ color: '#ccc' }}>info@apexcollege.edu.pk</Text>
-                  </ContactItem>
-                </ContactInfo>
-              </FooterSection>
-            </Col>
-          </Row>
-          
-          <Divider style={{ borderColor: '#333' }} />
-          
-          <SocialIcons>
-            <a href="#" style={{ color: 'white' }}>
-              <FacebookOutlined />
-            </a>
-            <a href="#" style={{ color: 'white' }}>
-              <InstagramOutlined />
-            </a>
-            <a href="#" style={{ color: 'white' }}>
-              <TwitterOutlined />
-            </a>
-          </SocialIcons>
-          
-          <Paragraph style={{ color: '#999', margin: 0 }}>
-            © 2025 Apex College Harichand. All rights reserved.
-          </Paragraph>
-        </FooterContent>
-      </StyledFooter>
-    </StyledLayout>
+          </FooterContainer>
+        </StyledFooter>
+      </StyledLayout>
+    </>
   );
 };
 

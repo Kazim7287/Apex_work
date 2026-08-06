@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
-import { Modal, Spin, Typography, Empty, Button, Popconfirm } from "antd";
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Modal, Spin, Typography, Empty, Button, Popconfirm, Checkbox, Space } from "antd";
+import { EditOutlined, DeleteOutlined, DeleteFilled } from '@ant-design/icons';
 
 const { Title } = Typography;
 
@@ -33,7 +33,11 @@ const TimetableModal = ({
     windowWidth,
     noDataMessage = "No timetable scheduled yet for this section",
     onEdit,
-    onDelete
+    onDelete,
+    selectedRowKeys = [],
+    onSelectChange,
+    onBulkDelete,
+    bulkDeleteLoading = false
 }) => {
     const modalStyles = {
         header: {
@@ -135,9 +139,54 @@ const TimetableModal = ({
 
     const timeSlots = getSortedTimeSlots();
 
+    // Handle checkbox change for a specific entry
+    const handleCheckboxChange = (entryId, checked) => {
+        if (onSelectChange) {
+            if (checked) {
+                onSelectChange([...selectedRowKeys, entryId]);
+            } else {
+                onSelectChange(selectedRowKeys.filter(id => id !== entryId));
+            }
+        }
+    };
+
+    // Handle select all
+    const handleSelectAll = (checked) => {
+        if (onSelectChange) {
+            if (checked) {
+                const allIds = timetableData.map(item => item.id);
+                onSelectChange(allIds);
+            } else {
+                onSelectChange([]);
+            }
+        }
+    };
+
+    // Get all entry IDs for select all
+    const allIds = timetableData.map(item => item.id);
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedRowKeys.includes(id));
+    const someSelected = selectedRowKeys.length > 0 && !allSelected;
+
     return (
         <Modal
-            title={`Timetable for ${section?.name || 'Selected Section'}`}
+            title={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span>
+                        Timetable for {section?.name || 'Selected Section'}
+                    </span>
+                    {selectedRowKeys.length > 0 && (
+                        <Button 
+                            danger
+                            icon={<DeleteFilled />}
+                            onClick={onBulkDelete}
+                            loading={bulkDeleteLoading}
+                            size={windowWidth < 768 ? "small" : "middle"}
+                        >
+                            Delete Selected ({selectedRowKeys.length})
+                        </Button>
+                    )}
+                </div>
+            }
             open={visible}
             onCancel={onCancel}
             footer={null}
@@ -150,10 +199,34 @@ const TimetableModal = ({
                 </div>
             ) : (
                 <div style={{ overflowX: 'auto' }}>
+                    {timetableData.length > 0 && (
+                        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <Checkbox
+                                checked={allSelected}
+                                indeterminate={someSelected}
+                                onChange={(e) => handleSelectAll(e.target.checked)}
+                            >
+                                Select All
+                            </Checkbox>
+                            {selectedRowKeys.length > 0 && (
+                                <span style={{ color: '#1890ff' }}>
+                                    {selectedRowKeys.length} selected
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    
                     {timeSlots.length > 0 ? (
                         <table style={modalStyles.table}>
                             <thead>
                                 <tr>
+                                    <th style={{ ...modalStyles.th, width: '40px' }}>
+                                        <Checkbox
+                                            checked={allSelected}
+                                            indeterminate={someSelected}
+                                            onChange={(e) => handleSelectAll(e.target.checked)}
+                                        />
+                                    </th>
                                     <th style={modalStyles.th}>Time/Day</th>
                                     {days.map(day => (
                                         <th key={day} style={modalStyles.th}>
@@ -167,6 +240,9 @@ const TimetableModal = ({
                                     const [startTime, endTime] = timeSlot.split('-');
                                     return (
                                         <tr key={index}>
+                                            <td style={{ ...modalStyles.td, ...modalStyles.timeCell, width: '40px' }}>
+                                                {/* Checkbox placeholder - no checkbox here, it's in the class cell */}
+                                            </td>
                                             <td style={{ ...modalStyles.td, ...modalStyles.timeCell }}>
                                                 {formatTimeDisplay(startTime)} - {formatTimeDisplay(endTime)}
                                             </td>
@@ -181,17 +257,25 @@ const TimetableModal = ({
                                                     <td key={`${day}-${index}`} style={modalStyles.td}>
                                                         {classInfo ? (
                                                             <div style={modalStyles.classCell}>
-                                                                <div style={modalStyles.subjectName}>
-                                                                    {classInfo.subject_name}
-                                                                </div>
-                                                                <div style={modalStyles.teacherName}>
-                                                                    {classInfo.teacher_name}
-                                                                </div>
-                                                                {windowWidth >= 768 && (
-                                                                    <div style={modalStyles.timeSlot}>
-                                                                        {formatTimeDisplay(classInfo.start_time)} - {formatTimeDisplay(classInfo.end_time)}
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                                    <Checkbox
+                                        checked={selectedRowKeys.includes(classInfo.id)}
+                                        onChange={(e) => handleCheckboxChange(classInfo.id, e.target.checked)}
+                                    />
+                                                                    <div>
+                                                                        <div style={modalStyles.subjectName}>
+                                                                            {classInfo.subject_name}
+                                                                        </div>
+                                                                        <div style={modalStyles.teacherName}>
+                                                                            {classInfo.teacher_name}
+                                                                        </div>
+                                                                        {windowWidth >= 768 && (
+                                                                            <div style={modalStyles.timeSlot}>
+                                                                                {formatTimeDisplay(classInfo.start_time)} - {formatTimeDisplay(classInfo.end_time)}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                )}
+                                                                </div>
                                                                 <div style={modalStyles.actionCell}>
                                                                     <Button
                                                                         type="text"

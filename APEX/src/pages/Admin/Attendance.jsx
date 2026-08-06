@@ -104,7 +104,7 @@ const AdminAttendanceView = () => {
   const fetchAllSections = async () => {
     setLoading(true);
     try {
-      const data = await fetchWithSession('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_read.php');
+      const data = await fetchWithSession('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php');
       if (data && Array.isArray(data)) {
         setSections(data);
       } else if (!data) {

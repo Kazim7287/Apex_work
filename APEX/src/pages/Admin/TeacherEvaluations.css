@@ -1,4 +1,5 @@
-/* TeacherEvaluations.css */
+/* TeacherEvaluations.css - Complete Working Version */
+
 .teacher-evaluations {
   max-width: 1200px;
   margin: 0 auto;
@@ -13,6 +14,15 @@
 .teachers-section h2 {
   margin-bottom: 15px;
   color: #2c3e50;
+}
+
+.teachers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
 }
 
 .teachers-grid {
@@ -30,6 +40,7 @@
   cursor: pointer;
   transition: all 0.3s ease;
   text-align: left;
+  width: 100%;
 }
 
 .teacher-button:hover {
@@ -41,6 +52,14 @@
 .teacher-button.active {
   border-color: #2196F3;
   background-color: #e3f2fd;
+}
+
+.teacher-button.evaluated {
+  border-left: 4px solid #4caf50;
+}
+
+.teacher-button.not-evaluated {
+  border-left: 4px solid #ff9800;
 }
 
 .teacher-name {
@@ -58,6 +77,16 @@
   color: #666;
 }
 
+.evaluation-badge {
+  margin-top: 4px;
+}
+
+.evaluation-count {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
 .loading {
   text-align: center;
   padding: 20px;
@@ -73,10 +102,11 @@
   margin-bottom: 20px;
 }
 
+/* ===== TEACHER HEADER ===== */
 .teacher-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 20px;
   padding-bottom: 10px;
   border-bottom: 1px solid #eee;
@@ -88,34 +118,106 @@
   flex: 1;
 }
 
-.print-button {
+.teacher-header-content h2 {
+  margin: 0 0 5px 0;
+}
+
+.teacher-header-content p {
+  margin: 0;
+  color: #666;
+}
+
+.header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 15px;
-  background-color: #2c3e50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.print-button:hover:not(:disabled) {
-  background-color: #1a252f;
+/* ===== PRINT BUTTON ===== */
+.print-button-wrapper {
+  position: relative;
+  display: inline-block;
 }
 
-.print-button:disabled {
-  background-color: #95a5a6;
-  cursor: not-allowed;
+.print-button-antd {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background-color: #2c3e50 !important;
+  border-color: #2c3e50 !important;
+  transition: all 0.3s ease !important;
 }
 
+.print-button-antd:hover:not(:disabled) {
+  background-color: #1a252f !important;
+  border-color: #1a252f !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3) !important;
+}
+
+.print-button-antd:disabled {
+  background-color: #95a5a6 !important;
+  border-color: #95a5a6 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7 !important;
+}
+
+.print-button-antd:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Print button tooltip */
+.print-tooltip {
+  visibility: hidden;
+  width: 220px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 1000;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+.print-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #333 transparent transparent transparent;
+}
+
+.print-button-wrapper:hover .print-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ===== AVERAGE RATINGS ===== */
 .average-ratings {
   background-color: #f5f5f5;
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 20px;
+}
+
+.average-ratings h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #2c3e50;
 }
 
 .rating-bar {
@@ -127,6 +229,7 @@
 .rating-label {
   width: 120px;
   font-weight: bold;
+  flex-shrink: 0;
 }
 
 .rating-bar-container {
@@ -140,7 +243,7 @@
 
 .rating-bar-fill {
   height: 100%;
-  background-color: #ff9800;
+  background: linear-gradient(90deg, #ff9800, #f57c00);
   transition: width 0.3s ease;
 }
 
@@ -148,12 +251,114 @@
   width: 50px;
   text-align: right;
   font-weight: bold;
+  flex-shrink: 0;
 }
 
+/* ===== EVALUATIONS TABLE - CRITICAL FIXES ===== */
 .evaluations-list {
   margin-top: 20px;
 }
 
+.evaluations-list h3 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.evaluations-table {
+  overflow-x: auto;
+}
+
+.evaluations-table .ant-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.evaluations-table .ant-table-thead > tr > th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+.evaluations-table .ant-table-tbody > tr:hover > td {
+  background: #f0f7ff;
+}
+
+/* Ensure all table cells are visible */
+.evaluations-table .ant-table-cell {
+  padding: 12px 8px !important;
+}
+
+/* Selection column - ensure checkboxes are visible */
+.evaluations-table .ant-table-selection-column {
+  width: 50px !important;
+  min-width: 50px !important;
+  text-align: center !important;
+}
+
+.evaluations-table .ant-table-selection-column .ant-checkbox-wrapper {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+/* Action column - ensure delete button is visible */
+.evaluations-table .ant-table-cell:last-child {
+  min-width: 150px !important;
+  width: 150px !important;
+  white-space: nowrap !important;
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 3 !important;
+  background: white !important;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.06) !important;
+}
+
+/* Ensure delete button is always visible */
+.evaluations-table .ant-btn-dangerous {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-width: 70px !important;
+  background-color: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: white !important;
+}
+
+.evaluations-table .ant-btn-danger:hover:not(:disabled) {
+  background-color: #ff7875 !important;
+  border-color: #ff7875 !important;
+  transform: scale(1.05);
+}
+
+.evaluations-table .ant-btn-danger .anticon {
+  font-size: 14px !important;
+}
+
+.evaluations-table .ant-popconfirm {
+  display: inline-block !important;
+}
+
+/* Fix for sticky header */
+.evaluations-table .ant-table-sticky-holder {
+  z-index: 2 !important;
+}
+
+/* Fix for scroll container */
+.evaluations-table .ant-table-content {
+  overflow-x: auto !important;
+}
+
+/* Selected rows count styling */
+.selected-count-banner {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: #e6f7ff;
+  border-radius: 4px;
+  border: 1px solid #91d5ff;
+}
+
+/* ===== EVALUATION CARDS (for print) ===== */
 .evaluation-card {
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -202,21 +407,20 @@
   border-radius: 4px;
 }
 
-.rating-label {
-  font-weight: bold;
-}
-
-.comments, .suggestions {
+.comments,
+.suggestions {
   margin-top: 10px;
 }
 
-.comments h4, .suggestions h4 {
+.comments h4,
+.suggestions h4 {
   margin: 0 0 5px 0;
   font-size: 0.9em;
   color: #616161;
 }
 
-.comments p, .suggestions p {
+.comments p,
+.suggestions p {
   margin: 0;
   padding: 10px;
   background-color: #f5f5f5;
@@ -224,6 +428,7 @@
   font-style: italic;
 }
 
+/* ===== PAGINATION ===== */
 .pagination-controls {
   display: flex;
   justify-content: center;
@@ -239,6 +444,11 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+  background-color: #1976D2;
 }
 
 .pagination-controls button:disabled {
@@ -246,14 +456,93 @@
   cursor: not-allowed;
 }
 
+.pagination-controls span {
+  color: #666;
+}
+
+/* ===== STATUS SUMMARY ===== */
+.status-summary {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.status-summary .ant-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ===== BULK DELETE MODAL ===== */
+.ant-modal-body .ant-tag {
+  margin: 2px 4px;
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .print-button-wrapper,
+  .print-button-antd,
+  .header-actions {
+    display: none !important;
+  }
+  
+  .teacher-evaluations {
+    padding: 0 !important;
+  }
+  
+  .evaluation-card {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  
+  .teacher-button {
+    border: 1px solid #ddd !important;
+  }
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
 @media (max-width: 768px) {
+  .teacher-evaluations {
+    padding: 12px;
+  }
+  
   .teachers-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  .teacher-button {
+    padding: 10px;
+  }
+  
+  .teacher-name {
+    font-size: 14px;
+  }
+  
+  .teacher-details {
+    font-size: 12px;
   }
   
   .teacher-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+  
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .header-actions .ant-btn {
+    flex: 1;
+    min-width: 100px;
+  }
+  
+  .print-button-antd {
+    width: 100%;
+    justify-content: center;
   }
   
   .evaluation-header {
@@ -268,5 +557,133 @@
   .pagination-controls {
     flex-direction: column;
     gap: 10px;
+  }
+  
+  .rating-bar {
+    flex-wrap: wrap;
+  }
+  
+  .rating-label {
+    width: 80px;
+    font-size: 13px;
+  }
+  
+  .rating-value {
+    width: 40px;
+    font-size: 13px;
+  }
+  
+  .evaluations-table .ant-table {
+    font-size: 12px;
+  }
+  
+  .evaluations-table .ant-table-thead > tr > th,
+  .evaluations-table .ant-table-tbody > tr > td {
+    padding: 8px 4px !important;
+  }
+  
+  .evaluations-table .ant-table-cell:last-child {
+    min-width: 100px !important;
+    width: 100px !important;
+  }
+  
+  .evaluations-table .ant-btn-danger {
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    min-width: 60px !important;
+  }
+  
+  .evaluations-table .ant-btn-danger .anticon {
+    font-size: 12px !important;
+  }
+  
+  /* Mobile tooltip adjustment */
+  .print-tooltip {
+    width: 180px;
+    font-size: 11px;
+    white-space: normal;
+    bottom: 130%;
+  }
+}
+
+@media (max-width: 480px) {
+  .teachers-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .status-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .ratings-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .header-actions .ant-btn {
+    min-width: 80px;
+    font-size: 12px;
+  }
+  
+  .print-tooltip {
+    width: 160px;
+    font-size: 10px;
+  }
+  
+  .evaluations-table .ant-table-cell:last-child {
+    min-width: 80px !important;
+    width: 80px !important;
+  }
+  
+  .evaluations-table .ant-btn-danger {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    min-width: 50px !important;
+  }
+}
+
+/* ===== ADDITIONAL FIXES ===== */
+
+/* Ensure modals display properly */
+.ant-modal {
+  z-index: 1000 !important;
+}
+
+.ant-modal-mask {
+  z-index: 999 !important;
+}
+
+/* Fix for popconfirm */
+.ant-popconfirm {
+  z-index: 1000 !important;
+}
+
+/* Empty state styling */
+.ant-empty {
+  margin: 40px 0;
+}
+
+/* Badge styling */
+.ant-badge-count {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Button hover states */
+.header-actions .ant-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Fix for table overflow */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+/* Ensure the table scrolls properly on mobile */
+@media (max-width: 768px) {
+  .ant-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }

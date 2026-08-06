@@ -32,6 +32,9 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
   const [loading, setLoading] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [manualAmount, setManualAmount] = useState(0);
+  const [inputValue, setInputValue] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatedDue, setUpdatedDue] = useState(null);
   const navigate = useNavigate();
   const printRef = useRef();
 
@@ -40,25 +43,40 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
 
   useEffect(() => {
     if (visible && due) {
-      // Calculate payment progress when modal opens
-      calculatePaymentProgress(due);
+      // Reset state when modal opens with new due
+      setUpdatedDue(null);
+      loadDueData(due);
+    }
+  }, [visible, due]);
+
+  const loadDueData = async (dueData) => {
+    setLoading(true);
+    try {
+      // Calculate payment progress
+      calculatePaymentProgress(dueData);
       
       // Set initial payment amount to remaining balance
-      const remaining = (due.amount || 0) - (due.amount_paid || 0);
-      setManualAmount(remaining > 0 ? remaining : 0);
+      const remaining = (dueData.amount || 0) - (dueData.amount_paid || 0);
+      const initialAmount = remaining > 0 ? remaining : 0;
+      setManualAmount(initialAmount);
+      setInputValue(initialAmount.toString());
       form.setFieldsValue({
-        amount_paid: remaining > 0 ? remaining : 0,
         payment_method: 'Cash'
       });
       
       // Fetch payment history
-      fetchPaymentHistory(due.id);
+      await fetchPaymentHistory(dueData.id);
+    } catch (error) {
+      console.error('Error loading due data:', error);
+      message.error('Failed to load payment details');
+    } finally {
+      setLoading(false);
     }
-  }, [visible, due, form]);
+  };
 
   const fetchPaymentHistory = async (dueId) => {
     try {
-     const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_payment_history.php', {
+      const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_payment_history.php', {
         params: { due_id: dueId },
         withCredentials: true
       });
@@ -116,7 +134,7 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
           message.success("Payment completed in full!");
         }
         
-        // Reset form and close modal
+        // Reset form
         form.resetFields();
         
         // Call success callback with payment data
@@ -126,11 +144,12 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
         
         // Refresh dues list if provided
         if (refreshDues) {
-          refreshDues();
+          await refreshDues();
         }
         
-        // Refresh payment history
-        fetchPaymentHistory(due.id);
+        // Refresh the modal data with updated due information
+        await refreshModalData();
+        
       } else {
         message.error(response.data.error || "Failed to process payment");
       }
@@ -148,32 +167,71 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
     }
   };
 
-  const handleRefresh = async () => {
-    if (!due?.id) return;
-    
-    setLoading(true);
+  const refreshModalData = async () => {
+    setRefreshing(true);
     try {
+      // Fetch updated due information
       const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_deus.php', {
         params: { studentId: due.student_id },
         withCredentials: true
       });
       
-      const updatedDue = response.data.find(d => d.id === due.id);
-      if (updatedDue) {
-        calculatePaymentProgress(updatedDue);
-        fetchPaymentHistory(due.id);
-        message.success('Due information refreshed');
+      const updatedDueData = response.data.find(d => d.id === due.id);
+      if (updatedDueData) {
+        setUpdatedDue(updatedDueData);
+        // Update the due object with fresh data
+        Object.assign(due, updatedDueData);
+        
+        // Recalculate payment progress
+        calculatePaymentProgress(updatedDueData);
+        
+        // Update remaining amount in input
+        const remaining = (updatedDueData.amount || 0) - (updatedDueData.amount_paid || 0);
+        const initialAmount = remaining > 0 ? remaining : 0;
+        setManualAmount(initialAmount);
+        setInputValue(initialAmount.toString());
+        
+        // Refresh payment history
+        await fetchPaymentHistory(due.id);
+        
+        message.success('Payment details refreshed');
       }
     } catch (error) {
-      console.error('Error refreshing due:', error);
-      message.error('Failed to refresh due information');
+      console.error('Error refreshing modal data:', error);
+      message.error('Failed to refresh payment details');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  const handleRefresh = async () => {
+    if (!due?.id) return;
+    await refreshModalData();
+  };
+
   const handleManualAmountChange = (value) => {
-    setManualAmount(value || 0);
+    const numValue = value !== null && value !== undefined && !isNaN(value) ? value : 0;
+    setManualAmount(numValue);
+    setInputValue(numValue.toString());
+  };
+
+  const handleInputChange = (e) => {
+    const rawValue = e.target.value;
+    const cleanedValue = rawValue.replace(/[^0-9.]/g, '');
+    setInputValue(cleanedValue);
+    
+    const numValue = parseFloat(cleanedValue);
+    if (!isNaN(numValue) && numValue >= 0) {
+      setManualAmount(numValue);
+    } else if (cleanedValue === '' || cleanedValue === '.') {
+      setManualAmount(0);
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (manualAmount > 0) {
+      setInputValue(manualAmount.toString());
+    }
   };
 
   const handlePrint = () => {
@@ -198,9 +256,10 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
     { value: 'Other', label: 'Other' },
   ];
 
-  const remainingAmount = (due?.amount || 0) - (due?.amount_paid || 0);
+  // Use updatedDue if available, otherwise use due
+  const currentDue = updatedDue || due;
+  const remainingAmount = (currentDue?.amount || 0) - (currentDue?.amount_paid || 0);
   const isFullyPaid = remainingAmount <= 0;
-  const hasPartialPayment = (due?.amount_paid || 0) > 0 && !isFullyPaid;
 
   // Add null check for due prop
   if (!due) {
@@ -241,8 +300,8 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
               icon={<ReloadOutlined />} 
               size="small" 
               onClick={handleRefresh}
-              loading={loading}
-              disabled={loading}
+              loading={refreshing || loading}
+              disabled={refreshing || loading}
             >
               Refresh
             </Button>
@@ -256,248 +315,268 @@ const PaymentModal = ({ visible, onCancel, due, onPaymentSuccess, refreshDues })
       maskClosable={false}
       destroyOnClose
     >
-      <div ref={printRef}>
-        <Divider />
-        
-        {/* Due Information Section */}
-        <div style={{ marginBottom: 24 }}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Text strong>Student: </Text>
-              <Text>{due.student_name || 'N/A'}</Text>
-            </Col>
-            <Col span={12}>
-              <Text strong>Due Type: </Text>
-              <Text>{due.due_type || 'N/A'}</Text>
-            </Col>
-          </Row>
+      <Spin spinning={loading || refreshing} tip="Loading...">
+        <div ref={printRef}>
+          <Divider />
           
-          <Row gutter={16} style={{ marginTop: 12 }}>
-            <Col span={12}>
-              <Text strong>Father's Name: </Text>
-              <Text>{due.fathers_name || 'N/A'}</Text>
-            </Col>
-            <Col span={12}>
-              <Text strong>Section: </Text>
-              <Text>{due.section_name || 'N/A'}</Text>
-            </Col>
-          </Row>
-          
-          <Row gutter={16} style={{ marginTop: 12 }}>
-            <Col span={12}>
-              <Text strong>Total Amount: </Text>
-              <Text>Rs. {(due.amount || 0).toLocaleString()}</Text>
-            </Col>
-            <Col span={12}>
-              <Text strong>Status: </Text>
-              <Text 
-                style={{ 
-                  color: due.status === 'Paid' ? '#52c41a' : 
-                         due.status === 'Partial' ? '#fa8c16' : '#ff4d4f',
-                  fontWeight: 'bold'
-                }}
-              >
-                {due.status || 'Pending'}
-              </Text>
-            </Col>
-          </Row>
-          
-          {due.due_date && (
+          {/* Due Information Section */}
+          <div style={{ marginBottom: 24 }}>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Text strong>Student: </Text>
+                <Text>{currentDue.student_name || 'N/A'}</Text>
+              </Col>
+              <Col span={12}>
+                <Text strong>Due Type: </Text>
+                <Text>{currentDue.due_type || 'N/A'}</Text>
+              </Col>
+            </Row>
+            
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}>
-                <Text strong>Due Date: </Text>
-                <Text>{new Date(due.due_date).toLocaleDateString()}</Text>
+                <Text strong>Father's Name: </Text>
+                <Text>{currentDue.fathers_name || 'N/A'}</Text>
               </Col>
               <Col span={12}>
-                <Text strong>Issued Date: </Text>
-                <Text>{due.issued_date ? new Date(due.issued_date).toLocaleDateString() : 'N/A'}</Text>
+                <Text strong>Section: </Text>
+                <Text>{currentDue.section_name || 'N/A'}</Text>
               </Col>
             </Row>
-          )}
-          
-          {/* Payment Progress */}
-          <div style={{ marginTop: 16 }}>
-            <Row gutter={16}>
-              <Col span={24}>
-                <Text strong>Payment Progress: </Text>
-                <div style={{ marginTop: 8 }}>
-                  <Progress 
-                    percent={paymentProgress.percentage}
-                    status={
-                      paymentProgress.percentage === 100 ? 'success' : 
-                      paymentProgress.percentage > 0 ? 'active' : 'normal'
-                    }
-                    size="small"
-                    strokeColor={
-                      paymentProgress.percentage === 100 ? '#52c41a' : 
-                      paymentProgress.percentage > 0 ? '#1890ff' : '#d9d9d9'
-                    }
-                  />
-                  <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
-                    Paid: Rs. {paymentProgress.paid.toLocaleString()} / 
-                    Total: Rs. {paymentProgress.total.toLocaleString()}
+            
+            <Row gutter={16} style={{ marginTop: 12 }}>
+              <Col span={12}>
+                <Text strong>Total Amount: </Text>
+                <Text>Rs. {(currentDue.amount || 0).toLocaleString()}</Text>
+              </Col>
+              <Col span={12}>
+                <Text strong>Status: </Text>
+                <Text 
+                  style={{ 
+                    color: currentDue.status === 'Paid' ? '#52c41a' : 
+                           currentDue.status === 'Partial' ? '#fa8c16' : '#ff4d4f',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {currentDue.status || 'Pending'}
+                </Text>
+              </Col>
+            </Row>
+            
+            {currentDue.due_date && (
+              <Row gutter={16} style={{ marginTop: 12 }}>
+                <Col span={12}>
+                  <Text strong>Due Date: </Text>
+                  <Text>{new Date(currentDue.due_date).toLocaleDateString()}</Text>
+                </Col>
+                <Col span={12}>
+                  <Text strong>Issued Date: </Text>
+                  <Text>{currentDue.issued_date ? new Date(currentDue.issued_date).toLocaleDateString() : 'N/A'}</Text>
+                </Col>
+              </Row>
+            )}
+            
+            {/* Payment Progress */}
+            <div style={{ marginTop: 16 }}>
+              <Row gutter={16}>
+                <Col span={24}>
+                  <Text strong>Payment Progress: </Text>
+                  <div style={{ marginTop: 8 }}>
+                    <Progress 
+                      percent={paymentProgress.percentage}
+                      status={
+                        paymentProgress.percentage === 100 ? 'success' : 
+                        paymentProgress.percentage > 0 ? 'active' : 'normal'
+                      }
+                      size="small"
+                      strokeColor={
+                        paymentProgress.percentage === 100 ? '#52c41a' : 
+                        paymentProgress.percentage > 0 ? '#1890ff' : '#d9d9d9'
+                      }
+                    />
+                    <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
+                      Paid: Rs. {paymentProgress.paid.toLocaleString()} / 
+                      Total: Rs. {paymentProgress.total.toLocaleString()}
+                    </div>
                   </div>
-                </div>
-              </Col>
-            </Row>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Remaining Amount */}
+            {!isFullyPaid && (
+              <Row gutter={16} style={{ marginTop: 16 }}>
+                <Col span={24}>
+                  <Alert
+                    message={
+                      <Text strong style={{ color: '#ff4d4f', fontSize: '16px' }}>
+                        Remaining Amount: Rs. {remainingAmount.toLocaleString()}
+                      </Text>
+                    }
+                    type="warning"
+                    showIcon
+                  />
+                </Col>
+              </Row>
+            )}
           </div>
 
-          {/* Remaining Amount */}
-          {!isFullyPaid && (
-            <Row gutter={16} style={{ marginTop: 16 }}>
-              <Col span={24}>
-                <Alert
-                  message={
-                    <Text strong style={{ color: '#ff4d4f', fontSize: '16px' }}>
-                      Remaining Amount: Rs. {remainingAmount.toLocaleString()}
-                    </Text>
-                  }
-                  type="warning"
-                  showIcon
+          {!isFullyPaid ? (
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleSubmit}
+              initialValues={{
+                payment_method: 'Cash'
+              }}
+            >
+              <Form.Item
+                label="Amount to Pay (PKR)"
+                required
+              >
+                <div style={{ position: 'relative' }}>
+                  <span style={{ 
+                    position: 'absolute', 
+                    left: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)',
+                    zIndex: 1,
+                    fontWeight: 'bold',
+                    color: '#666'
+                  }}>
+                    Rs.
+                  </span>
+                  <Input
+                    type="text"
+                    value={inputValue}
+                    onChange={handleInputChange}
+                    onBlur={handleInputBlur}
+                    placeholder="Enter payment amount"
+                    disabled={submitting || loading || refreshing}
+                    style={{ 
+                      width: '100%', 
+                      paddingLeft: '50px',
+                      height: '40px',
+                      fontSize: '16px'
+                    }}
+                    maxLength={15}
+                  />
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                  Maximum allowed: Rs. {remainingAmount.toLocaleString()}
+                </div>
+                <div style={{ marginTop: 4, fontSize: 12, color: '#999' }}>
+                  Enter only numbers (e.g., 2000)
+                </div>
+              </Form.Item>
+
+              <Form.Item
+                name="payment_method"
+                label="Payment Method"
+                rules={[{ required: true, message: "Please select a payment method!" }]}
+              >
+                <Select 
+                  placeholder="Select payment method"
+                  options={paymentMethodOptions}
+                  disabled={submitting || loading || refreshing}
                 />
-              </Col>
-            </Row>
-          )}
-        </div>
+              </Form.Item>
 
-        {!isFullyPaid ? (
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-            initialValues={{
-              payment_method: 'Cash'
-            }}
-          >
-            <Form.Item
-              label="Amount to Pay (PKR)"
-              required
-            >
-              <InputNumber
-                style={{ width: '100%' }}
-                placeholder="Enter payment amount"
-                value={manualAmount}
-                onChange={handleManualAmountChange}
-                min={0.01}
-                max={remainingAmount}
-                step={100}
-                precision={2}
-                formatter={value => `Rs. ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value.replace(/Rs\s?|(,*)/g, '')}
-                disabled={submitting}
-              />
-              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                Maximum allowed: Rs. {remainingAmount.toLocaleString()}
-              </div>
-            </Form.Item>
+              <Form.Item
+                name="notes"
+                label="Payment Notes (Optional)"
+              >
+                <Input.TextArea 
+                  rows={3} 
+                  placeholder="Additional notes about this payment (receipt number, transaction ID, etc.)" 
+                  maxLength={500}
+                  showCount
+                  disabled={submitting || loading || refreshing}
+                />
+              </Form.Item>
 
-            <Form.Item
-              name="payment_method"
-              label="Payment Method"
-              rules={[{ required: true, message: "Please select a payment method!" }]}
-            >
-              <Select 
-                placeholder="Select payment method"
-                options={paymentMethodOptions}
-                disabled={submitting}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="notes"
-              label="Payment Notes (Optional)"
-            >
-              <Input.TextArea 
-                rows={3} 
-                placeholder="Additional notes about this payment (receipt number, transaction ID, etc.)" 
-                maxLength={500}
-                showCount
-                disabled={submitting}
-              />
-            </Form.Item>
-
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={submitting}
-                disabled={submitting || manualAmount <= 0}
-                icon={<DollarOutlined />}
-                style={{ 
-                  width: '100%', 
-                  height: '48px',
-                  fontSize: '16px',
-                  fontWeight: 'bold'
-                }}
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={submitting}
+                  disabled={submitting || loading || refreshing || manualAmount <= 0 || manualAmount > remainingAmount}
+                  icon={<DollarOutlined />}
+                  style={{ 
+                    width: '100%', 
+                    height: '48px',
+                    fontSize: '16px',
+                    fontWeight: 'bold'
+                  }}
+                  size="large"
+                >
+                  {submitting ? 'Processing Payment...' : `Pay Rs. ${manualAmount.toLocaleString()}`}
+                </Button>
+              </Form.Item>
+            </Form>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <DollarOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
+              <Title level={4} style={{ color: '#52c41a', marginBottom: 8 }}>
+                Payment Completed
+              </Title>
+              <Text style={{ fontSize: '16px', display: 'block', marginBottom: 16 }}>
+                This due has been fully paid. Total paid: Rs. {(currentDue.amount_paid || 0).toLocaleString()}
+              </Text>
+              {currentDue.paid_date && (
+                <Text style={{ color: '#666', display: 'block', marginBottom: 16 }}>
+                  Paid on: {new Date(currentDue.paid_date).toLocaleDateString()}
+                </Text>
+              )}
+              <Button 
+                type="primary" 
+                onClick={onCancel}
                 size="large"
               >
-                {submitting ? 'Processing Payment...' : `Pay Rs. ${manualAmount.toLocaleString()}`}
+                Close
               </Button>
-            </Form.Item>
-          </Form>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <DollarOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
-            <Title level={4} style={{ color: '#52c41a', marginBottom: 8 }}>
-              Payment Completed
-            </Title>
-            <Text style={{ fontSize: '16px', display: 'block', marginBottom: 16 }}>
-              This due has been fully paid. Total paid: Rs. {(due.amount_paid || 0).toLocaleString()}
-            </Text>
-            {due.paid_date && (
-              <Text style={{ color: '#666', display: 'block', marginBottom: 16 }}>
-                Paid on: {new Date(due.paid_date).toLocaleDateString()}
-              </Text>
-            )}
-            <Button 
-              type="primary" 
-              onClick={onCancel}
-              size="large"
-            >
-              Close
-            </Button>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Payment History Section */}
-        {paymentHistory.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <Divider />
-            <Title level={5}>Payment History</Title>
-            <List
-              dataSource={paymentHistory}
-              renderItem={(payment) => (
-                <List.Item>
-                  <Card size="small" style={{ width: '100%' }}>
-                    <Row gutter={16} align="middle">
-                      <Col span={6}>
-                        <Text strong>Date:</Text>
-                        <br />
-                        <Text>{new Date(payment.payment_date).toLocaleDateString()}</Text>
-                      </Col>
-                      <Col span={6}>
-                        <Text strong>Amount:</Text>
-                        <br />
-                        <Text>Rs. {parseFloat(payment.amount_paid).toLocaleString()}</Text>
-                      </Col>
-                      <Col span={6}>
-                        <Text strong>Method:</Text>
-                        <br />
-                        <Tag color="blue">{payment.payment_method}</Tag>
-                      </Col>
-                      <Col span={6}>
-                        <Text strong>Notes:</Text>
-                        <br />
-                        <Text>{payment.notes || 'N/A'}</Text>
-                      </Col>
-                    </Row>
-                  </Card>
-                </List.Item>
-              )}
-            />
-          </div>
-        )}
-      </div>
+          {/* Payment History Section */}
+          {paymentHistory.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <Divider />
+              <Title level={5}>Payment History</Title>
+              <List
+                dataSource={paymentHistory}
+                renderItem={(payment) => (
+                  <List.Item>
+                    <Card size="small" style={{ width: '100%' }}>
+                      <Row gutter={16} align="middle">
+                        <Col span={6}>
+                          <Text strong>Date:</Text>
+                          <br />
+                          <Text>{new Date(payment.payment_date).toLocaleDateString()}</Text>
+                        </Col>
+                        <Col span={6}>
+                          <Text strong>Amount:</Text>
+                          <br />
+                          <Text>Rs. {parseFloat(payment.amount_paid).toLocaleString()}</Text>
+                        </Col>
+                        <Col span={6}>
+                          <Text strong>Method:</Text>
+                          <br />
+                          <Tag color="blue">{payment.payment_method}</Tag>
+                        </Col>
+                        <Col span={6}>
+                          <Text strong>Notes:</Text>
+                          <br />
+                          <Text>{payment.notes || 'N/A'}</Text>
+                        </Col>
+                      </Row>
+                    </Card>
+                  </List.Item>
+                )}
+              />
+            </div>
+          )}
+        </div>
+      </Spin>
     </Modal>
   );
 };

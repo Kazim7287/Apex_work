@@ -1,403 +1,479 @@
+// src/pages/Admin/Sidebar.jsx
 import { useState, useEffect } from "react";
-import styled, { css } from "styled-components";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Layout, Menu, Avatar, Typography, Spin, Badge, Button, Tooltip, Divider } from 'antd';
 import {
-    BsGraphUp,
-    BsPerson,
-    BsFileText,
-    BsBook,
-    BsCashCoin,
-    BsGraphDown,
-    BsCalendar,
-    BsPeople,
-    BsGear,
-    BsCalendar3,
-    BsCalendarEvent,
-    BsClipboard,
-    BsChevronLeft,
-    BsChevronRight,
-    BsChatSquareText,
-    BsInfoCircle,
-    BsChevronDown,
-    BsChevronUp,
-    BsStar, // Added for teacher evaluation icon
-    BsClipboardCheck // Alternative icon option
-} from 'react-icons/bs';
-import { Avatar, Spin } from 'antd';
+  DashboardOutlined,
+  UserOutlined,
+  TeamOutlined,
+  BookOutlined,
+  CalendarOutlined,
+  SettingOutlined,
+  StarOutlined,
+  ScheduleOutlined,
+  FileTextOutlined,
+  DollarOutlined,
+  BellOutlined,
+  MessageOutlined,
+  InfoCircleOutlined,
+  LockOutlined,
+  KeyOutlined,
+  MenuUnfoldOutlined,
+  MenuFoldOutlined,
+  LockFilled,
+  CheckCircleOutlined
+} from '@ant-design/icons';
+import { usePermissions } from '../../contexts/PermissionContext';
 
-export const SidebarContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: ${({ isOpen }) => (isOpen ? '220px' : '60px')};
-  height: 100%;
-  background-color: white;
-  color: #2c3e50;
-  overflow-y: auto;
-  padding-top: 60px;
-  transition: width 0.3s ease;
-  z-index: 100;
-  border-right: 1px solid #e0e0e0;
-`;
-
-export const SidebarHeader = styled.div`
-  padding: 20px;
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-`;
-
-export const SidebarNav = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin-top: 20px;
-`;
-
-export const SidebarNavItem = styled.li`
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  font-size: 16px;
-  border-bottom: 1px solid #f0f0f0;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  
-  &:hover {
-    background-color: #f5f5f5;
-  }
-  
-  span {
-    margin-left: ${({ isOpen }) => (isOpen ? '10px' : '0')};
-    opacity: ${({ isOpen }) => (isOpen ? '1' : '0')};
-    transition: opacity 0.3s ease, margin-left 0.3s ease;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-`;
-
-export const SidebarIcon = styled.div`
-  min-width: 20px;
-  display: flex;
-  justify-content: center;
-  color: #2c3e50;
-`;
-
-export const AdminInfo = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  transition: all 0.3s ease;
-  opacity: ${({ isOpen }) => (isOpen ? '1' : '0')};
-  height: ${({ isOpen }) => (isOpen ? 'auto' : '0')};
-  overflow: hidden;
-`;
-
-export const AdminName = styled.div`
-  font-weight: 600;
-  font-size: 14px;
-  white-space: nowrap;
-`;
-
-export const AdminRole = styled.div`
-  font-size: 12px;
-  color: #666;
-`;
-
-export const ToggleButton = styled.div`
-  position: absolute;
-  top: 20px;
-  right: -15px;
-  width: 30px;
-  height: 30px;
-  background-color: #f0f0f0;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 5px rgba(0,0,0,0.1);
-  z-index: 101;
-  color: #2c3e50;
-  
-  &:hover {
-    background-color: #e0e0e0;
-  }
-`;
-
-export const DropdownHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  font-size: 16px;
-  border-bottom: 1px solid #f0f0f0;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background-color: #f5f5f5;
-  }
-  
-  div {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  span {
-    opacity: ${({ isOpen }) => (isOpen ? '1' : '0')};
-    transition: opacity 0.3s ease;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-`;
-
-export const DropdownMenu = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: ${({ isOpen }) => (isOpen ? '500px' : '0')};
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-`;
-
-export const DropdownItem = styled.li`
-  display: flex;
-  align-items: center;
-  padding: 10px 20px 10px 40px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background-color: #f5f5f5;
-  }
-  
-  span {
-    margin-left: 10px;
-    opacity: ${({ isOpen }) => (isOpen ? '1' : '0')};
-    transition: opacity 0.3s ease;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-`;
+const { Sider } = Layout;
+const { Text } = Typography;
 
 const Sidebar = () => {
-  const [isOpen, setIsOpen] = useState(true);
-  const [adminData, setAdminData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [openDropdowns, setOpenDropdowns] = useState({
-    academic: true,
-    management: true,
-    system: true
-  });
+  const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { adminData, loading, isSuperAdmin, hasPermission, permissions } = usePermissions();
 
-  useEffect(() => {
-    const fetchAdminData = async () => {
-      try {
-        const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Admindata.php', {
-          credentials: 'include'
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch admin data');
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setAdminData(data.data);
-        } else {
-          throw new Error(data.error || 'Failed to fetch admin data');
-        }
-      } catch (error) {
-        console.error('Error fetching admin data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  console.log('🔍 Sidebar Debug:');
+  console.log('  - isSuperAdmin:', isSuperAdmin);
+  console.log('  - permissions:', permissions);
+  console.log('  - loading:', loading);
 
-    fetchAdminData();
-  }, []);
-
-  const toggleSidebar = () => {
-    setIsOpen(!isOpen);
+  // Toggle sidebar
+  const toggleCollapsed = () => {
+    setCollapsed(!collapsed);
   };
 
-  const toggleDropdown = (dropdown) => {
-    setOpenDropdowns(prev => ({
-      ...prev,
-      [dropdown]: !prev[dropdown]
-    }));
+  // Define all menu items with their required permissions
+  const allMenuItems = [
+    {
+      key: '/admin/dashboard',
+      icon: <DashboardOutlined />,
+      label: 'Dashboard',
+      permission: 'dashboard_view',
+      description: 'View dashboard statistics'
+    },
+    {
+      key: '/admin/students',
+      icon: <UserOutlined />,
+      label: 'Students',
+      permission: 'students_view',
+      description: 'Manage student records'
+    },
+    {
+      key: '/admin/teachers',
+      icon: <TeamOutlined />,
+      label: 'Teachers',
+      permission: 'teachers_view',
+      description: 'Manage teacher records'
+    },
+    {
+      key: '/admin/classes',
+      icon: <BookOutlined />,
+      label: 'Classes',
+      permission: 'classes_view',
+      description: 'Manage classes and subjects'
+    },
+    {
+      key: '/admin/exams',
+      icon: <FileTextOutlined />,
+      label: 'Exams',
+      permission: 'exams_view',
+      description: 'Manage exams and results'
+    },
+    {
+      key: '/admin/attendance',
+      icon: <CalendarOutlined />,
+      label: 'Attendance',
+      permission: 'attendance_view',
+      description: 'View and manage attendance'
+    },
+    {
+      key: '/admin/teacher-evaluations',
+      icon: <StarOutlined />,
+      label: 'Teacher Evaluations',
+      permission: 'evaluations_view',
+      description: 'Evaluate teacher performance'
+    },
+    {
+      key: '/admin/communication',
+      icon: <ScheduleOutlined />,
+      label: 'Time Table',
+      permission: 'timetable_view',
+      description: 'Manage class schedules'
+    },
+    {
+      key: '/admin/library',
+      icon: <DollarOutlined />,
+      label: 'Dues',
+      permission: 'dues_view',
+      description: 'Manage fee dues'
+    },
+    {
+      key: '/admin/events',
+      icon: <BellOutlined />,
+      label: 'Events',
+      permission: 'events_view',
+      description: 'Manage events and calendar'
+    },
+    {
+      key: '/admin/feedback-management',
+      icon: <MessageOutlined />,
+      label: 'Feedback',
+      permission: 'feedback_view',
+      description: 'Manage feedback'
+    },
+    {
+      key: '/admin/about-management',
+      icon: <InfoCircleOutlined />,
+      label: 'About',
+      permission: 'about_view',
+      description: 'Manage about content'
+    },
+    {
+      key: '/admin/admin-management',
+      icon: <LockOutlined />,
+      label: 'Admin Management',
+      permission: 'admins_manage',
+      description: 'Manage admin users'
+    },
+    {
+      key: '/admin/permission-management',
+      icon: <KeyOutlined />,
+      label: 'Permission Management',
+      permission: 'permissions_manage',
+      description: 'Manage permissions'
+    },
+    {
+      key: '/admin/settings',
+      icon: <SettingOutlined />,
+      label: 'Settings',
+      permission: 'settings_view',
+      description: 'System settings'
+    }
+  ];
+
+  // Get menu items with their status (active or inactive)
+  const getMenuItemsWithStatus = () => {
+    return allMenuItems.map(item => {
+      const hasAccess = isSuperAdmin || hasPermission(item.permission);
+      return {
+        ...item,
+        hasAccess
+      };
+    });
   };
 
-  const handleNavigation = (path) => {
-    navigate(path);
+  // Count active and total items
+  const totalItems = allMenuItems.length;
+  const activeItems = allMenuItems.filter(item => isSuperAdmin || hasPermission(item.permission)).length;
+  const inactiveItems = totalItems - activeItems;
+
+  // Custom menu item renderer
+  const renderMenuItem = (item) => {
+    const isActive = item.hasAccess;
+    const isSelected = location.pathname === item.key;
+
+    return (
+      <div
+        key={item.key}
+        onClick={() => {
+          if (isActive) {
+            navigate(item.key);
+          }
+        }}
+        style={{
+          padding: '0 16px',
+          height: 40,
+          display: 'flex',
+          alignItems: 'center',
+          cursor: isActive ? 'pointer' : 'not-allowed',
+          backgroundColor: isSelected ? '#e6f7ff' : 'transparent',
+          borderRight: isSelected ? '3px solid #1890ff' : 'none',
+          opacity: isActive ? 1 : 0.5,
+          transition: 'all 0.2s ease',
+          marginBottom: 2,
+          position: 'relative'
+        }}
+        className={isActive ? 'menu-item-active' : 'menu-item-disabled'}
+        onMouseEnter={(e) => {
+          if (isActive) {
+            e.currentTarget.style.backgroundColor = '#f5f5f5';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isActive) {
+            e.currentTarget.style.backgroundColor = isSelected ? '#e6f7ff' : 'transparent';
+          }
+        }}
+      >
+        <Tooltip 
+          title={
+            !isActive 
+              ? `🔒 You don't have permission to access ${item.label}` 
+              : item.description
+          }
+          placement="right"
+          mouseEnterDelay={0.5}
+        >
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            width: '100%'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ 
+                fontSize: 16,
+                color: isActive ? (isSelected ? '#1890ff' : '#595959') : '#d9d9d9'
+              }}>
+                {item.icon}
+              </span>
+              {!collapsed && (
+                <span style={{ 
+                  fontSize: 14,
+                  color: isActive ? (isSelected ? '#1890ff' : '#595959') : '#bfbfbf'
+                }}>
+                  {item.label}
+                </span>
+              )}
+            </div>
+            {!collapsed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {isActive ? (
+                  <CheckCircleOutlined 
+                    style={{ 
+                      fontSize: 12, 
+                      color: '#52c41a'
+                    }} 
+                  />
+                ) : (
+                  <LockFilled 
+                    style={{ 
+                      fontSize: 12, 
+                      color: '#d9d9d9'
+                    }} 
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </Tooltip>
+      </div>
+    );
   };
 
-  const getInitial = (name) => {
-    return name ? name.charAt(0).toUpperCase() : 'A';
-  };
+  if (loading) {
+    return (
+      <Sider 
+        width={200} 
+        collapsed={collapsed}
+        collapsible
+        trigger={null}
+        style={{ 
+          background: '#fff', 
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          borderRight: '1px solid #f0f0f0',
+          zIndex: 100,
+          overflow: 'auto'
+        }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <Spin size="large" />
+          <Text type="secondary">Loading permissions...</Text>
+        </div>
+      </Sider>
+    );
+  }
+
+  const itemsWithStatus = getMenuItemsWithStatus();
 
   return (
-    <SidebarContainer isOpen={isOpen}>
-      <SidebarHeader>
-        {loading ? (
-          <Spin size="small" />
-        ) : (
-          <>
-            <Avatar 
-              size={40} 
-              style={{ 
-                backgroundColor: '#1890ff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '18px',
-                fontWeight: 'bold'
-              }}
-            >
-              {adminData ? getInitial(adminData.name) : 'A'}
-            </Avatar>
-            
-            <AdminInfo isOpen={isOpen}>
-              {adminData && (
-                <>
-                  <AdminName>{adminData.name}</AdminName>
-                  <AdminRole>{adminData.designation}</AdminRole>
-                </>
-              )}
-            </AdminInfo>
-          </>
+    <Sider 
+      collapsible 
+      collapsed={collapsed} 
+      onCollapse={setCollapsed}
+      trigger={null}
+      width={200}
+      style={{ 
+        background: '#fff', 
+        height: '100vh',
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        borderRight: '1px solid #f0f0f0',
+        zIndex: 100,
+        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+      {/* Toggle Button - Centered */}
+      <div style={{ 
+        padding: '12px 16px', 
+        borderBottom: '1px solid #f0f0f0',
+        display: 'flex',
+        justifyContent: 'right',
+        alignItems: 'center',
+        flexShrink: 0
+      }}>
+        <Button 
+          type="text" 
+          icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          onClick={toggleCollapsed}
+          style={{
+            fontSize: '16px',
+            width: 32,
+            height: 32,
+            color: '#666',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        />
+      </div>
+
+      {/* Profile Section - Centered */}
+      <div style={{ 
+        padding: collapsed ? '12px 8px' : '20px 16px', 
+        textAlign: 'center',
+        borderBottom: '1px solid #f0f0f0',
+        transition: 'all 0.2s',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <Avatar 
+          size={collapsed ? 40 : 64}
+          style={{ 
+            backgroundColor: '#1890ff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: collapsed ? 18 : 28,
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)'
+          }}
+          onClick={() => navigate('/admin/settings')}
+        >
+          {adminData?.name?.charAt(0)?.toUpperCase() || 'A'}
+        </Avatar>
+        
+        {!collapsed && (
+          <div style={{ marginTop: 12, width: '100%' }}>
+            <Text strong style={{ fontSize: 14, display: 'block' }}>
+              {adminData?.name || 'Admin'}
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 2 }}>
+              {adminData?.designation || 'Administrator'}
+            </Text>
+            <div style={{ marginTop: 6 }}>
+              <Badge 
+                status={isSuperAdmin ? 'success' : 'processing'} 
+                text={
+                  <Text type="secondary" style={{ fontSize: 10 }}>
+                    {isSuperAdmin ? '🔑 Super Admin' : `${activeItems}/${totalItems} permissions`}
+                  </Text>
+                }
+              />
+            </div>
+          </div>
         )}
-        
-        <ToggleButton onClick={toggleSidebar}>
-          {isOpen ? <BsChevronLeft /> : <BsChevronRight />}
-        </ToggleButton>
-      </SidebarHeader>
+      </div>
+
+      {/* Permission Summary Bar (when expanded) */}
+      {!collapsed && !isSuperAdmin && (
+        <div style={{ 
+          padding: '8px 16px',
+          borderBottom: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            fontSize: 11,
+            color: '#666'
+          }}>
+            <span>✅ Active: {activeItems}</span>
+            <span>🔒 Inactive: {inactiveItems}</span>
+          </div>
+          <div style={{ 
+            width: '100%', 
+            height: 3, 
+            backgroundColor: '#f0f0f0',
+            marginTop: 4,
+            borderRadius: 2,
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              width: `${(activeItems / totalItems) * 100}%`, 
+              height: '100%', 
+              backgroundColor: '#52c41a',
+              transition: 'width 0.3s ease',
+              borderRadius: 2
+            }} />
+          </div>
+        </div>
+      )}
       
-      <SidebarNav>
-        <SidebarNavItem isOpen={isOpen} onClick={() => handleNavigation("/admin/dashboard")}>
-          <SidebarIcon><BsGraphUp /></SidebarIcon>
-          <span>Dashboard</span>
-        </SidebarNavItem>
-        
-        {/* Academic Management Dropdown */}
-        <li>
-          <DropdownHeader 
-            isOpen={isOpen} 
-            onClick={() => toggleDropdown('academic')}
-          >
-            <div>
-              <SidebarIcon><BsBook /></SidebarIcon>
-              <span>Academic</span>
-            </div>
-            {isOpen && (openDropdowns.academic ? <BsChevronUp size={12} /> : <BsChevronDown size={12} />)}
-          </DropdownHeader>
-          <DropdownMenu isOpen={openDropdowns.academic && isOpen}>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/classes")}>
-              <SidebarIcon><BsPeople /></SidebarIcon>
-              <span>Class</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/students")}>
-              <SidebarIcon><BsPerson /></SidebarIcon>
-              <span>Student Reports</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/teachers")}>
-              <SidebarIcon><BsPerson /></SidebarIcon>
-              <span>Teacher</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/assignments")}>
-              <SidebarIcon><BsFileText /></SidebarIcon>
-              <span>Assignments</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/exams")}>
-              <SidebarIcon><BsBook /></SidebarIcon>
-              <span>Exams</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/performance")}>
-              <SidebarIcon><BsGraphDown /></SidebarIcon>
-              <span>Performance</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/attendance")}>
-              <SidebarIcon><BsCalendar /></SidebarIcon>
-              <span>Attendance</span>
-            </DropdownItem>
-          </DropdownMenu>
-        </li>
-        
-        {/* School Management Dropdown */}
-        <li>
-          <DropdownHeader 
-            isOpen={isOpen} 
-            onClick={() => toggleDropdown('management')}
-          >
-            <div>
-              <SidebarIcon><BsClipboard /></SidebarIcon>
-              <span>Management</span>
-            </div>
-            {isOpen && (openDropdowns.management ? <BsChevronUp size={12} /> : <BsChevronDown size={12} />)}
-          </DropdownHeader>
-          <DropdownMenu isOpen={openDropdowns.management && isOpen}>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/teacher-evaluations")}>
-              <SidebarIcon><BsStar /></SidebarIcon>
-              <span>Teacher Evaluations</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/library")}>
-              <SidebarIcon><BsCashCoin /></SidebarIcon>
-              <span>Dues</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/communication")}>
-              <SidebarIcon><BsCalendar3 /></SidebarIcon>
-              <span>Time Table</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/events")}>
-              <SidebarIcon><BsCalendarEvent /></SidebarIcon>
-              <span>Events & Calendar</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/applications")}>
-              <SidebarIcon><BsClipboard /></SidebarIcon>
-              <span>Student Applications</span>
-            </DropdownItem>
-          </DropdownMenu>
-        </li>
-        
-        {/* System & Settings Dropdown */}
-        <li>
-          <DropdownHeader 
-            isOpen={isOpen} 
-            onClick={() => toggleDropdown('system')}
-          >
-            <div>
-              <SidebarIcon><BsGear /></SidebarIcon>
-              <span>System</span>
-            </div>
-            {isOpen && (openDropdowns.system ? <BsChevronUp size={12} /> : <BsChevronDown size={12} />)}
-          </DropdownHeader>
-          <DropdownMenu isOpen={openDropdowns.system && isOpen}>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/feedback-management")}>
-              <SidebarIcon><BsChatSquareText /></SidebarIcon>
-              <span>Feedback Management</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/about-management")}>
-              <SidebarIcon><BsInfoCircle /></SidebarIcon>
-              <span>About Management</span>
-            </DropdownItem>
-            <DropdownItem isOpen={isOpen} onClick={() => handleNavigation("/admin/settings")}>
-              <SidebarIcon><BsGear /></SidebarIcon>
-              <span>Settings & Profile</span>
-            </DropdownItem>
-          </DropdownMenu>
-        </li>
-      </SidebarNav>
-    </SidebarContainer>
+      {/* Custom Menu with all items - active and inactive */}
+      <div style={{ 
+        flex: 1,
+        overflowY: 'auto',
+        padding: '8px 0'
+      }}>
+        {itemsWithStatus.map(item => renderMenuItem(item))}
+      </div>
+
+      {/* Show message if no permissions */}
+      {!collapsed && activeItems === 0 && !isSuperAdmin && (
+        <div style={{ padding: '16px', textAlign: 'center', flexShrink: 0 }}>
+          <LockFilled style={{ fontSize: 24, color: '#d9d9d9', display: 'block', marginBottom: 8 }} />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            No permissions assigned
+          </Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            Contact your administrator
+          </Text>
+        </div>
+      )}
+
+      {/* Legend */}
+      {!collapsed && (
+        <div style={{ 
+          padding: '8px 16px', 
+          borderTop: '1px solid #f0f0f0',
+          fontSize: 11,
+          color: '#999',
+          flexShrink: 0,
+          backgroundColor: '#fafafa'
+        }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <span>
+              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 10 }} /> Active
+            </span>
+            <span>
+              <LockFilled style={{ fontSize: 10, color: '#d9d9d9' }} /> Inactive
+            </span>
+          </div>
+        </div>
+      )}
+    </Sider>
   );
 };
 

@@ -20,7 +20,9 @@ import {
   Space,
   Popconfirm,
   Grid,
-  Drawer
+  Drawer,
+  Checkbox,
+  Result
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -29,15 +31,19 @@ import {
   DeleteOutlined,
   PlusOutlined,
   FilterOutlined,
-  PrinterOutlined
+  PrinterOutlined,
+  DeleteFilled
 } from '@ant-design/icons';
+import PermissionGuard from '../../components/PermissionGuard';
+import { usePermissions } from '../../contexts/PermissionContext';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { useBreakpoint } = Grid;
 
-const StudentManagement = () => {
+// Main Content Component
+const StudentManagementContent = () => {
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
@@ -61,19 +67,38 @@ const StudentManagement = () => {
     const [insertForm] = Form.useForm();
     const printRef = useRef(null);
 
+    // State for bulk selection
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [isBulkDeleteModalVisible, setIsBulkDeleteModalVisible] = useState(false);
+
+    // Permissions
+    const { hasPermission, isSuperAdmin } = usePermissions();
+    const canViewStudents = hasPermission('students_view') || isSuperAdmin;
+    const canManageStudents = hasPermission('students_manage') || isSuperAdmin;
+    const canDeleteStudents = hasPermission('students_delete') || isSuperAdmin;
+
     const screens = useBreakpoint();
 
-    // Fetch sections data
+    // API Base URL
+    const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
+
+    // Create axios instance WITHOUT credentials
+    const api = axios.create({
+        baseURL: API_BASE,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        withCredentials: true
+    });
+
+    // Fetch sections data - NO CREDENTIALS
     const fetchSections = async () => {
         try {
-            const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php', {
-                withCredentials: true,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            const response = await api.get('Sec_Read.php');
             if (Array.isArray(response.data)) {
                 setSections(response.data);
+            } else if (response.data.success && Array.isArray(response.data.data)) {
+                setSections(response.data.data);
             } else {
                 throw new Error('Invalid sections data format');
             }
@@ -83,8 +108,13 @@ const StudentManagement = () => {
         }
     };
 
-    // Fetch students data with pagination, search, sorting
+    // Fetch students data - NO CREDENTIALS
     const fetchStudents = async () => {
+        if (!canViewStudents) {
+            message.error('You do not have permission to view students');
+            return;
+        }
+        
         setLoading(true);
         try {
             const { current, pageSize } = pagination;
@@ -96,38 +126,36 @@ const StudentManagement = () => {
                 sort: sortField,
                 order: sortOrder
             };
-            const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/excel_students.php', {
-                params: params,
-                withCredentials: true,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            const response = await api.get('excel_students.php', { params });
 
             if (response.data.success) {
-                setStudents(response.data.data);
+                setStudents(response.data.data || []);
                 setPagination({
                     ...pagination,
-                    total: response.data.pagination.total,
-                    totalPages: response.data.pagination.total_pages
+                    total: response.data.pagination?.total || 0,
+                    totalPages: response.data.pagination?.total_pages || 0
                 });
+                // Clear selection when data changes
+                setSelectedRowKeys([]);
             } else {
                 throw new Error(response.data.error || 'Failed to fetch students');
             }
         } catch (error) {
-            if (error.response?.status === 401) {
-                message.error('Session expired. Please log in again.');
-            } else {
-                message.error(error.response?.data?.error || 'Error fetching students');
-            }
+            message.error(error.response?.data?.error || 'Error fetching students');
             console.error('Error:', error);
+            setStudents([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // Handle Excel file import
+    // Handle Excel file import - NO CREDENTIALS
     const handleExcelImport = async (file) => {
+        if (!canManageStudents) {
+            message.error('You do not have permission to import students');
+            return false;
+        }
+        
         setImportLoading(true);
         try {
             const data = await new Promise((resolve, reject) =>{
@@ -235,16 +263,11 @@ const StudentManagement = () => {
         }
     };
 
-    // Import students to database
+    // Import students to database - NO CREDENTIALS
     const importStudents = async (studentsData) => {
         try {
-            const response = await axios.post('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Import_students.php', {
+            const response = await api.post('Import_students.php', {
                 students: studentsData
-            }, {
-                withCredentials: true,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
             });
 
             if (response.data.success) {
@@ -260,13 +283,17 @@ const StudentManagement = () => {
         }
     };
 
-    // Handle manual student insertion
+    // Handle manual student insertion - NO CREDENTIALS
     const handleInsert = () => {
+        if (!canManageStudents) {
+            message.error('You do not have permission to add students');
+            return;
+        }
         insertForm.resetFields();
         setIsInsertModalVisible(true);
     };
 
-    // Submit manual insertion form
+    // Submit manual insertion form - NO CREDENTIALS
     const handleInsertSubmit = async () => {
         try {
             const values = await insertForm.validateFields();
@@ -280,16 +307,7 @@ const StudentManagement = () => {
                 Guardian_Contact: values.guardian_contact,
                 Discipline: values.discipline
             };
-            const response = await axios.post(
-                'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/std_insert.php',
-                insertData,
-                { 
-                    withCredentials: true,
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    } 
-                }
-            );
+            const response = await api.post('std_insert.php', insertData);
 
             if (response.data.success) {
                 message.success('Student added successfully');
@@ -306,8 +324,12 @@ const StudentManagement = () => {
         }
     };
 
-    // Handle student edit
+    // Handle student edit - NO CREDENTIALS
     const handleEdit = (student) => {
+        if (!canManageStudents) {
+            message.error('You do not have permission to edit students');
+            return;
+        }
         setCurrentStudent(student);
         form.setFieldsValue({
             id: student.id,
@@ -322,7 +344,7 @@ const StudentManagement = () => {
         setIsEditModalVisible(true);
     };
 
-    // Handle student update
+    // Handle student update - NO CREDENTIALS
     const handleUpdate = async () => {
         try {
             const values = await form.validateFields();
@@ -338,16 +360,7 @@ const StudentManagement = () => {
                 Admission_Status: values.admission_status
             };
 
-            const response = await axios.put(
-                'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/student_update.php',
-                updateData,
-                { 
-                    withCredentials: true,
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    } 
-                }
-            );
+            const response = await api.put('student_update.php', updateData);
 
             if (response.data.success) {
                 message.success('Student updated successfully');
@@ -364,29 +377,70 @@ const StudentManagement = () => {
         }
     };
 
-    // Handle student deletion
+    // Handle single student deletion
     const handleDelete = async (id) => {
+        if (!canDeleteStudents) {
+            message.error('You do not have permission to delete students');
+            return;
+        }
+        
         try {
             setLoading(true);
-            const response = await axios.delete(
-                `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/student_delete.php?id=${id}`,
-                {
-                    withCredentials: true,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            const response = await api.delete(`student_delete.php`, {
+                params: { id: id }
+            });
 
             if (response.data.success) {
-                message.success('Student deleted successfully');
+                message.success(response.data.message);
                 fetchStudents();
             } else {
                 throw new Error(response.data.error || 'Delete failed');
             }
         } catch (error) {
-            message.error(error.message || 'Error deleting student');
+            message.error(error.response?.data?.error || error.message || 'Error deleting student');
             console.error('Delete error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle bulk delete
+    const handleBulkDelete = async () => {
+        if (!canDeleteStudents) {
+            message.error('You do not have permission to delete students');
+            return;
+        }
+        
+        if (selectedRowKeys.length === 0) {
+            message.warning('Please select at least one student to delete');
+            return;
+        }
+
+        setIsBulkDeleteModalVisible(true);
+    };
+
+    const confirmBulkDelete = async () => {
+        try {
+            setLoading(true);
+            setIsBulkDeleteModalVisible(false);
+            
+            const response = await api.delete(`student_delete.php`, {
+                data: { ids: selectedRowKeys },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.data.success) {
+                message.success(response.data.message);
+                setSelectedRowKeys([]);
+                fetchStudents();
+            } else {
+                throw new Error(response.data.error || 'Bulk delete failed');
+            }
+        } catch (error) {
+            message.error(error.response?.data?.error || error.message || 'Error performing bulk delete');
+            console.error('Bulk delete error:', error);
         } finally {
             setLoading(false);
         }
@@ -410,10 +464,34 @@ const StudentManagement = () => {
         return Promise.reject(new Error('Please enter a valid email or phone number!'));
     };
 
+    // Row selection configuration
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (selectedKeys) => {
+            setSelectedRowKeys(selectedKeys);
+        },
+        selections: [
+            Table.SELECTION_ALL,
+            Table.SELECTION_INVERT,
+            Table.SELECTION_NONE,
+        ],
+        getCheckboxProps: (record) => ({
+            disabled: !canDeleteStudents,
+        }),
+    };
+
     // Responsive table columns configuration
     const getColumns = () => {
         const baseColumns = [
-          
+            {
+                title: 'ID',
+                dataIndex: 'id',
+                key: 'id',
+                sorter: true,
+                width: 60,
+                sortOrder: sortField === 'id' && (sortOrder === 'asc' ? 'ascend' : 'descend'),
+                responsive: ['sm']
+            },
             {
                 title: 'Student Name',
                 dataIndex: 'name',
@@ -444,7 +522,7 @@ const StudentManagement = () => {
                 dataIndex: 'section_name',
                 key: 'section_name',
                 width: 120,
-                render: (section) => <Tag color="blue" style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{section}</Tag>,
+                render: (section) => <Tag color="blue" style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{section || 'N/A'}</Tag>,
                 sorter: true,
                 sortOrder: sortField === 'section_name' && (sortOrder === 'asc' ? 'ascend' : 'descend'),
                 responsive: ['sm']
@@ -466,7 +544,7 @@ const StudentManagement = () => {
                 sortOrder: sortField === 'guardian_contact' && (sortOrder === 'asc' ? 'ascend' : 'descend'),
                 responsive: ['lg'],
                 render: (contact) => {
-                    // Check if it's an email
+                    if (!contact) return 'N/A';
                     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
                     return isEmail ? (
                         <a href={`mailto:${contact}`}>{contact}</a>
@@ -486,7 +564,8 @@ const StudentManagement = () => {
                     if (status === 'Full scholershiped') color = 'green';
                     if (status === 'Disabled') color = 'blue';
                     if (status === 'Struck Off') color = 'red';
-                    return <Tag color={color}>{status}</Tag>;
+                    if (status === 'Pending') color = 'orange';
+                    return <Tag color={color}>{status || 'Pending'}</Tag>;
                 },
                 sorter: true,
                 sortOrder: sortField === 'admission_status' && (sortOrder === 'asc' ? 'ascend' : 'descend')
@@ -503,18 +582,21 @@ const StudentManagement = () => {
                             type="link" 
                             icon={<EditOutlined />} 
                             onClick={() => handleEdit(record)}
+                            disabled={!canManageStudents}
                         />
                         <Popconfirm
                             title="Are you sure to delete this student?"
                             onConfirm={() => handleDelete(record.id)}
                             okText="Yes"
                             cancelText="No"
+                            disabled={!canDeleteStudents}
                         >
                             <Button 
                                 size="small"
                                 type="link" 
                                 icon={<DeleteOutlined />} 
                                 danger
+                                disabled={!canDeleteStudents}
                             />
                         </Popconfirm>
                     </Space>
@@ -538,18 +620,21 @@ const StudentManagement = () => {
                                     type="link" 
                                     icon={<EditOutlined />} 
                                     onClick={() => handleEdit(record)}
+                                    disabled={!canManageStudents}
                                 />
                                 <Popconfirm
                                     title="Are you sure to delete this student?"
                                     onConfirm={() => handleDelete(record.id)}
                                     okText="Yes"
                                     cancelText="No"
+                                    disabled={!canDeleteStudents}
                                 >
                                     <Button 
                                         size="small"
                                         type="link" 
                                         icon={<DeleteOutlined />} 
                                         danger
+                                        disabled={!canDeleteStudents}
                                     />
                                 </Popconfirm>
                             </Space>
@@ -563,14 +648,18 @@ const StudentManagement = () => {
 
     // Initial data fetch
     useEffect(() => {
-        fetchSections();
-    }, []);
+        if (canViewStudents) {
+            fetchSections();
+        }
+    }, [canViewStudents]);
 
     // Fetch students when filters change
     useEffect(() => {
-        fetchStudents();
+        if (canViewStudents) {
+            fetchStudents();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pagination.current, pagination.pageSize, searchTerm, searchField, sortField, sortOrder]);
+    }, [pagination.current, pagination.pageSize, searchTerm, searchField, sortField, sortOrder, canViewStudents]);
 
     // Handle table changes (pagination, sorting)
     const handleTableChange = (pagination, filters, sorter) => {
@@ -597,7 +686,7 @@ const StudentManagement = () => {
         },
         accept: '.xlsx, .xls',
         showUploadList: false,
-        disabled: importLoading
+        disabled: importLoading || !canManageStudents
     };
 
     // Print students table
@@ -628,6 +717,22 @@ const StudentManagement = () => {
             win.close();
         }, 500);
     };
+
+    // Check if user has permission to view students
+    if (!canViewStudents) {
+        return (
+            <Result
+                status="403"
+                title="403"
+                subTitle="Sorry, you do not have permission to view student records."
+                extra={
+                    <Button type="primary" onClick={() => window.location.href = '/admin/dashboard'}>
+                        Go to Dashboard
+                    </Button>
+                }
+            />
+        );
+    }
 
     // Search and filter component
     const renderSearchFilter = () => (
@@ -704,26 +809,43 @@ const StudentManagement = () => {
                     }
                     extra={
                         <Space direction={screens.xs ? "vertical" : "horizontal"} style={{ width: screens.xs ? '100%' : 'auto' }}>
-                            <Button 
-                                type="primary" 
-                                icon={<PlusOutlined />}
-                                onClick={handleInsert}
-                                loading={loading}
-                                size={screens.xs ? "small" : "middle"}
-                                block={screens.xs}
-                            >
-                                {screens.xs ? 'Add' : 'Add Student'}
-                            </Button>
-                            <Upload {...uploadProps}>
+                            {selectedRowKeys.length > 0 && canDeleteStudents && (
                                 <Button 
-                                    icon={<UploadOutlined />}
-                                    loading={importLoading}
+                                    danger
+                                    icon={<DeleteFilled />}
+                                    onClick={handleBulkDelete}
+                                    loading={loading}
                                     size={screens.xs ? "small" : "middle"}
                                     block={screens.xs}
                                 >
-                                    {screens.xs ? 'Import' : 'Import Excel'}
+                                    Delete Selected ({selectedRowKeys.length})
                                 </Button>
-                            </Upload>
+                            )}
+                            {canManageStudents && (
+                                <Button 
+                                    type="primary" 
+                                    icon={<PlusOutlined />}
+                                    onClick={handleInsert}
+                                    loading={loading}
+                                    size={screens.xs ? "small" : "middle"}
+                                    block={screens.xs}
+                                >
+                                    {screens.xs ? 'Add' : 'Add Student'}
+                                </Button>
+                            )}
+                            {canManageStudents && (
+                                <Upload {...uploadProps}>
+                                    <Button 
+                                        icon={<UploadOutlined />}
+                                        loading={importLoading}
+                                        size={screens.xs ? "small" : "middle"}
+                                        block={screens.xs}
+                                        disabled={!canManageStudents}
+                                    >
+                                        {screens.xs ? 'Import' : 'Import Excel'}
+                                    </Button>
+                                </Upload>
+                            )}
                             <Button
                                 icon={<PrinterOutlined />}
                                 onClick={handlePrint}
@@ -738,12 +860,23 @@ const StudentManagement = () => {
                 >
                     {/* Search */}
                     {renderSearchFilter()}
+                    
+                    {/* Selected count indicator */}
+                    {selectedRowKeys.length > 0 && (
+                        <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
+                            <Text>
+                                Selected <strong>{selectedRowKeys.length}</strong> student(s)
+                            </Text>
+                        </div>
+                    )}
+                    
                     <Spin spinning={loading || importLoading}>
                         <div ref={printRef}>
                             <Table 
                                 columns={getColumns()} 
                                 dataSource={students} 
                                 rowKey="id"
+                                rowSelection={canDeleteStudents ? rowSelection : undefined}
                                 bordered
                                 size={screens.xs ? "small" : "middle"}
                                 pagination={{
@@ -771,7 +904,7 @@ const StudentManagement = () => {
                     title="Search"
                     placement="right"
                     onClose={() => setShowMobileFilters(false)}
-                    visible={showMobileFilters}
+                    open={showMobileFilters}
                     width={300}
                 >
                     {renderSearchFilter()}
@@ -780,7 +913,7 @@ const StudentManagement = () => {
                 {/* Import Errors Modal */}
                 <Modal
                     title="Import Errors"
-                    visible={isErrorModalVisible}
+                    open={isErrorModalVisible}
                     onCancel={() => setIsErrorModalVisible(false)}
                     footer={[
                         <Button key="close" onClick={() => setIsErrorModalVisible(false)}>
@@ -798,10 +931,38 @@ const StudentManagement = () => {
                     </div>
                 </Modal>
 
+                {/* Bulk Delete Confirmation Modal */}
+                <Modal
+                    title="Confirm Bulk Delete"
+                    open={isBulkDeleteModalVisible}
+                    onOk={confirmBulkDelete}
+                    onCancel={() => setIsBulkDeleteModalVisible(false)}
+                    okText="Yes, Delete All"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true, loading: loading }}
+                >
+                    <p>
+                        Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected student(s)?
+                    </p>
+                    <p style={{ color: '#ff4d4f' }}>
+                        This action cannot be undone.
+                    </p>
+                    <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
+                        {students
+                            .filter(s => selectedRowKeys.includes(s.id))
+                            .map(s => (
+                                <div key={s.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                    <Text>ID: {s.id} - {s.name}</Text>
+                                </div>
+                            ))
+                        }
+                    </div>
+                </Modal>
+
                 {/* Edit Student Modal */}
                 <Modal
                     title="Edit Student"
-                    visible={isEditModalVisible}
+                    open={isEditModalVisible}
                     onOk={handleUpdate}
                     onCancel={() => setIsEditModalVisible(false)}
                     confirmLoading={loading}
@@ -881,8 +1042,8 @@ const StudentManagement = () => {
                         >
                             <Select>
                                 <Option value="Pending">Pending</Option>
-                                <Option value="Full Scholershiped">Full Scholershiped</Option>
-                                <Option value="Half Scholershiped">Half Scholershiped</Option>
+                                <Option value="Full scholershiped">Full Scholershiped</Option>
+                                <Option value="Half scholershiped">Half Scholershiped</Option>
                                 <Option value="Self">Self</Option>
                                 <Option value="Hafiz">Hafiz</Option>
                                 <Option value="Disabled">Disabled</Option>
@@ -894,7 +1055,7 @@ const StudentManagement = () => {
                 {/* Insert Student Modal */}
                 <Modal
                     title="Add New Student"
-                    visible={isInsertModalVisible}
+                    open={isInsertModalVisible}
                     onOk={handleInsertSubmit}
                     onCancel={() => setIsInsertModalVisible(false)}
                     confirmLoading={loading}
@@ -970,9 +1131,9 @@ const StudentManagement = () => {
                             rules={[{ required: true, message: 'Please select admission status!' }]}
                         >
                             <Select>
-                                 <Option value="Pending">Pending</Option>
-                                <Option value="Full Scholershiped">Full Scholershiped</Option>
-                                <Option value="Half Scholershiped">Half Scholershiped</Option>
+                                <Option value="Pending">Pending</Option>
+                                <Option value="Full scholershiped">Full Scholershiped</Option>
+                                <Option value="Half scholershiped">Half Scholershiped</Option>
                                 <Option value="Self">Self</Option>
                                 <Option value="Hafiz">Hafiz</Option>
                                 <Option value="Disabled">Disabled</Option>
@@ -982,6 +1143,15 @@ const StudentManagement = () => {
                 </Modal>
             </Content>
         </Layout>
+    );
+};
+
+// Export with Permission Guard
+const StudentManagement = () => {
+    return (
+        <PermissionGuard requiredPermission="students_view">
+            <StudentManagementContent />
+        </PermissionGuard>
     );
 };
 

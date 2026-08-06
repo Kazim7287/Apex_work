@@ -59,7 +59,7 @@ const EventCalendar = () => {
     const isMobile = useMediaQuery({ maxWidth: 768 });
 
     // API endpoints
-    const API_BASE =' https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
+    const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
     const GET_EVENTS_API = `${API_BASE}/get_eventsad.php`;
     const ADD_EVENT_API = `${API_BASE}/Add_event.php`;
     const UPDATE_EVENT_API = `${API_BASE}/update_event.php`;
@@ -90,20 +90,16 @@ const EventCalendar = () => {
                 credentials: 'include'
             });
             
-            if (response.status === 401) {
-                navigate('/admin-signin');
-                return;
+            // REMOVED: Authentication redirect checks
+            // Just check if response is ok
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             
             const data = await response.json();
             
-            if (data.success === false && data.error_code === "ADMIN_AUTH_REQUIRED") {
-                navigate('/admin-signin');
-                return;
-            }
-            
+            // REMOVED: ADMIN_AUTH_REQUIRED check
+            // Just check if data has success and data array
             if (data.success && Array.isArray(data.data)) {
                 const formattedEvents = data.data.map(event => ({
                     ...event,
@@ -179,12 +175,10 @@ const EventCalendar = () => {
                 credentials: 'include'
             });
 
-            if (response.status === 401) {
-                navigate('/admin-signin');
-                return;
+            // REMOVED: Authentication redirect checks
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
             if (!data.success) throw new Error(data.message);
@@ -239,12 +233,10 @@ const EventCalendar = () => {
                 credentials: 'include'
             });
 
-            if (response.status === 401) {
-                navigate('/admin-signin');
-                return;
+            // REMOVED: Authentication redirect checks
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
             if (!data.success) throw new Error(data.message);
@@ -279,12 +271,10 @@ const EventCalendar = () => {
                 credentials: 'include'
             });
 
-            if (response.status === 401) {
-                navigate('/admin-signin');
-                return;
+            // REMOVED: Authentication redirect checks
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
             if (!data.success) throw new Error(data.message);

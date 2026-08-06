@@ -1,7 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import Layout from "../src/components/Layout"; // 👈 Import layout
 
-
+// Public components
 import AboutManagement from "../src/pages/Admin/AboutManagement";
 import FeedbackManagement from "../src/pages/Admin/FeedbackManagement";
 import About from "../src/components/Home/About"; 
@@ -16,6 +16,7 @@ import Unauthorized from "../src/components/Unauthorized";
 
 // Admin components
 import AdminManagement from "../src/pages/Admin/AdminManagement";
+import PermissionManagement from "../src/pages/Admin/PermissionManagement"; // 👈 ADD THIS
 import UnassignedApplications from "../src/pages/Admin/StudentsApplications";
 import AdminDashboard from "../src/pages/Admin/Dashboard";
 import Announcement from "../src/pages/Admin/Announcement";
@@ -23,7 +24,7 @@ import Classes from "../src/pages/Admin/Classes";
 import Assignment from "../src/pages/Admin/Assignment";
 import Exam from "../src/pages/Admin/Exam";
 import TeacherEvaluations from "../src/pages/Admin/TeacherEvaluations";
- import Attendance from "../src/pages/Admin/Attendance";
+import Attendance from "../src/pages/Admin/Attendance";
 import EventCalender from "../src/pages/Admin/EventCalender";
 import Library from "../src/pages/Admin/Library";
 import Performance from "../src/pages/Admin/Performance";
@@ -85,15 +86,16 @@ export const router = createBrowserRouter([
     path: "/admin",
     element: <Layout />,
     children: [
-      {path: "teacher-evaluations", element: <TeacherEvaluations /> },
+      { path: "teacher-evaluations", element: <TeacherEvaluations /> },
       { path: "admin-management", element: <AdminManagement /> },
+      { path: "permission-management", element: <PermissionManagement /> }, // 👈 ADD THIS
       { path: "dashboard", element: <AdminDashboard /> },
       { path: "applications", element: <UnassignedApplications /> },
       { path: "feedback-management", element: <FeedbackManagement /> },
       { path: "about-management", element: <AboutManagement /> },
       { path: "classes", element: <Classes /> },
       { path: "exams", element: <Exam /> },
-      { path: "attendance", element: <Attendance/> },
+      { path: "attendance", element: <Attendance /> },
       { path: "performance", element: <Performance /> },
       { path: "teachers", element: <Teachers /> },
       { path: "students", element: <Student /> },
@@ -122,7 +124,7 @@ export const router = createBrowserRouter([
       { path: "announcement", element: <AnnouncementSection /> },
       { path: "profile", element: <ProfileSection /> },
       { path: "term/list", element: <TermList /> },
-       { path: "teacher-evaluation", element: <TeacherEvaluation /> },
+      { path: "teacher-evaluation", element: <TeacherEvaluation /> },
       { path: "assignment/list", element: <AssignmentList /> },
       { path: "performance/list", element: <PerformanceList /> },
     ],
@@ -153,7 +155,7 @@ export const router = createBrowserRouter([
   // Fallback route for 404
   {
     path: "*",
-    element:<Home />,
+    element: <Home />,
   },
 ], {
   future: {

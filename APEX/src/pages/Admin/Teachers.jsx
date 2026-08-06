@@ -89,7 +89,7 @@ const Teachers = () => {
     // Fetch sections data
     const fetchSections = async () => {
         try {
-            const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_read.php');
+            const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php');
             if (response.status === 200) {
                 setSections(response.data);
             } else {

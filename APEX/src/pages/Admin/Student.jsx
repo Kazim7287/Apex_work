@@ -22,7 +22,8 @@ import {
   Grid,
   Dropdown,
   Space,
-  Drawer
+  Drawer,
+  Popconfirm
 } from 'antd';
 import {
   UserOutlined,
@@ -37,16 +38,15 @@ import {
   MenuOutlined,
   DownloadOutlined,
   FilePdfOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  DeleteOutlined,
+  DeleteFilled
 } from '@ant-design/icons';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 const { useBreakpoint } = Grid;
-
-// Set Axios defaults to include credentials
-axios.defaults.withCredentials = true;
 
 const StudentReports = () => {
     const [reports, setReports] = useState([]);
@@ -58,10 +58,32 @@ const StudentReports = () => {
     const [activeTab, setActiveTab] = useState('performance');
     const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);
     
+    // State for bulk selection and deletion
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [isBulkDeleteModalVisible, setIsBulkDeleteModalVisible] = useState(false);
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+    
     const screens = useBreakpoint();
     const isMobile = !screens.md;
     const isSmallMobile = !screens.sm;
     const reportRef = useRef();
+
+    // Create axios instances
+    const publicApi = axios.create({
+        baseURL: 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/',
+        withCredentials: false,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+
+    const authApi = axios.create({
+        baseURL: 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/',
+        withCredentials: true,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 
     useEffect(() => {
         fetchSections();
@@ -70,7 +92,7 @@ const StudentReports = () => {
     const fetchSections = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php');
+            const response = await publicApi.get('Sec_Read.php');
             setSections(response.data);
         } catch (error) {
             if (error.response && error.response.status === 401) {
@@ -87,8 +109,9 @@ const StudentReports = () => {
     const fetchReportsBySection = async (sectionId) => {
         setLoading(true);
         setSelectedSection(sectionId);
+        setSelectedRowKeys([]);
         try {
-            const response = await axios.get(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/adstdreports_read.php?section_id=${sectionId}`);
+            const response = await publicApi.get(`adstdreports_read.php?section_id=${sectionId}`);
             setReports(response.data.data || []);
             if (isMobile) {
                 setMobileDrawerVisible(false);
@@ -105,6 +128,74 @@ const StudentReports = () => {
         setSelectedReport(report);
         setModalVisible(true);
         setActiveTab('performance');
+    };
+
+    // Handle single delete - Immediate removal
+    const handleDelete = async (id) => {
+        try {
+            const response = await publicApi.delete(`admin_std_reports_delete.php?id=${id}`);
+            
+            if (response.data.success) {
+                message.success(response.data.message || 'Report deleted successfully');
+                
+                // Remove the deleted report from the list immediately
+                setReports(prevReports => prevReports.filter(report => report.id !== id));
+                setSelectedRowKeys(prevKeys => prevKeys.filter(key => key !== id));
+                
+                // If the deleted report was the one being viewed in the modal, close it
+                if (selectedReport && selectedReport.id === id) {
+                    setModalVisible(false);
+                    setSelectedReport(null);
+                }
+            } else {
+                throw new Error(response.data.message || 'Delete failed');
+            }
+        } catch (error) {
+            message.error(error.response?.data?.message || error.message || 'Failed to delete report');
+            console.error('Delete error:', error);
+        }
+    };
+
+    // Handle bulk delete - Immediate removal
+    const handleBulkDelete = () => {
+        if (selectedRowKeys.length === 0) {
+            message.warning('Please select at least one report to delete');
+            return;
+        }
+        setIsBulkDeleteModalVisible(true);
+    };
+
+    const confirmBulkDelete = async () => {
+        try {
+            setBulkDeleteLoading(true);
+            setIsBulkDeleteModalVisible(false);
+            
+            const idsParam = selectedRowKeys.join(',');
+            const response = await publicApi.delete(`admin_std_reports_delete.php?ids=${idsParam}`);
+
+            if (response.data.success) {
+                message.success(response.data.message);
+                
+                // Remove all selected reports from the list immediately
+                setReports(prevReports => 
+                    prevReports.filter(report => !selectedRowKeys.includes(report.id))
+                );
+                setSelectedRowKeys([]);
+                
+                // If the selected report was deleted, close the modal
+                if (selectedReport && selectedRowKeys.includes(selectedReport.id)) {
+                    setModalVisible(false);
+                    setSelectedReport(null);
+                }
+            } else {
+                throw new Error(response.data.message || 'Bulk delete failed');
+            }
+        } catch (error) {
+            message.error(error.response?.data?.message || error.message || 'Error performing bulk delete');
+            console.error('Bulk delete error:', error);
+        } finally {
+            setBulkDeleteLoading(false);
+        }
     };
 
     // Print functionality
@@ -241,6 +332,19 @@ const StudentReports = () => {
         printWindow.document.close();
     };
 
+    // Row selection configuration
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (selectedKeys) => {
+            setSelectedRowKeys(selectedKeys);
+        },
+        selections: [
+            Table.SELECTION_ALL,
+            Table.SELECTION_INVERT,
+            Table.SELECTION_NONE,
+        ],
+    };
+
     const columns = [
         {
             title: 'Student',
@@ -347,8 +451,27 @@ const StudentReports = () => {
                     />
                 );
             },
-            fixed: isMobile ? 'right' : false,
-            width: isMobile ? 60 : undefined,
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            width: 80,
+            render: (_, record) => (
+                <Popconfirm
+                    title="Are you sure to delete this report?"
+                    onConfirm={() => handleDelete(record.id)}
+                    okText="Yes"
+                    cancelText="No"
+                    placement="left"
+                >
+                    <Button
+                        type="text"
+                        icon={<DeleteOutlined />}
+                        danger
+                        size="small"
+                    />
+                </Popconfirm>
+            ),
         }
     ];
 
@@ -617,16 +740,29 @@ const StudentReports = () => {
                         </div>
                     }
                     extra={
-                        !isMobile && (
-                            <Text type="secondary" style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                {new Date().toLocaleDateString('en-US', { 
-                                    weekday: 'long', 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                })}
-                            </Text>
-                        )
+                        <Space>
+                            {selectedRowKeys.length > 0 && (
+                                <Button 
+                                    danger
+                                    icon={<DeleteFilled />}
+                                    onClick={handleBulkDelete}
+                                    loading={bulkDeleteLoading}
+                                    size={isSmallMobile ? 'small' : 'middle'}
+                                >
+                                    Delete Selected ({selectedRowKeys.length})
+                                </Button>
+                            )}
+                            {!isMobile && (
+                                <Text type="secondary" style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
+                                    {new Date().toLocaleDateString('en-US', { 
+                                        weekday: 'long', 
+                                        year: 'numeric', 
+                                        month: 'long', 
+                                        day: 'numeric' 
+                                    })}
+                                </Text>
+                            )}
+                        </Space>
                     }
                     bordered={false}
                     style={{ 
@@ -662,26 +798,66 @@ const StudentReports = () => {
                     )}
 
                     {selectedSection && (
-                        <Spin spinning={loading}>
-                            <Table 
-                                columns={columns} 
-                                dataSource={reports} 
-                                rowKey="id"
-                                bordered
-                                size={isSmallMobile ? 'small' : 'middle'}
-                                locale={{ emptyText: 'No reports found for this section' }}
-                                pagination={{
-                                    pageSize: 10,
-                                    showSizeChanger: false,
-                                    showTotal: (total) => `Total ${total} students`,
-                                    simple: isMobile,
-                                    size: isSmallMobile ? 'small' : 'default'
-                                }}
-                                scroll={{ x: isMobile ? 500 : true }}
-                            />
-                        </Spin>
+                        <>
+                            {selectedRowKeys.length > 0 && (
+                                <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
+                                    <Text>
+                                        Selected <strong>{selectedRowKeys.length}</strong> report(s)
+                                    </Text>
+                                </div>
+                            )}
+                            <Spin spinning={loading}>
+                                <Table 
+                                    columns={columns} 
+                                    dataSource={reports} 
+                                    rowKey="id"
+                                    rowSelection={rowSelection}
+                                    bordered
+                                    size={isSmallMobile ? 'small' : 'middle'}
+                                    locale={{ emptyText: 'No reports found for this section' }}
+                                    pagination={{
+                                        pageSize: 10,
+                                        showSizeChanger: false,
+                                        showTotal: (total) => `Total ${total} students`,
+                                        simple: isMobile,
+                                        size: isSmallMobile ? 'small' : 'default'
+                                    }}
+                                    scroll={{ x: isMobile ? 500 : true }}
+                                />
+                            </Spin>
+                        </>
                     )}
                 </Card>
+
+                {/* Bulk Delete Confirmation Modal */}
+                <Modal
+                    title="Confirm Bulk Delete"
+                    open={isBulkDeleteModalVisible}
+                    onOk={confirmBulkDelete}
+                    onCancel={() => setIsBulkDeleteModalVisible(false)}
+                    okText="Yes, Delete All"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
+                >
+                    <p>
+                        Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected report(s)?
+                    </p>
+                    <p style={{ color: '#ff4d4f' }}>
+                        This action cannot be undone.
+                    </p>
+                    <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
+                        {reports
+                            .filter(r => selectedRowKeys.includes(r.id))
+                            .map(r => (
+                                <div key={r.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                    <Text>
+                                        {r.student.name} - {r.section.name} ({r.subject.name})
+                                    </Text>
+                                </div>
+                            ))
+                        }
+                    </div>
+                </Modal>
 
                 {/* Report Details Modal */}
                 <Modal

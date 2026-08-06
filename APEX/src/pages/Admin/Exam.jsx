@@ -83,7 +83,7 @@ const ExamTimetable = () => {
   const isTablet = screens.md && !screens.lg;
 
   // API endpoints
-  const SECTIONS_API = "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/sec_read.php";
+  const SECTIONS_API = "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php";
   const SUBJECTS_API = "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/FilterAd.php";
   const EXAM_READ_API = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/exam_read.php`;
   const EXAM_TIMETABLE_READ_API = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/ExamTimetableFetch.php`;

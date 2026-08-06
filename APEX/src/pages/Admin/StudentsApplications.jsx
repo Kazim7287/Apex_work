@@ -19,7 +19,9 @@ import {
   Badge,
   Divider,
   Tooltip,
-  Tabs
+  Tabs,
+  Popconfirm,
+  Empty
 } from 'antd';
 import {
   EyeOutlined,
@@ -31,7 +33,9 @@ import {
   SyncOutlined,
   ClockCircleOutlined,
   TeamOutlined,
-  SolutionOutlined
+  SolutionOutlined,
+  DeleteOutlined,
+  DeleteFilled
 } from '@ant-design/icons';
 
 const { Option } = Select;
@@ -52,16 +56,34 @@ const StudentApplications = () => {
     const [form] = Form.useForm();
     const navigate = useNavigate();
 
+    // State for bulk selection and deletion
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [isBulkDeleteModalVisible, setIsBulkDeleteModalVisible] = useState(false);
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
+    // API Base URL
+    const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
+
+    // Create axios-like fetch wrapper
+    const apiFetch = async (endpoint, options = {}) => {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+        return response;
+    };
+
     // Determine user role (admin or teacher)
     useEffect(() => {
         const checkUserRole = async () => {
             try {
-                // Try to fetch teacher applications first
-                const teacherResponse = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/read_leave_applications.php', {
-                    credentials: 'include'
-                });
+                const response = await apiFetch('read_leave_applications.php');
                 
-                if (teacherResponse.status === 200) {
+                if (response.status === 200) {
                     setUserRole('teacher');
                 } else {
                     setUserRole('admin');
@@ -75,126 +97,182 @@ const StudentApplications = () => {
         checkUserRole();
     }, []);
 
-const fetchApplications = async () => {
-    setLoading(true);
-    try {
-        let apiUrl = userRole === 'admin' 
-            ? 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/AdminApplications.php'
-            : 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/read_leave_applications.php';
-        
-        const response = await fetch(apiUrl, {
-            credentials: 'include'
-        });
+    const fetchApplications = async () => {
+        setLoading(true);
+        try {
+            const endpoint = userRole === 'admin' 
+                ? 'AdminApplications.php'
+                : 'read_leave_applications.php';
+            
+            const response = await apiFetch(endpoint);
 
-        if (response.status === 401) {
-            navigate(userRole === 'admin' ? '/admin/login' : '/teacher/login');
-            return;
-        }
-
-        const data = await response.json();
-        
-        let applicationsData = [];
-        
-        if (userRole === 'admin') {
-            // Admin format: {success: true, data: [...]}
-            if (data.success && Array.isArray(data.data)) {
-                applicationsData = data.data;
+            if (response.status === 401) {
+                navigate(userRole === 'admin' ? '/admin/login' : '/teacher/login');
+                return;
             }
-        } else {
-            // Teacher format: direct array or sometimes {message: ...}
-            if (Array.isArray(data)) {
-                applicationsData = data;
-            } else if (data.data && Array.isArray(data.data)) {
-                // Some APIs might wrap array in data property
-                applicationsData = data.data;
+
+            const data = await response.json();
+            
+            let applicationsData = [];
+            
+            if (userRole === 'admin') {
+                if (data.success && Array.isArray(data.data)) {
+                    applicationsData = data.data;
+                }
+            } else {
+                if (Array.isArray(data)) {
+                    applicationsData = data;
+                } else if (data.data && Array.isArray(data.data)) {
+                    applicationsData = data.data;
+                }
             }
-        }
 
-        // More lenient filtering
-        const validApplications = applicationsData.filter(app => 
-            app && (app.student_name !== null && app.student_name !== undefined)
-        );
-
-        setApplications(validApplications);
-        setFilteredApplications(validApplications);
-        
-        if (validApplications.length === 0) {
-            message.info(userRole === 'admin' 
-                ? "No applications found" 
-                : "No applications found for your students"
+            const validApplications = applicationsData.filter(app => 
+                app && (app.student_name !== null && app.student_name !== undefined)
             );
-        }
-        
-    } catch (error) {
-        console.error("Fetch error:", error);
-        message.error("Network error while fetching applications");
-        setApplications([]);
-        setFilteredApplications([]);
-    } finally {
-        setLoading(false);
-    }
-};
-   const handleResponseSubmit = async (values) => {
-    setSubmitting(true);
-    try {
-        let payload = {};
-        let apiUrl = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/read_leave_applications.php'; // Use the same API for both
-        
-        if (userRole === 'admin') {
-            payload = {
-                id: selectedApp.id,
-                status: values.status,
-                response: values.response || '',
-                response_description: values.response_description || '',
-                teacher_id: values.teacher_id || null
-            };
-        } else if (userRole === 'teacher') {
-            payload = {
-                id: selectedApp.id,
-                status: values.status,
-                response_description: values.response_description || ''
-            };
-        }
 
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-            credentials: 'include'
-        });
+            setApplications(validApplications);
+            setFilteredApplications(validApplications);
+            setSelectedRowKeys([]);
+            
+            if (validApplications.length === 0) {
+                message.info(userRole === 'admin' 
+                    ? "No applications found" 
+                    : "No applications found for your students"
+                );
+            }
+            
+        } catch (error) {
+            console.error("Fetch error:", error);
+            message.error("Network error while fetching applications");
+            setApplications([]);
+            setFilteredApplications([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        if (response.status === 401) {
-            navigate(userRole === 'admin' ? '/admin/login' : '/teacher/login');
+    // Handle single delete
+    const handleDelete = async (id) => {
+        try {
+            const response = await apiFetch(`delete_applications.php?id=${id}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                message.success(data.message || 'Application deleted successfully');
+                
+                // Remove from local state
+                setApplications(prev => prev.filter(app => app.id !== id));
+                setFilteredApplications(prev => prev.filter(app => app.id !== id));
+                setSelectedRowKeys(prev => prev.filter(key => key !== id));
+            } else {
+                message.error(data.message || 'Delete failed');
+            }
+        } catch (error) {
+            message.error('Error deleting application');
+            console.error('Delete error:', error);
+        }
+    };
+
+    // Handle bulk delete
+    const handleBulkDelete = () => {
+        if (selectedRowKeys.length === 0) {
+            message.warning('Please select at least one application to delete');
             return;
         }
+        setIsBulkDeleteModalVisible(true);
+    };
 
-        const data = await response.json();
-        
-        if (data.success) {
-            message.success("Application updated successfully");
+    const confirmBulkDelete = async () => {
+        try {
+            setBulkDeleteLoading(true);
+            setIsBulkDeleteModalVisible(false);
             
-            // Update local state with the returned data
-            setApplications(prev => prev.map(app => 
-                app.id === selectedApp.id ? { ...app, ...data.data } : app
-            ));
-            setFilteredApplications(prev => prev.map(app => 
-                app.id === selectedApp.id ? { ...app, ...data.data } : app
-            ));
+            const idsParam = selectedRowKeys.join(',');
+            const response = await apiFetch(`delete_applications.php?ids=${idsParam}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
             
-            setResponseVisible(false);
-            form.resetFields();
-        } else {
-            message.error(data.message || data.error || "Failed to update application");
+            if (data.success) {
+                message.success(data.message);
+                
+                // Remove selected applications from local state
+                setApplications(prev => prev.filter(app => !selectedRowKeys.includes(app.id)));
+                setFilteredApplications(prev => prev.filter(app => !selectedRowKeys.includes(app.id)));
+                setSelectedRowKeys([]);
+            } else {
+                message.error(data.message || 'Bulk delete failed');
+            }
+        } catch (error) {
+            message.error('Error performing bulk delete');
+            console.error('Bulk delete error:', error);
+        } finally {
+            setBulkDeleteLoading(false);
         }
-    } catch (error) {
-        message.error("Error submitting response");
-        console.error("Submit error:", error);
-    } finally {
-        setSubmitting(false);
-    }
-};
+    };
+
+    const handleResponseSubmit = async (values) => {
+        setSubmitting(true);
+        try {
+            let payload = {};
+            const endpoint = 'read_leave_applications.php';
+            
+            if (userRole === 'admin') {
+                payload = {
+                    id: selectedApp.id,
+                    status: values.status,
+                    response: values.response || '',
+                    response_description: values.response_description || '',
+                    teacher_id: values.teacher_id || null
+                };
+            } else {
+                payload = {
+                    id: selectedApp.id,
+                    status: values.status,
+                    response_description: values.response_description || ''
+                };
+            }
+
+            const response = await apiFetch(endpoint, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            if (response.status === 401) {
+                navigate(userRole === 'admin' ? '/admin/login' : '/teacher/login');
+                return;
+            }
+
+            const data = await response.json();
+            
+            if (data.success) {
+                message.success("Application updated successfully");
+                
+                setApplications(prev => prev.map(app => 
+                    app.id === selectedApp.id ? { ...app, ...data.data } : app
+                ));
+                setFilteredApplications(prev => prev.map(app => 
+                    app.id === selectedApp.id ? { ...app, ...data.data } : app
+                ));
+                
+                setResponseVisible(false);
+                form.resetFields();
+            } else {
+                message.error(data.message || data.error || "Failed to update application");
+            }
+        } catch (error) {
+            message.error("Error submitting response");
+            console.error("Submit error:", error);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const handleTabChange = (key) => {
         setActiveTab(key);
         if (key === 'all') {
@@ -202,6 +280,7 @@ const fetchApplications = async () => {
         } else {
             setFilteredApplications(applications.filter(app => app.status === key));
         }
+        setSelectedRowKeys([]);
     };
 
     const getStatusColor = (status) => {
@@ -227,6 +306,19 @@ const fetchApplications = async () => {
     useEffect(() => {
         fetchApplications();
     }, [userRole]);
+
+    // Row selection configuration
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (selectedKeys) => {
+            setSelectedRowKeys(selectedKeys);
+        },
+        selections: [
+            Table.SELECTION_ALL,
+            Table.SELECTION_INVERT,
+            Table.SELECTION_NONE,
+        ],
+    };
 
     const columns = [
         {
@@ -287,7 +379,7 @@ const fetchApplications = async () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 120,
+            width: 140,
             fixed: 'right',
             render: (_, record) => (
                 <Space>
@@ -319,6 +411,19 @@ const fetchApplications = async () => {
                             {userRole === 'teacher' ? 'Review' : 'Respond'}
                         </Button>
                     </Tooltip>
+                    <Popconfirm
+                        title="Are you sure to delete this application?"
+                        onConfirm={() => handleDelete(record.id)}
+                        okText="Yes"
+                        cancelText="No"
+                        placement="left"
+                    >
+                        <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            size="middle"
+                        />
+                    </Popconfirm>
                 </Space>
             )
         }
@@ -347,15 +452,35 @@ const fetchApplications = async () => {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}
                 extra={
-                    <Button 
-                        icon={<SyncOutlined />} 
-                        onClick={fetchApplications}
-                        loading={loading}
-                    >
-                        Refresh
-                    </Button>
+                    <Space>
+                        {selectedRowKeys.length > 0 && (
+                            <Button 
+                                danger
+                                icon={<DeleteFilled />}
+                                onClick={handleBulkDelete}
+                                loading={bulkDeleteLoading}
+                            >
+                                Delete Selected ({selectedRowKeys.length})
+                            </Button>
+                        )}
+                        <Button 
+                            icon={<SyncOutlined />} 
+                            onClick={fetchApplications}
+                            loading={loading}
+                        >
+                            Refresh
+                        </Button>
+                    </Space>
                 }
             >
+                {selectedRowKeys.length > 0 && (
+                    <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
+                        <Text>
+                            Selected <strong>{selectedRowKeys.length}</strong> application(s)
+                        </Text>
+                    </div>
+                )}
+
                 <Tabs 
                     activeKey={activeTab} 
                     onChange={handleTabChange}
@@ -405,6 +530,7 @@ const fetchApplications = async () => {
                         columns={columns} 
                         dataSource={filteredApplications} 
                         rowKey="id"
+                        rowSelection={rowSelection}
                         bordered
                         pagination={{ 
                             pageSize: 10, 
@@ -413,22 +539,48 @@ const fetchApplications = async () => {
                             showTotal: (total, range) => 
                                 `${range[0]}-${range[1]} of ${total} applications`
                         }}
-                        scroll={{ x: 800 }}
+                        scroll={{ x: 900 }}
                         size="middle"
                         locale={{
                             emptyText: (
-                                <div style={{ padding: '40px 0' }}>
-                                    <div style={{ fontSize: '24px', marginBottom: '16px' }}>
-                                        📝
-                                    </div>
-                                    <Text type="secondary">
-                                        No student applications found
-                                    </Text>
-                                </div>
+                                <Empty
+                                    description="No student applications found"
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                />
                             )
                         }}
                     />
                 </Spin>
+
+                {/* Bulk Delete Confirmation Modal */}
+                <Modal
+                    title="Confirm Bulk Delete"
+                    open={isBulkDeleteModalVisible}
+                    onOk={confirmBulkDelete}
+                    onCancel={() => setIsBulkDeleteModalVisible(false)}
+                    okText="Yes, Delete All"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
+                >
+                    <p>
+                        Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected application(s)?
+                    </p>
+                    <p style={{ color: '#ff4d4f' }}>
+                        This action cannot be undone.
+                    </p>
+                    <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
+                        {applications
+                            .filter(app => selectedRowKeys.includes(app.id))
+                            .map(app => (
+                                <div key={app.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                    <Text>
+                                        {app.student_name} - {app.type} ({app.status || 'Pending'})
+                                    </Text>
+                                </div>
+                            ))
+                        }
+                    </div>
+                </Modal>
 
                 {/* Application Detail Modal */}
                 <Modal

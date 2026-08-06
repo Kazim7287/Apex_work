@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Layout, Table, Typography, Row, Col, Spin, Button, message, Drawer, Empty, Popconfirm, Card } from "antd";
+import { Layout, Table, Typography, Row, Col, Spin, Button, message, Drawer, Empty, Popconfirm, Card, Modal, Space } from "antd";
 import Sidebar from "./Sidebar";
 import axios from "axios";
-import { ScheduleOutlined, MenuOutlined, EditOutlined, DeleteOutlined, PrinterOutlined } from '@ant-design/icons';
-import TimetableModal from "./TimetableModal";
+import { ScheduleOutlined, MenuOutlined, EditOutlined, DeleteOutlined, PrinterOutlined, DeleteFilled } from '@ant-design/icons';
 import ScheduleModal from "./ScheduleModal";
 import './Timetable.css';
 import { useNavigate } from "react-router-dom";
@@ -32,8 +31,27 @@ const Timetable = () => {
     const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
     const printRef = useRef();
 
-    // Configure axios to include credentials
-    axios.defaults.withCredentials = true;
+    // State for bulk selection and deletion
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [isBulkDeleteModalVisible, setIsBulkDeleteModalVisible] = useState(false);
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
+    // Create axios instances
+    const publicApi = axios.create({
+        baseURL: 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/',
+        withCredentials: false,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+
+    const authApi = axios.create({
+        baseURL: 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/',
+        withCredentials: true,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 
     useEffect(() => {
         const handleResize = () => {
@@ -49,9 +67,7 @@ const Timetable = () => {
     useEffect(() => {
         const fetchSections = async () => {
             try {
-                const response = await axios.get("https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php", {
-                    withCredentials: true
-                });
+                const response = await publicApi.get("Sec_Read.php");
                 
                 if (response.status === 401) {
                     navigate('/admin-signin');
@@ -80,9 +96,8 @@ const Timetable = () => {
                     setLoadingSectionData(true);
                     setLoadingTimetable(true);
                     
-                    const filterResponse = await axios.get(
-                        `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/FilterAd.php?section_id=${selectedSection}`,
-                        { withCredentials: true }
+                    const filterResponse = await publicApi.get(
+                        `FilterAd.php?section_id=${selectedSection}`
                     );
                     
                     if (filterResponse.status === 401) {
@@ -90,18 +105,16 @@ const Timetable = () => {
                         return;
                     }
                     
-                    // Transform the data to include all necessary fields
                     const transformedData = filterResponse.data.map(item => ({
                         ...item,
-                        tech_name: item.teach_name, // Ensure consistent naming
+                        tech_name: item.teach_name,
                         section_name: item.section_name
                     }));
                     
                     setSectionData(transformedData);
                     
-                    const timetableResponse = await axios.get(
-                        `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetAdTimetable.php?section_id=${selectedSection}`,
-                        { withCredentials: true }
+                    const timetableResponse = await publicApi.get(
+                        `GetAdTimetable.php?section_id=${selectedSection}`
                     );
                     
                     if (timetableResponse.status === 401) {
@@ -141,12 +154,10 @@ const Timetable = () => {
         const grouped = {};
         const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
-        // Initialize empty arrays for each day
         dayOrder.forEach(day => {
             grouped[day] = [];
         });
         
-        // Group entries by day
         data.forEach(entry => {
             if (grouped[entry.day]) {
                 grouped[entry.day].push(entry);
@@ -155,7 +166,6 @@ const Timetable = () => {
             }
         });
         
-        // Sort entries by start time within each day
         dayOrder.forEach(day => {
             if (grouped[day].length > 0) {
                 grouped[day].sort((a, b) => {
@@ -183,9 +193,8 @@ const Timetable = () => {
     const showTimetableModal = async () => {
         try {
             setLoadingTimetable(true);
-            const response = await axios.get(
-                `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetAdTimetable.php?section_id=${selectedSection}`,
-                { withCredentials: true }
+            const response = await publicApi.get(
+                `GetAdTimetable.php?section_id=${selectedSection}`
             );
             
             if (response.status === 401) {
@@ -230,12 +239,14 @@ const Timetable = () => {
 
     const handleTimetableModalCancel = () => {
         setIsTimetableModalVisible(false);
+        setSelectedRowKeys([]);
     };
 
     const handleSectionSelect = (sectionId) => {
         if (selectedSection !== sectionId) {
             setSelectedSection(sectionId);
             setActiveButtonId(null);
+            setSelectedRowKeys([]);
         }
         if (windowWidth <= 768) {
             setMobileMenuVisible(false);
@@ -257,14 +268,7 @@ const Timetable = () => {
                 end_time: values.time_range[1].format('HH:mm:ss')
             };
 
-            const response = await axios.post(
-                'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/timetable.php',
-                requestData,
-                { 
-                    headers: { 'Content-Type': 'application/json' },
-                    withCredentials: true 
-                }
-            );
+            const response = await authApi.post('timetable.php', requestData);
 
             if (response.status === 401) {
                 navigate('/admin-signin');
@@ -302,14 +306,7 @@ const Timetable = () => {
                 end_time: values.time_range[1].format('HH:mm:ss')
             };
 
-            const response = await axios.put(
-                'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/timetableupdate.php',
-                requestData,
-                { 
-                    headers: { 'Content-Type': 'application/json' },
-                    withCredentials: true 
-                }
-            );
+            const response = await authApi.put('timetableupdate.php', requestData);
 
             if (response.status === 401) {
                 navigate('/admin/login');
@@ -331,12 +328,10 @@ const Timetable = () => {
         }
     };
 
+    // Handle single delete
     const handleDelete = async (id) => {
         try {
-            const response = await axios.delete(
-                `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/timetabledelete.php?id=${id}`,
-                { withCredentials: true }
-            );
+            const response = await authApi.delete(`timetabledelete.php?id=${id}`);
             
             if (response.status === 401) {
                 navigate('/admin-signin');
@@ -344,7 +339,8 @@ const Timetable = () => {
             }
 
             if (response.data.success) {
-                message.success('Timetable entry deleted successfully');
+                message.success(response.data.message || 'Timetable entry deleted successfully');
+                setSelectedRowKeys(selectedRowKeys.filter(key => key !== id));
                 refreshTimetableData();
             }
         } catch (error) {
@@ -356,12 +352,43 @@ const Timetable = () => {
         }
     };
 
+    // Handle bulk delete
+    const handleBulkDelete = () => {
+        if (selectedRowKeys.length === 0) {
+            message.warning('Please select at least one entry to delete');
+            return;
+        }
+        setIsBulkDeleteModalVisible(true);
+    };
+
+    const confirmBulkDelete = async () => {
+        try {
+            setBulkDeleteLoading(true);
+            setIsBulkDeleteModalVisible(false);
+            
+            const idsParam = selectedRowKeys.join(',');
+            const response = await authApi.delete(`timetabledelete.php?ids=${idsParam}`);
+
+            if (response.data.success) {
+                message.success(response.data.message);
+                setSelectedRowKeys([]);
+                refreshTimetableData();
+            } else {
+                throw new Error(response.data.error || 'Bulk delete failed');
+            }
+        } catch (error) {
+            message.error(error.response?.data?.error || error.message || 'Error performing bulk delete');
+            console.error('Bulk delete error:', error);
+        } finally {
+            setBulkDeleteLoading(false);
+        }
+    };
+
     const refreshTimetableData = async () => {
         try {
             setLoadingTimetable(true);
-            const response = await axios.get(
-                `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetAdTimetable.php?section_id=${selectedSection}`,
-                { withCredentials: true }
+            const response = await publicApi.get(
+                `GetAdTimetable.php?section_id=${selectedSection}`
             );
             
             if (response.status === 401) {
@@ -401,15 +428,33 @@ const Timetable = () => {
         }
     };
 
-    // Function to handle printing
+    // Professional Print Layout - Days as columns, Time as rows
     const handlePrint = () => {
         if (!timetableData || timetableData.length === 0) {
             message.warning('No timetable data to print');
             return;
         }
 
-        const printWindow = window.open('', '_blank');
         const sectionName = sections.find(s => s.id === selectedSection)?.name || 'Selected Section';
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        // Get unique time slots
+        const timeSlots = [];
+        const timeSet = new Set();
+        timetableData.forEach(item => {
+            const key = `${item.start_time}-${item.end_time}`;
+            if (!timeSet.has(key)) {
+                timeSet.add(key);
+                timeSlots.push({
+                    start: item.start_time,
+                    end: item.end_time,
+                    key: key
+                });
+            }
+        });
+        timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+
+        const printWindow = window.open('', '_blank');
         
         const printContent = `
             <!DOCTYPE html>
@@ -417,66 +462,208 @@ const Timetable = () => {
             <head>
                 <title>Timetable - ${sectionName}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    .print-header { text-align: center; margin-bottom: 20px; }
-                    .print-header h1 { margin: 0; color: #1890ff; }
-                    .print-header p { margin: 5px 0; }
-                    .day-section { margin-bottom: 20px; page-break-inside: avoid; }
-                    .day-title { background-color: #f0f0f0; padding: 8px; font-weight: bold; border-radius: 4px; }
-                    .class-card { margin: 8px 0; padding: 12px; border: 1px solid #ddd; border-radius: 4px; }
-                    .class-time { font-weight: bold; color: #1890ff; }
-                    .class-details { margin-top: 5px; }
-                    .print-footer { margin-top: 30px; text-align: right; font-size: 12px; color: #666; }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        padding: 20px;
+                        background: #fff;
+                    }
+                    .print-header {
+                        text-align: center;
+                        margin-bottom: 25px;
+                        padding-bottom: 20px;
+                        border-bottom: 3px solid #1890ff;
+                    }
+                    .print-header h1 {
+                        font-size: 28px;
+                        color: #1890ff;
+                        margin: 0;
+                        font-weight: 700;
+                        letter-spacing: 1px;
+                    }
+                    .print-header .subtitle {
+                        font-size: 16px;
+                        color: #666;
+                        margin-top: 8px;
+                    }
+                    .print-header .meta {
+                        font-size: 13px;
+                        color: #888;
+                        margin-top: 5px;
+                    }
+                    .print-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 13px;
+                        margin-top: 10px;
+                    }
+                    .print-table th {
+                        background: linear-gradient(135deg, #1890ff, #096dd9);
+                        color: #fff;
+                        font-weight: 600;
+                        padding: 12px 10px;
+                        text-align: center;
+                        border: 1px solid #096dd9;
+                        text-transform: uppercase;
+                        font-size: 12px;
+                        letter-spacing: 0.5px;
+                    }
+                    .print-table td {
+                        padding: 10px 8px;
+                        border: 1px solid #d9d9d9;
+                        text-align: center;
+                        vertical-align: middle;
+                        min-height: 50px;
+                    }
+                    .print-table .time-cell {
+                        background: #f0f5ff;
+                        font-weight: 600;
+                        color: #1890ff;
+                        min-width: 100px;
+                        font-size: 12px;
+                    }
+                    .print-table .class-cell {
+                        min-height: 50px;
+                    }
+                    .print-table .class-cell .subject {
+                        font-weight: 600;
+                        font-size: 14px;
+                        color: #262626;
+                    }
+                    .print-table .class-cell .teacher {
+                        font-size: 12px;
+                        color: #666;
+                        margin-top: 3px;
+                    }
+                    .print-table .empty-cell {
+                        color: #bfbfbf;
+                        font-size: 12px;
+                    }
+                    .print-footer {
+                        margin-top: 30px;
+                        padding-top: 15px;
+                        border-top: 2px solid #e8e8e8;
+                        text-align: center;
+                        font-size: 12px;
+                        color: #999;
+                    }
+                    .print-footer .footer-left {
+                        float: left;
+                    }
+                    .print-footer .footer-right {
+                        float: right;
+                    }
+                    .print-table .break-row td {
+                        background: #fafafa;
+                        padding: 4px;
+                    }
                     @media print {
-                        body { margin: 0; }
-                        .print-header { margin-bottom: 15px; }
-                        .day-section { page-break-inside: avoid; }
+                        body { padding: 10px; }
+                        .print-table th {
+                            background: #1890ff !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        .print-table .time-cell {
+                            background: #f0f5ff !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
                     }
                 </style>
             </head>
             <body>
                 <div class="print-header">
-                    <h1>Class Timetable</h1>
-                    <p><strong>Section:</strong> ${sectionName}</p>
-                    <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+                    <h1>📚 Class Timetable</h1>
+                    <div class="subtitle">${sectionName}</div>
+                    <div class="meta">
+                        Generated on: ${new Date().toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })} at ${new Date().toLocaleTimeString()}
+                    </div>
                 </div>
-                
-                ${Object.entries(groupedTimetableData).map(([day, classes]) => {
-                    if (classes.length === 0) return '';
-                    
-                    return `
-                        <div class="day-section">
-                            <div class="day-title">${day}</div>
-                            ${classes.map(cls => `
-                                <div class="class-card">
-                                    <div class="class-time">
-                                        ${formatTimeDisplay(cls.start_time)} - ${formatTimeDisplay(cls.end_time)}
-                                    </div>
-                                    <div class="class-details">
-                                        <strong>${cls.subject_name}</strong> with ${cls.teacher_name}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                }).join('')}
-                
+
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Time</th>
+                            ${days.map(day => `<th>${day}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${timeSlots.map((slot, index) => {
+                            const startTime = formatTimeDisplay(slot.start);
+                            const endTime = formatTimeDisplay(slot.end);
+                            
+                            return `
+                                <tr>
+                                    <td class="time-cell">
+                                        ${startTime} - ${endTime}
+                                    </td>
+                                    ${days.map(day => {
+                                        const classInfo = timetableData.find(
+                                            item => item.day === day && 
+                                                    item.start_time === slot.start && 
+                                                    item.end_time === slot.end
+                                        );
+                                        
+                                        if (classInfo) {
+                                            return `
+                                                <td class="class-cell">
+                                                    <div class="subject">${classInfo.subject_name}</div>
+                                                    <div class="teacher">👨‍🏫 ${classInfo.teacher_name}</div>
+                                                </td>
+                                            `;
+                                        } else {
+                                            return `
+                                                <td class="empty-cell">
+                                                    <span style="color: #d9d9d9;">—</span>
+                                                </td>
+                                            `;
+                                        }
+                                    }).join('')}
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+
                 <div class="print-footer">
-                    Printed from Apex Education System
+                    <span class="footer-left">Apex Education System</span>
+                    <span class="footer-right">Printed on ${new Date().toLocaleDateString()}</span>
+                    <div style="clear: both;"></div>
                 </div>
+
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(function() {
+                            window.close();
+                        }, 1000);
+                    }
+                </script>
             </body>
             </html>
         `;
 
         printWindow.document.write(printContent);
         printWindow.document.close();
-        
-        // Wait for content to load before printing
-        printWindow.onload = function() {
-            printWindow.focus();
-            printWindow.print();
-            // printWindow.close(); // Uncomment if you want to automatically close after printing
-        };
+    };
+
+    // Row selection configuration for timetable modal
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (selectedKeys) => {
+            setSelectedRowKeys(selectedKeys);
+        },
+        selections: [
+            Table.SELECTION_ALL,
+            Table.SELECTION_INVERT,
+            Table.SELECTION_NONE,
+        ],
     };
 
     // Define columns for the teachers/subjects table
@@ -523,70 +710,81 @@ const Timetable = () => {
     ];
 
     // Define columns for the timetable modal
-    const timetableColumns = [
-        {
-            title: 'Day',
-            dataIndex: 'day',
-            key: 'day',
-            width: 120,
-            fixed: windowWidth < 768 ? 'left' : false,
-        },
-        {
-            title: 'Time',
-            dataIndex: 'start_time',
-            key: 'time',
-            render: (_, record) => (
-                <span>
-                    {formatTimeDisplay(record.start_time)} - {formatTimeDisplay(record.end_time)}
-                </span>
-            ),
-            width: 150,
-        },
-        {
-            title: 'Subject',
-            dataIndex: 'subject_name',
-            key: 'subject',
-        },
-        {
-            title: 'Teacher',
-            dataIndex: 'teacher_name',
-            key: 'teacher',
-            responsive: ['md'],
-        },
-        {
-            title: 'Section',
-            dataIndex: 'section_name',
-            key: 'section',
-            responsive: ['md'],
-        },
-        {
-            title: 'Actions',
-            key: 'actions',
-            render: (_, record) => (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        onClick={() => showEditModal(record)}
-                        size="small"
-                    />
-                    <Popconfirm
-                        title="Are you sure to delete this entry?"
-                        onConfirm={() => handleDelete(record.id)}
-                        okText="Yes"
-                        cancelText="No"
-                    >
+    const getTimetableColumns = () => {
+        const baseColumns = [
+            {
+                title: 'Day',
+                dataIndex: 'day',
+                key: 'day',
+                width: 120,
+                fixed: windowWidth < 768 ? 'left' : false,
+                sorter: (a, b) => {
+                    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                    return dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
+                }
+            },
+            {
+                title: 'Time',
+                dataIndex: 'start_time',
+                key: 'time',
+                render: (_, record) => (
+                    <span>
+                        {formatTimeDisplay(record.start_time)} - {formatTimeDisplay(record.end_time)}
+                    </span>
+                ),
+                width: 150,
+                sorter: (a, b) => a.start_time.localeCompare(b.start_time)
+            },
+            {
+                title: 'Subject',
+                dataIndex: 'subject_name',
+                key: 'subject',
+                sorter: (a, b) => a.subject_name.localeCompare(b.subject_name)
+            },
+            {
+                title: 'Teacher',
+                dataIndex: 'teacher_name',
+                key: 'teacher',
+                responsive: ['md'],
+                sorter: (a, b) => a.teacher_name.localeCompare(b.teacher_name)
+            },
+            {
+                title: 'Section',
+                dataIndex: 'section_name',
+                key: 'section',
+                responsive: ['md']
+            },
+            {
+                title: 'Actions',
+                key: 'actions',
+                width: 120,
+                render: (_, record) => (
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                         <Button
                             type="text"
-                            icon={<DeleteOutlined />}
-                            danger
+                            icon={<EditOutlined />}
+                            onClick={() => showEditModal(record)}
                             size="small"
                         />
-                    </Popconfirm>
-                </div>
-            ),
-        },
-    ];
+                        <Popconfirm
+                            title="Are you sure to delete this entry?"
+                            onConfirm={() => handleDelete(record.id)}
+                            okText="Yes"
+                            cancelText="No"
+                        >
+                            <Button
+                                type="text"
+                                icon={<DeleteOutlined />}
+                                danger
+                                size="small"
+                            />
+                        </Popconfirm>
+                    </div>
+                ),
+            },
+        ];
+        return baseColumns;
+    };
 
     // Render the grouped timetable view
     const renderGroupedTimetable = () => {
@@ -695,7 +893,7 @@ const Timetable = () => {
                     placement="left"
                     closable={true}
                     onClose={() => setMobileMenuVisible(false)}
-                    visible={mobileMenuVisible}
+                    open={mobileMenuVisible}
                     width={200}
                     bodyStyle={{ padding: 0 }}
                 >
@@ -799,18 +997,82 @@ const Timetable = () => {
                                 </div>
                             )}
 
-                            <TimetableModal
-                                visible={isTimetableModalVisible}
+                            {/* Timetable Modal with Bulk Delete */}
+                            <Modal
+                                title={
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                        <span>
+                                            <ScheduleOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                                            <Text strong style={{ fontSize: windowWidth < 768 ? '16px' : '18px' }}>
+                                                Timetable - {sections.find(s => s.id === selectedSection)?.name}
+                                            </Text>
+                                        </span>
+                                        <Space>
+                                            {selectedRowKeys.length > 0 && (
+                                                <Button 
+                                                    danger
+                                                    icon={<DeleteFilled />}
+                                                    onClick={handleBulkDelete}
+                                                    loading={bulkDeleteLoading}
+                                                    size={windowWidth < 768 ? "small" : "middle"}
+                                                >
+                                                    Delete Selected ({selectedRowKeys.length})
+                                                </Button>
+                                            )}
+                                            <Button onClick={handleTimetableModalCancel}>
+                                                Close
+                                            </Button>
+                                        </Space>
+                                    </div>
+                                }
+                                open={isTimetableModalVisible}
                                 onCancel={handleTimetableModalCancel}
-                                loading={loadingTimetable}
-                                timetableData={timetableData}
-                                section={sections.find(s => s.id === selectedSection)}
-                                windowWidth={windowWidth}
-                                noDataMessage="No timetable scheduled yet for this section"
-                                onEdit={showEditModal}
-                                onDelete={handleDelete}
-                                columns={timetableColumns}
-                            />
+                                footer={null}
+                                width={windowWidth < 768 ? '95%' : '90%'}
+                                bodyStyle={{
+                                    padding: windowWidth < 768 ? '12px' : '24px',
+                                    maxHeight: '70vh',
+                                    overflowY: 'auto'
+                                }}
+                                destroyOnClose
+                            >
+                                <Spin spinning={loadingTimetable}>
+                                    {timetableData && timetableData.length > 0 ? (
+                                        <>
+                                            {selectedRowKeys.length > 0 && (
+                                                <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
+                                                    <Text>
+                                                        Selected <strong>{selectedRowKeys.length}</strong> entry(ies)
+                                                    </Text>
+                                                </div>
+                                            )}
+                                            <Table
+                                                dataSource={timetableData}
+                                                columns={getTimetableColumns()}
+                                                rowKey="id"
+                                                rowSelection={rowSelection}
+                                                pagination={{
+                                                    pageSize: 10,
+                                                    showSizeChanger: true,
+                                                    pageSizeOptions: ['5', '10', '20', '50'],
+                                                    showTotal: (total) => `Total ${total} entries`,
+                                                    size: windowWidth < 768 ? 'small' : 'default'
+                                                }}
+                                                scroll={{ x: true }}
+                                                size={windowWidth < 768 ? 'small' : 'middle'}
+                                                bordered
+                                            />
+                                        </>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+                                            <Empty
+                                                description="No timetable entries found"
+                                                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                            />
+                                        </div>
+                                    )}
+                                </Spin>
+                            </Modal>
 
                             <ScheduleModal
                                 visible={isModalVisible}
@@ -833,6 +1095,37 @@ const Timetable = () => {
                     )}
                 </Content>
             </Layout>
+
+            {/* Bulk Delete Confirmation Modal */}
+            <Modal
+                title="Confirm Bulk Delete"
+                open={isBulkDeleteModalVisible}
+                onOk={confirmBulkDelete}
+                onCancel={() => setIsBulkDeleteModalVisible(false)}
+                okText="Yes, Delete All"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
+                width={windowWidth < 768 ? '95%' : 600}
+            >
+                <p>
+                    Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected timetable entry(ies)?
+                </p>
+                <p style={{ color: '#ff4d4f' }}>
+                    This action cannot be undone.
+                </p>
+                <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
+                    {timetableData
+                        .filter(t => selectedRowKeys.includes(t.id))
+                        .map(t => (
+                            <div key={t.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                <Text>
+                                    {t.day} - {t.subject_name} ({formatTimeDisplay(t.start_time)} - {formatTimeDisplay(t.end_time)})
+                                </Text>
+                            </div>
+                        ))
+                    }
+                </div>
+            </Modal>
         </Layout>
     );
 };

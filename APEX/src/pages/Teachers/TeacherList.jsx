@@ -61,8 +61,8 @@ const TeacherList = () => {
         const formattedTeachers = Array.isArray(data.data) ? data.data.map(teacher => ({
           id: teacher.id,
           name: teacher.teach_name,
-          email: teacher.teach_email,
-          phone: teacher.teach_no
+          // email: teacher.teach_email,
+          // phone: teacher.teach_no
         })) : [];
 
         setTeachers(formattedTeachers);
@@ -129,25 +129,25 @@ const TeacherList = () => {
           width: 150
         },
         {
-          title: 'Actions',
-          key: 'actions',
-          render: (_, record) => (
-            <Dropdown
-              overlay={
-                <Menu>
-                  <Menu.Item key="email">
-                    <MailOutlined /> <a href={`mailto:${record.email}`}>{record.email || 'N/A'}</a>
-                  </Menu.Item>
-                  <Menu.Item key="phone">
-                    <PhoneOutlined /> <a href={`tel:${record.phone}`}>{record.phone || 'N/A'}</a>
-                  </Menu.Item>
-                </Menu>
-              }
-              trigger={['click']}
-            >
-              <Button type="text" icon={<MoreOutlined />} size="small" />
-            </Dropdown>
-          ),
+          // title: 'Actions',
+          // key: 'actions',
+          // render: (_, record) => (
+            // // <Dropdown
+            // //   overlay={
+            // //     <Menu>
+            // //       <Menu.Item key="email">
+            // //         <MailOutlined /> <a href={`mailto:${record.email}`}>{record.email || 'N/A'}</a>
+            // //       </Menu.Item>
+            // //       <Menu.Item key="phone">
+            // //         <PhoneOutlined /> <a href={`tel:${record.phone}`}>{record.phone || 'N/A'}</a>
+            // //       </Menu.Item>
+            // //     </Menu>
+            // //   }
+            // //   trigger={['click']}
+            // // >
+            //   <Button type="text" icon={<MoreOutlined />} size="small" />
+            // </Dropdown>
+          
           width: 50
         }
       ];
