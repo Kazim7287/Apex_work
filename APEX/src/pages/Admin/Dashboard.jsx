@@ -320,14 +320,14 @@ const AdminDashboard = () => {
                         style={{ height: '100%', cursor: 'pointer' }}
                         bodyStyle={{ padding: 24 }}
                     >
-                        <Link to="/admin/teachers" style={{ textDecoration: 'none' }}>
+                        <Link to="/admin/teacher-list" style={{ textDecoration: 'none' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div>
                                     <Text style={{ color: '#64748b', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                         Faculty Directory
                                     </Text>
                                     <Title level={3} style={{ margin: '6px 0 0 0', color: '#0b1b3d', fontWeight: 800 }}>
-                                        Teachers Portal
+                                        Announcments
                                     </Title>
                                     <Text style={{ color: '#d4af37', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
                                         Faculty Management <ArrowRightOutlined />
