@@ -1,8 +1,5 @@
-/* eslint-disable react/jsx-key */
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { 
-  Layout,
   Card,
   Typography,
   Form,
@@ -20,7 +17,9 @@ import {
   Modal,
   Calendar,
   Badge,
-  Drawer
+  Tag,
+  Popconfirm,
+  Tooltip
 } from 'antd';
 import { 
   DeleteOutlined, 
@@ -28,17 +27,16 @@ import {
   CalendarOutlined,
   ClockCircleOutlined,
   UserOutlined,
-  MenuOutlined
+  PlusOutlined,
+  BellOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import 'dayjs/locale/en';
-import { useMediaQuery } from 'react-responsive';
-import Sidebar from "./Sidebar";
 
 dayjs.extend(duration);
 
-const { Content, Sider } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -47,16 +45,12 @@ const EventCalendar = () => {
     const [currentTime, setCurrentTime] = useState(dayjs());
     const [error, setError] = useState('');
     const [form] = Form.useForm();
+    const [addForm] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [api, contextHolder] = notification.useNotification();
     const [nextEvent, setNextEvent] = useState(null);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingEvent, setEditingEvent] = useState(null);
-    const [selectedDate, setSelectedDate] = useState(dayjs());
-    const [mobileSidebarVisible, setMobileSidebarVisible] = useState(false);
-    const navigate = useNavigate();
-    
-    const isMobile = useMediaQuery({ maxWidth: 768 });
 
     // API endpoints
     const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
@@ -66,22 +60,18 @@ const EventCalendar = () => {
     const DELETE_EVENT_API = `${API_BASE}/Event_delete.php`;
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                await fetchEvents();
-                const timer = setInterval(() => {
-                    setCurrentTime(dayjs());
-                    updateNextEventCountdown();
-                }, 1000);
-                
-                return () => clearInterval(timer);
-            } catch (error) {
-                console.error("Initialization error:", error);
-            }
-        };
-
-        fetchData();
+        fetchEvents();
+        const timer = setInterval(() => {
+            setCurrentTime(dayjs());
+        }, 1000);
+        return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        if (events.length > 0) {
+            updateNextEventCountdown();
+        }
+    }, [currentTime, events]);
 
     const fetchEvents = async () => {
         try {
@@ -89,120 +79,135 @@ const EventCalendar = () => {
             const response = await fetch(GET_EVENTS_API, {
                 credentials: 'include'
             });
-            
-            // REMOVED: Authentication redirect checks
-            // Just check if response is ok
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
             const data = await response.json();
-            
-            // REMOVED: ADMIN_AUTH_REQUIRED check
-            // Just check if data has success and data array
-            if (data.success && Array.isArray(data.data)) {
-                const formattedEvents = data.data.map(event => ({
-                    ...event,
-                    id: event.id,
-                    formattedDate: dayjs(event.event_date).format('MMMM D, YYYY'),
-                    formattedTime: event.event_time ? dayjs(event.event_time, 'HH:mm:ss').format('h:mm A') : 'No time specified',
-                    dayName: dayjs(event.event_date).format('dddd'),
-                    dateTime: dayjs(`${event.event_date} ${event.event_time || '00:00:00'}`)
-                }));
-                
-                setEvents(formattedEvents);
-                calculateNextEvent(formattedEvents);
+            if (Array.isArray(data)) {
+                setEvents(data);
+                setError('');
             } else {
-                throw new Error(data.message || 'Invalid data structure');
+                setError(data.error || 'Failed to fetch events');
             }
         } catch (err) {
-            setError(err.message);
-            api.error({ 
-                message: 'Error', 
-                description: err.message,
-                duration: 3
-            });
+            setError(err.message || 'Failed to fetch events');
         } finally {
             setLoading(false);
         }
     };
 
-    const calculateNextEvent = (events) => {
-        const now = dayjs();
-        const upcomingEvent = events
-            .filter(event => event.dateTime.isAfter(now))
-            .sort((a, b) => a.dateTime.diff(b.dateTime))[0];
-        setNextEvent(upcomingEvent || null);
-    };
-
     const updateNextEventCountdown = () => {
-        if (nextEvent && nextEvent.dateTime.isBefore(dayjs())) {
+        const upcomingEvents = events.filter(e => {
+            const dateStr = `${e.event_date} ${e.event_time || '00:00:00'}`;
+            return dayjs(dateStr).isAfter(currentTime);
+        });
+
+        if (upcomingEvents.length > 0) {
+            upcomingEvents.sort((a, b) => {
+                const dateA = dayjs(`${a.event_date} ${a.event_time || '00:00:00'}`);
+                const dateB = dayjs(`${b.event_date} ${b.event_time || '00:00:00'}`);
+                return dateA.diff(dateB);
+            });
+            setNextEvent(upcomingEvents[0]);
+        } else {
             setNextEvent(null);
         }
     };
 
-    const getCountdownText = () => {
-        if (!nextEvent) return "No upcoming events scheduled";
-        
-        const diff = dayjs.duration(nextEvent.dateTime.diff(dayjs()));
-        if (diff.asSeconds() <= 0) return `"${nextEvent.event_name}" has ended`;
-
-        return (
-            <Space>
-                <ClockCircleOutlined />
-                <Text>
-                    {diff.hours()}h {diff.minutes()}m {diff.seconds()}s until "{nextEvent.event_name}"
-                </Text>
-            </Space>
-        );
-    };
-
-    const handleSubmit = async (values) => {
+    const handleAddEvent = async (values) => {
         try {
             setLoading(true);
-            const formattedValues = {
+            const eventData = {
                 event_name: values.event_name,
                 event_description: values.event_description || '',
                 event_date: values.event_date.format('YYYY-MM-DD'),
-                event_time: values.event_time?.format('HH:mm:ss') || null,
+                event_time: values.event_time ? values.event_time.format('HH:mm:ss') : '00:00:00',
                 event_manager: values.event_manager
             };
 
             const response = await fetch(ADD_EVENT_API, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formattedValues),
-                credentials: 'include'
+                credentials: 'include',
+                body: JSON.stringify(eventData)
             });
-
-            // REMOVED: Authentication redirect checks
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
 
             const data = await response.json();
-            if (!data.success) throw new Error(data.message);
-
-            api.success({ 
-                message: 'Success', 
-                description: 'Event added successfully',
-                duration: 2
-            });
-            form.resetFields();
-            await fetchEvents();
+            if (data.status === 'success' || data.success) {
+                api.success({
+                    message: 'Event Created',
+                    description: 'The event has been successfully added to the calendar.',
+                    icon: <CheckCircleOutlined style={{ color: '#10b981' }} />
+                });
+                addForm.resetFields();
+                fetchEvents();
+            } else {
+                throw new Error(data.message || data.error || 'Failed to add event');
+            }
         } catch (err) {
-            setError(err.message);
-            api.error({ 
-                message: 'Error', 
-                description: err.message,
-                duration: 3
-            });
+            api.error({ message: 'Error', description: err.message });
         } finally {
             setLoading(false);
         }
     };
 
-    const showEditModal = (event) => {
+    const handleUpdate = async (values) => {
+        try {
+            setLoading(true);
+            const eventData = {
+                id: editingEvent.id,
+                event_name: values.event_name,
+                event_description: values.event_description || '',
+                event_date: values.event_date.format('YYYY-MM-DD'),
+                event_time: values.event_time ? values.event_time.format('HH:mm:ss') : '00:00:00',
+                event_manager: values.event_manager
+            };
+
+            const response = await fetch(UPDATE_EVENT_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(eventData)
+            });
+
+            const data = await response.json();
+            if (data.status === 'success' || data.success) {
+                api.success({ message: 'Event Updated', description: 'Event modified successfully.' });
+                setIsEditModalVisible(false);
+                setEditingEvent(null);
+                fetchEvents();
+            } else {
+                throw new Error(data.message || 'Failed to update event');
+            }
+        } catch (err) {
+            api.error({ message: 'Error', description: err.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        try {
+            setLoading(true);
+            const response = await fetch(`${DELETE_EVENT_API}?id=${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            const data = await response.json();
+            if (data.status === 'success' || data.success) {
+                api.success({ message: 'Event Deleted' });
+                fetchEvents();
+            } else {
+                throw new Error(data.message || 'Failed to delete event');
+            }
+        } catch (err) {
+            api.error({ message: 'Error', description: err.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openEditModal = (event) => {
         setEditingEvent(event);
         form.setFieldsValue({
             event_name: event.event_name,
@@ -214,398 +219,209 @@ const EventCalendar = () => {
         setIsEditModalVisible(true);
     };
 
-    const handleUpdate = async (values) => {
-        try {
-            setLoading(true);
-            const formattedValues = {
-                id: editingEvent.id,
-                event_name: values.event_name,
-                event_description: values.event_description || '',
-                event_date: values.event_date.format('YYYY-MM-DD'),
-                event_time: values.event_time?.format('HH:mm:ss') || null,
-                event_manager: values.event_manager
-            };
-
-            const response = await fetch(UPDATE_EVENT_API, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formattedValues),
-                credentials: 'include'
-            });
-
-            // REMOVED: Authentication redirect checks
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (!data.success) throw new Error(data.message);
-
-            api.success({ 
-                message: 'Success', 
-                description: 'Event updated successfully',
-                duration: 2
-            });
-            setIsEditModalVisible(false);
-            setEditingEvent(null);
-            form.resetFields();
-            await fetchEvents();
-        } catch (err) {
-            setError(err.message);
-            api.error({ 
-                message: 'Error', 
-                description: err.message,
-                duration: 3
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDelete = async (id) => {
-        try {
-            const response = await fetch(DELETE_EVENT_API, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id }),
-                credentials: 'include'
-            });
-
-            // REMOVED: Authentication redirect checks
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (!data.success) throw new Error(data.message);
-
-            api.success({ 
-                message: 'Success', 
-                description: 'Event deleted successfully',
-                duration: 2
-            });
-            await fetchEvents();
-        } catch (err) {
-            setError(err.message);
-            api.error({ 
-                message: 'Error', 
-                description: err.message,
-                duration: 3
-            });
-        }
-    };
-
-    const dateCellRender = (value) => {
-        const dateEvents = events.filter(event => 
-            dayjs(event.event_date).isSame(value, 'day')
-        );
-        
-        return (
-            <div style={{ minHeight: isMobile ? 60 : 80 }}>
-                {dateEvents.map(event => (
-                    <Badge 
-                        key={event.id} 
-                        color={event.dateTime.isBefore(dayjs()) ? 'gray' : 'blue'}
-                        text={
-                            <Text 
-                                ellipsis 
-                                style={{ 
-                                    fontSize: isMobile ? 10 : 12,
-                                    color: event.dateTime.isBefore(dayjs()) ? '#999' : '#1890ff'
-                                }}
-                            >
-                                {event.event_name}
-                            </Text>
-                        }
-                    />
-                ))}
-            </div>
-        );
-    };
-
-    const getEventsForSelectedDate = () => {
-        return events.filter(event => 
-            dayjs(event.event_date).isSame(selectedDate, 'day')
-        );
+    const formatCountdown = (event) => {
+        if (!event) return null;
+        const target = dayjs(`${event.event_date} ${event.event_time || '00:00:00'}`);
+        const diff = dayjs.duration(target.diff(currentTime));
+        return `${diff.days()}d ${diff.hours()}h ${diff.minutes()}m ${diff.seconds()}s`;
     };
 
     return (
-        <>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
             {contextHolder}
-            <Layout style={{ minHeight: '100vh' }}>
-                {isMobile && (
-                    <Button 
-                        type="text"
-                        icon={<MenuOutlined />}
-                        onClick={() => setMobileSidebarVisible(true)}
-                        style={{ 
-                            position: 'fixed',
-                            zIndex: 1,
-                            top: 16,
-                            left: 16,
-                            width: 48,
-                            height: 48
-                        }}
-                    />
-                )}
-
-                {!isMobile && (
-                    <Sider width={200} theme="light">
-                        <Sidebar />
-                    </Sider>
-                )}
-
-                <Layout>
-                    <Content style={{ 
-                        margin: isMobile ? '16px' : '24px',
-                        paddingTop: isMobile ? '64px' : 0
-                    }}>
-                        <Row gutter={[16, 16]}>
-                            <Col span={24}>
-                                <Space 
-                                    direction={isMobile ? "vertical" : "horizontal"} 
-                                    align={isMobile ? "start" : "center"}
-                                    size={isMobile ? 8 : 16}
-                                >
-                                    <Space align="center">
-                                        <CalendarOutlined style={{ fontSize: isMobile ? 20 : 24 }} />
-                                        <Title level={isMobile ? 3 : 2} style={{ margin: 0 }}>Event Calendar</Title>
-                                    </Space>
-                                    <Space>
-                                        <ClockCircleOutlined />
-                                        <Text>
-                                            {currentTime.format('MMMM D, YYYY - h:mm:ss A')}
-                                        </Text>
-                                    </Space>
-                                </Space>
-                                <div style={{ marginTop: 8 }}>
-                                    {getCountdownText()}
+            
+            {/* Header Countdown Banner */}
+            {nextEvent && (
+                <Alert
+                    type="info"
+                    style={{ 
+                        marginBottom: 24, 
+                        borderRadius: 12, 
+                        background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', 
+                        color: '#ffffff',
+                        border: '1px solid rgba(212, 175, 55, 0.3)',
+                        padding: '16px 20px'
+                    }}
+                    message={
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <BellOutlined style={{ color: '#d4af37', fontSize: 24 }} />
+                                <div>
+                                    <Text strong style={{ color: '#ffffff', fontSize: 16 }}>Upcoming Event: {nextEvent.event_name}</Text>
+                                    <Text style={{ color: '#cbd5e1', fontSize: 12, display: 'block' }}>
+                                        Scheduled for {nextEvent.event_date} at {nextEvent.event_time}
+                                    </Text>
                                 </div>
-                            </Col>
-                            
-                            <Col span={24}>
-                                <Card bordered={false} bodyStyle={{ padding: isMobile ? 0 : 16 }}>
-                                    <Calendar 
-                                        value={selectedDate}
-                                        onSelect={setSelectedDate}
-                                        dateCellRender={dateCellRender}
-                                        fullscreen={!isMobile}
-                                    />
-                                </Card>
-                            </Col>
-                            
-                            <Col xs={24} md={12}>
-                                <Card 
-                                    title={`Events for ${selectedDate.format('MMMM D, YYYY')}`}
-                                    bordered={false}
-                                    loading={loading}
-                                    style={{ marginBottom: isMobile ? 16 : 0 }}
+                            </div>
+                            <Tag color="gold" style={{ background: '#d4af37', color: '#0b1b3d', fontSize: 14, fontWeight: 700, padding: '4px 14px', borderRadius: 20 }}>
+                                Countdown: {formatCountdown(nextEvent)}
+                            </Tag>
+                        </div>
+                    }
+                />
+            )}
+
+            <Row gutter={[20, 20]}>
+                {/* Left Side: Events List & Calendar */}
+                <Col xs={24} lg={16}>
+                    <Card
+                        className="apex-card"
+                        title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(212, 175, 55, 0.15)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                                    <CalendarOutlined />
+                                </div>
+                                <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>Academic Events & Calendar</Title>
+                            </div>
+                        }
+                    >
+                        <List
+                            loading={loading}
+                            dataSource={events}
+                            renderItem={(item) => (
+                                <List.Item
+                                    style={{ padding: '16px 0', borderBottom: '1px solid #f1f5f9' }}
+                                    actions={[
+                                        <Tooltip key="edit" title="Edit Event">
+                                            <Button type="text" icon={<EditOutlined style={{ color: '#1e3a8a' }} />} onClick={() => openEditModal(item)} style={{ borderRadius: 6, background: '#f1f5f9' }} />
+                                        </Tooltip>,
+                                        <Popconfirm
+                                            key="delete"
+                                            title="Delete Event"
+                                            description="Are you sure to delete this event?"
+                                            onConfirm={() => handleDelete(item.id)}
+                                            okText="Yes"
+                                            cancelText="No"
+                                            okButtonProps={{ danger: true }}
+                                        >
+                                            <Tooltip title="Delete Event">
+                                                <Button type="text" danger icon={<DeleteOutlined />} style={{ borderRadius: 6, background: '#fef2f2' }} />
+                                            </Tooltip>
+                                        </Popconfirm>
+                                    ]}
                                 >
-                                    {getEventsForSelectedDate().length > 0 ? (
-                                        <List
-                                            itemLayout="horizontal"
-                                            dataSource={getEventsForSelectedDate()}
-                                            renderItem={(event) => (
-                                                <List.Item
-                                                    actions={[
-                                                        // eslint-disable-next-line react/jsx-key
-                                                        <Button 
-                                                            icon={<EditOutlined />} 
-                                                            onClick={() => showEditModal(event)}
-                                                            size={isMobile ? "small" : "middle"}
-                                                        />,
-                                                        <Button 
-                                                            danger 
-                                                            icon={<DeleteOutlined />} 
-                                                            onClick={() => handleDelete(event.id)}
-                                                            size={isMobile ? "small" : "middle"}
-                                                        />
-                                                    ]}
-                                                >
-                                                    <List.Item.Meta
-                                                        title={<Text strong>{event.event_name}</Text>}
-                                                        description={
-                                                            <Space direction="vertical" size={4}>
-                                                                <Text>{event.event_description}</Text>
-                                                                <Space>
-                                                                    <ClockCircleOutlined />
-                                                                    <Text>{event.formattedTime}</Text>
-                                                                </Space>
-                                                                <Space>
-                                                                    <UserOutlined />
-                                                                    <Text>{event.event_manager}</Text>
-                                                                </Space>
-                                                            </Space>
-                                                        }
-                                                    />
-                                                </List.Item>
-                                            )}
-                                        />
-                                    ) : (
-                                        <Text type="secondary">No events for this date</Text>
-                                    )}
-                                </Card>
-                            </Col>
-                            
-                            <Col xs={24} md={12}>
-                                <Card title="Add New Event" bordered={false}>
-                                    <Form form={form} layout="vertical" onFinish={handleSubmit}>
-                                        <Form.Item
-                                            name="event_name"
-                                            label="Event Name"
-                                            rules={[{ required: true, message: 'Please enter event name' }]}
-                                        >
-                                            <Input size={isMobile ? "small" : "middle"} />
-                                        </Form.Item>
-                                        
-                                        <Form.Item
-                                            name="event_description"
-                                            label="Event Description"
-                                        >
-                                            <TextArea rows={isMobile ? 2 : 3} size={isMobile ? "small" : "middle"} />
-                                        </Form.Item>
-                                        
-                                        <Row gutter={16}>
-                                            <Col span={12}>
-                                                <Form.Item
-                                                    name="event_date"
-                                                    label="Date"
-                                                    rules={[{ required: true, message: 'Please select date' }]}
-                                                >
-                                                    <DatePicker 
-                                                        style={{ width: '100%' }} 
-                                                        size={isMobile ? "small" : "middle"}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={12}>
-                                                <Form.Item
-                                                    name="event_time"
-                                                    label="Time"
-                                                >
-                                                    <TimePicker 
-                                                        style={{ width: '100%' }} 
-                                                        format="h:mm A"
-                                                        size={isMobile ? "small" : "middle"}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                        </Row>
-                                        
-                                        <Form.Item
-                                            name="event_manager"
-                                            label="Manager"
-                                            rules={[{ required: true, message: 'Please enter manager' }]}
-                                        >
-                                            <Input size={isMobile ? "small" : "middle"} />
-                                        </Form.Item>
-                                        
-                                        <Form.Item>
-                                            <Button 
-                                                type="primary" 
-                                                htmlType="submit" 
-                                                block
-                                                size={isMobile ? "small" : "middle"}
-                                                loading={loading}
-                                            >
-                                                Add Event
-                                            </Button>
-                                        </Form.Item>
-                                    </Form>
-                                </Card>
-                            </Col>
-                        </Row>
-                    </Content>
-                </Layout>
-            </Layout>
+                                    <List.Item.Meta
+                                        avatar={
+                                            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                                <CalendarOutlined style={{ color: '#d4af37', fontSize: 18 }} />
+                                            </div>
+                                        }
+                                        title={
+                                            <Text strong style={{ color: '#0b1b3d', fontSize: 15 }}>{item.event_name}</Text>
+                                        }
+                                        description={
+                                            <Space direction="vertical" size={2}>
+                                                <Text style={{ color: '#64748b', fontSize: 13 }}>{item.event_description || 'No description provided.'}</Text>
+                                                <Space size="large" style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+                                                    <span><CalendarOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />{item.event_date}</span>
+                                                    <span><ClockCircleOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />{item.event_time}</span>
+                                                    <span><UserOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />Organizer: {item.event_manager}</span>
+                                                </Space>
+                                            </Space>
+                                        }
+                                    />
+                                </List.Item>
+                            )}
+                        />
+                    </Card>
+                </Col>
 
-            <Drawer
-                placement="left"
-                open={mobileSidebarVisible}
-                onClose={() => setMobileSidebarVisible(false)}
-                width={200}
-                bodyStyle={{ padding: 0 }}
-                closable={false}
-            >
-                <Sidebar mobile onClose={() => setMobileSidebarVisible(false)} />
-            </Drawer>
+                {/* Right Side: Add Event Form */}
+                <Col xs={24} lg={8}>
+                    <Card
+                        className="apex-card"
+                        title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 8, background: '#0b1b3d', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                                    <PlusOutlined />
+                                </div>
+                                <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>Add New Event</Title>
+                            </div>
+                        }
+                    >
+                        <Form form={addForm} layout="vertical" onFinish={handleAddEvent}>
+                            <Form.Item name="event_name" label={<Text strong>Event Title</Text>} rules={[{ required: true, message: 'Please enter event title' }]}>
+                                <Input placeholder="Annual Sports Day, Science Fair" style={{ borderRadius: 8 }} />
+                            </Form.Item>
 
+                            <Form.Item name="event_description" label={<Text strong>Description</Text>}>
+                                <TextArea rows={3} placeholder="Event details and instructions" style={{ borderRadius: 8 }} />
+                            </Form.Item>
+
+                            <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item name="event_date" label={<Text strong>Date</Text>} rules={[{ required: true, message: 'Select date' }]}>
+                                        <DatePicker style={{ width: '100%', borderRadius: 8 }} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name="event_time" label={<Text strong>Time</Text>}>
+                                        <TimePicker use12Hours format="h:mm a" style={{ width: '100%', borderRadius: 8 }} />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+
+                            <Form.Item name="event_manager" label={<Text strong>Event Manager / Organizer</Text>} rules={[{ required: true, message: 'Enter organizer name' }]}>
+                                <Input placeholder="Principal / Sports Committee" style={{ borderRadius: 8 }} />
+                            </Form.Item>
+
+                            <Button type="primary" htmlType="submit" loading={loading} block className="apex-btn-gold" style={{ height: 40, marginTop: 8 }}>
+                                Create Event
+                            </Button>
+                        </Form>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Edit Event Modal */}
             <Modal
-                title="Edit Event"
+                title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <EditOutlined style={{ color: '#d4af37' }} />
+                        <span>Edit Event Details</span>
+                    </div>
+                }
                 open={isEditModalVisible}
                 onCancel={() => {
                     setIsEditModalVisible(false);
                     setEditingEvent(null);
                 }}
                 footer={null}
-                destroyOnClose
-                width={isMobile ? '90%' : '50%'}
+                width={550}
+                centered
             >
-                <Form form={form} layout="vertical" onFinish={handleUpdate}>
-                    <Form.Item
-                        name="event_name"
-                        label="Event Name"
-                        rules={[{ required: true }]}
-                    >
-                        <Input size={isMobile ? "small" : "middle"} />
+                <Form form={form} layout="vertical" onFinish={handleUpdate} style={{ paddingTop: 12 }}>
+                    <Form.Item name="event_name" label={<Text strong>Event Title</Text>} rules={[{ required: true }]}>
+                        <Input style={{ borderRadius: 8 }} />
                     </Form.Item>
-                    
-                    <Form.Item
-                        name="event_description"
-                        label="Event Description"
-                    >
-                        <TextArea rows={isMobile ? 2 : 3} size={isMobile ? "small" : "middle"} />
+
+                    <Form.Item name="event_description" label={<Text strong>Description</Text>}>
+                        <TextArea rows={3} style={{ borderRadius: 8 }} />
                     </Form.Item>
-                    
-                    <Row gutter={16}>
+
+                    <Row gutter={12}>
                         <Col span={12}>
-                            <Form.Item
-                                name="event_date"
-                                label="Date"
-                                rules={[{ required: true }]}
-                            >
-                                <DatePicker 
-                                    style={{ width: '100%' }} 
-                                    size={isMobile ? "small" : "middle"}
-                                />
+                            <Form.Item name="event_date" label={<Text strong>Date</Text>} rules={[{ required: true }]}>
+                                <DatePicker style={{ width: '100%', borderRadius: 8 }} />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item
-                                name="event_time"
-                                label="Time"
-                            >
-                                <TimePicker 
-                                    style={{ width: '100%' }} 
-                                    format="h:mm A"
-                                    size={isMobile ? "small" : "middle"}
-                                />
+                            <Form.Item name="event_time" label={<Text strong>Time</Text>}>
+                                <TimePicker use12Hours format="h:mm a" style={{ width: '100%', borderRadius: 8 }} />
                             </Form.Item>
                         </Col>
                     </Row>
-                    
-                    <Form.Item
-                        name="event_manager"
-                        label="Manager"
-                        rules={[{ required: true }]}
-                    >
-                        <Input size={isMobile ? "small" : "middle"} />
+
+                    <Form.Item name="event_manager" label={<Text strong>Event Manager</Text>} rules={[{ required: true }]}>
+                        <Input style={{ borderRadius: 8 }} />
                     </Form.Item>
-                    
-                    <Form.Item>
-                        <Button 
-                            type="primary" 
-                            htmlType="submit" 
-                            block
-                            loading={loading}
-                            size={isMobile ? "small" : "middle"}
-                        >
-                            Update Event
-                        </Button>
-                    </Form.Item>
+
+                    <Button type="primary" htmlType="submit" loading={loading} block className="apex-btn-gold" style={{ height: 40, marginTop: 8 }}>
+                        Update Event Record
+                    </Button>
                 </Form>
             </Modal>
-        </>
+        </div>
     );
 };
 

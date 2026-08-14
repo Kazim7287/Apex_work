@@ -1,51 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  Button, 
-  Form, 
-  Input, 
-  Upload, 
-  message, 
-  Row, 
-  Col, 
+import React, { useEffect, useState } from 'react';
+import {
+  Card,
+  Button,
+  Form,
+  Input,
+  Upload,
+  message,
+  Row,
+  Col,
   Image,
   Modal,
-  Divider,
   Typography,
   Space,
   Spin,
   Popconfirm,
-  InputNumber
+  Tooltip,
 } from 'antd';
-import { 
-  UploadOutlined, 
-  DeleteOutlined, 
+import {
+  UploadOutlined,
+  DeleteOutlined,
   EditOutlined,
   PlusOutlined,
-  LoadingOutlined,
   EyeOutlined,
-  CloseOutlined,
-  CheckOutlined
+  InfoCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+
+const API_BASE_URL =
+  'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX';
+
+const BASE_IMAGE_URL =
+  'https://white-trout-460511.hostingersite.com/APEX/';
 
 const AboutManagement = () => {
   const [form] = Form.useForm();
+
   const [sections, setSections] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [currentSection, setCurrentSection] = useState(null);
   const [fileList, setFileList] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [imageLoading, setImageLoading] = useState({});
-  const [viewingImage, setViewingImage] = useState(null);
+
   const [editingImage, setEditingImage] = useState(null);
   const [tempImageUrl, setTempImageUrl] = useState('');
 
-  // Base URL for images
-  const BASE_IMAGE_URL = 'https://white-trout-460511.hostingersite.com/APEX/';
+  // --------------------------------------------------
+  // Fetch sections
+  // --------------------------------------------------
 
   useEffect(() => {
     fetchSections();
@@ -54,543 +60,772 @@ const AboutManagement = () => {
   const fetchSections = async () => {
     try {
       setLoading(true);
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_about_sections.php');
-      
+
+      const response = await fetch(
+        `${API_BASE_URL}/get_about_sections.php`
+      );
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      
-      if (data.status === 'success') {
-        const apiSections = data.data || [];
-        
-        const sectionsWithImages = await Promise.all(
-          apiSections.map(async (section) => {
-            try {
-              const imagesResponse = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/imagesread.php?section_id=${section.id}`);
-              if (imagesResponse.ok) {
-                const imagesData = await imagesResponse.json();
-                
-                // Add full_image_url to each image
-                const imagesWithFullUrl = imagesData.status === 'success' 
-                  ? imagesData.data.map(img => ({
-                      ...img,
-                      full_image_url: img.full_image_url || `${BASE_IMAGE_URL}${img.image_path}`
-                    }))
-                  : [];
-                
-                return {
-                  ...section,
-                  images: imagesWithFullUrl
-                };
-              }
-              return section;
-            } catch (error) {
-              console.error(`Error fetching images for section ${section.id}:`, error);
-              return section;
-            }
-          })
-        );
-        
-        setSections(sectionsWithImages);
-      } else {
+
+      if (data.status !== 'success') {
         message.error(data.message || 'Failed to fetch sections');
         setSections([]);
+        return;
       }
+
+      const apiSections = data.data || [];
+
+      const sectionsWithImages = await Promise.all(
+        apiSections.map(async (section) => {
+          try {
+            const imagesResponse = await fetch(
+              `${API_BASE_URL}/imagesread.php?section_id=${section.id}`
+            );
+
+            if (!imagesResponse.ok) {
+              return {
+                ...section,
+                images: [],
+              };
+            }
+
+            const imagesData = await imagesResponse.json();
+
+            const images =
+              imagesData.status === 'success'
+                ? (imagesData.data || []).map((img) => ({
+                    ...img,
+                    full_image_url:
+                      img.full_image_url ||
+                      `${BASE_IMAGE_URL}${img.image_path}`,
+                  }))
+                : [];
+
+            return {
+              ...section,
+              images,
+            };
+          } catch (error) {
+            console.error(
+              `Error fetching images for section ${section.id}:`,
+              error
+            );
+
+            return {
+              ...section,
+              images: [],
+            };
+          }
+        })
+      );
+
+      setSections(sectionsWithImages);
     } catch (error) {
       console.error('Error fetching sections:', error);
-      message.error('Failed to load sections. Please try again later.');
+      message.error('Failed to connect to the server');
       setSections([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (values) => {
-    try {
-      const url = currentSection 
-        ? `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/updateabout.php?id=${currentSection.id}`
-        : 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/add_about_section.php';
+  // --------------------------------------------------
+  // Create / Update section
+  // --------------------------------------------------
 
-      const method = currentSection ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: values.title,
-          description: values.description
-        }),
-      });
+  const handleCreateOrUpdateSection = async (values) => {
+    try {
+      setUploading(true);
+
+      const formData = new FormData();
+
+      if (currentSection) {
+        formData.append('id', currentSection.id);
+        formData.append('action', 'update');
+      } else {
+        formData.append('action', 'create');
+      }
+
+      formData.append('title', values.title);
+      formData.append('content', values.content || '');
+
+      if (
+        fileList.length > 0 &&
+        fileList[0].originFileObj
+      ) {
+        formData.append(
+          'image',
+          fileList[0].originFileObj
+        );
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/aboutuspost.php`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP error! status: ${response.status}`
+        );
+      }
 
       const data = await response.json();
-      
-      if (data.status === 'success') {
-        const sectionId = data.id || currentSection?.id;
-        
-        const newFiles = fileList.filter(file => file.originFileObj);
-        if (newFiles.length > 0) {
-          setUploading(true);
-          const imageFormData = new FormData();
-          newFiles.forEach(file => {
-            imageFormData.append('images[]', file.originFileObj);
-          });
-          
-          const imageResponse = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/imagupload.php?section_id=${sectionId}`, {
-            method: 'POST',
-            body: imageFormData,
-          });
-          
-          const imageData = await imageResponse.json();
-          if (imageData.status !== 'success') {
-            throw new Error('Section saved but image upload failed');
-          }
-        }
 
-        message.success(currentSection ? 'Section updated successfully!' : 'Section added successfully!');
-        setIsModalVisible(false);
-        form.resetFields();
-        setFileList([]);
-        await fetchSections();
+      if (data.status === 'success') {
+        message.success(
+          data.message ||
+            (currentSection
+              ? 'Section updated successfully'
+              : 'Section created successfully')
+        );
+
+        closeModal();
+        fetchSections();
       } else {
-        throw new Error(data.message || 'Operation failed');
+        message.error(
+          data.message || 'Failed to save section'
+        );
       }
     } catch (error) {
-      console.error('Submission error:', error);
-      message.error(`Failed: ${error.message}`);
+      console.error('Error saving section:', error);
+      message.error(
+        'An error occurred while saving the section'
+      );
     } finally {
       setUploading(false);
     }
   };
 
-  const handleEdit = (section) => {
-    setCurrentSection(section);
-    form.setFieldsValue({
-      title: section.title,
-      description: section.description
-    });
-    
-    const existingImages = section.images?.map((img, index) => ({
-      uid: `existing-${index}-${img.id || index}`,
-      name: img.image_path.split('/').pop(),
-      status: 'done',
-      url: img.full_image_url || `${BASE_IMAGE_URL}${img.image_path}`,
-      id: img.id
-    })) || [];
-    
-    setFileList(existingImages);
-    setIsModalVisible(true);
-  };
+  // --------------------------------------------------
+  // Delete section
+  // --------------------------------------------------
 
   const handleDeleteSection = async (id) => {
     try {
-      const response = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/delete_about_section.php?id=${id}`, {
-        method: 'DELETE',
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/delete_about_section.php?id=${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
       const data = await response.json();
-      
+
       if (data.status === 'success') {
-        message.success('Section deleted successfully!');
-        setSections(sections.filter(section => section.id !== id));
+        message.success(
+          'Section deleted successfully'
+        );
+
+        fetchSections();
       } else {
-        message.error(data.message || 'Failed to delete section');
+        message.error(
+          data.message || 'Failed to delete section'
+        );
       }
     } catch (error) {
-      console.error('Error deleting section:', error);
-      message.error('Network error while deleting section');
+      console.error(
+        'Error deleting section:',
+        error
+      );
+
+      message.error(
+        'An error occurred while deleting the section'
+      );
     }
   };
 
-  const handleDeleteImage = async (imageId, sectionId) => {
+  // --------------------------------------------------
+  // Delete image
+  // --------------------------------------------------
+
+  const handleDeleteImage = async (imageId) => {
     try {
-      setImageLoading(prev => ({ ...prev, [imageId]: true }));
-      
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/imagedelete.php', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image_id: imageId })
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/delete_section_image.php?id=${imageId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
       const data = await response.json();
-      
+
       if (data.status === 'success') {
-        message.success('Image deleted successfully!');
-        setSections(sections.map(section => {
-          if (section.id === sectionId) {
-            return {
-              ...section,
-              images: section.images.filter(img => img.id !== imageId)
-            };
-          }
-          return section;
-        }));
+        message.success('Image deleted successfully');
+        fetchSections();
       } else {
-        message.error(data.message || 'Failed to delete image');
+        message.error(
+          data.message || 'Failed to delete image'
+        );
       }
     } catch (error) {
-      console.error('Error deleting image:', error);
-      message.error('Network error while deleting image');
-    } finally {
-      setImageLoading(prev => ({ ...prev, [imageId]: false }));
+      console.error(
+        'Error deleting image:',
+        error
+      );
+
+      message.error(
+        'Error deleting image'
+      );
     }
   };
+
+  // --------------------------------------------------
+  // Update image URL
+  // --------------------------------------------------
 
   const handleUpdateImage = async () => {
+    if (
+      !editingImage ||
+      !tempImageUrl.trim()
+    ) {
+      return;
+    }
+
     try {
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/imageupdate.php', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image_id: editingImage.id,
-          image_order: editingImage.image_order,
-          image_path: tempImageUrl.replace(BASE_IMAGE_URL, '') // Remove base URL before saving
-        })
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/update_section_image.php`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: editingImage.id,
+            image_path: tempImageUrl.trim(),
+          }),
+        }
+      );
+
       const data = await response.json();
-      
+
       if (data.status === 'success') {
-        message.success('Image updated successfully!');
-        setSections(sections.map(section => {
-          if (section.id === editingImage.section_id) {
-            return {
-              ...section,
-              images: section.images.map(img => 
-                img.id === editingImage.id 
-                  ? { 
-                      ...img, 
-                      image_path: tempImageUrl.replace(BASE_IMAGE_URL, ''),
-                      full_image_url: tempImageUrl,
-                      image_order: editingImage.image_order 
-                    }
-                  : img
-              )
-            };
-          }
-          return section;
-        }));
-        
+        message.success(
+          'Image URL updated successfully'
+        );
+
         setEditingImage(null);
         setTempImageUrl('');
+
+        fetchSections();
       } else {
-        message.error(data.message || 'Failed to update image');
+        message.error(
+          data.message ||
+            'Failed to update image'
+        );
       }
     } catch (error) {
-      console.error('Error updating image:', error);
-      message.error('Network error while updating image');
+      console.error(
+        'Error updating image:',
+        error
+      );
+
+      message.error(
+        'Error updating image'
+      );
     }
   };
 
-  const beforeUpload = (file) => {
-    const isImage = file.type.startsWith('image/');
-    if (!isImage) {
-      message.error('You can only upload image files!');
-      return Upload.LIST_IGNORE;
-    }
-    const isLt5M = file.size / 1024 / 1024 < 5;
-    if (!isLt5M) {
-      message.error('Image must be smaller than 5MB!');
-      return Upload.LIST_IGNORE;
-    }
-    return false;
+  // --------------------------------------------------
+  // Modal controls
+  // --------------------------------------------------
+
+  const openCreateModal = () => {
+    setCurrentSection(null);
+    form.resetFields();
+    setFileList([]);
+    setIsModalVisible(true);
   };
 
-  const handleUploadChange = ({ fileList: newFileList }) => {
-    setFileList(newFileList);
+  const openEditModal = (section) => {
+    setCurrentSection(section);
+
+    form.setFieldsValue({
+      title: section.title,
+      content: section.content,
+    });
+
+    setFileList([]);
+    setIsModalVisible(true);
   };
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setCurrentSection(null);
+    setFileList([]);
+    form.resetFields();
+  };
+
+  // --------------------------------------------------
+  // Render
+  // --------------------------------------------------
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div
+      style={{
+        maxWidth: 1400,
+        margin: '0 auto',
+        width: '100%',
+      }}
+    >
       <Card
-        title={<Title level={4}>About Page Content</Title>}
-        extra={
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setCurrentSection(null);
-              setIsModalVisible(true);
-              form.resetFields();
-              setFileList([]);
+        className="apex-card"
+        title={
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
             }}
           >
-            Add New Section
-          </Button>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                minWidth: 38,
+                borderRadius: 10,
+                background:
+                  'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)',
+                color: '#d4af37',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+              }}
+            >
+              <InfoCircleOutlined />
+            </div>
+
+            <div>
+              <Title
+                level={4}
+                style={{
+                  margin: 0,
+                  color: '#0b1b3d',
+                  fontWeight: 700,
+                }}
+              >
+                Public Website "About Us" Content Management
+              </Title>
+
+              <Text
+                style={{
+                  color: '#64748b',
+                  fontSize: 12,
+                }}
+              >
+                Manage institute profile sections,
+                history, mission, and media gallery
+              </Text>
+            </div>
+          </div>
+        }
+        extra={
+          <Space wrap>
+            <Button
+              type="text"
+              icon={<ReloadOutlined />}
+              onClick={fetchSections}
+              loading={loading}
+              style={{
+                borderRadius: 8,
+              }}
+            />
+
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={openCreateModal}
+              className="apex-btn-gold"
+            >
+              Add New Section
+            </Button>
+          </Space>
         }
       >
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '24px' }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '60px 0',
+            }}
+          >
             <Spin size="large" />
+
+            <Text
+              style={{
+                display: 'block',
+                marginTop: 12,
+                color: '#64748b',
+              }}
+            >
+              Loading about content sections...
+            </Text>
+          </div>
+        ) : sections.length === 0 ? (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+            }}
+          >
+            <Text type="secondary">
+              No About Us sections found.
+            </Text>
+
+            <br />
+
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={openCreateModal}
+              style={{ marginTop: 16 }}
+            >
+              Create First Section
+            </Button>
           </div>
         ) : (
-          <Row gutter={[16, 16]}>
-            {sections.length > 0 ? (
-              sections.map(section => (
-                <Col xs={24} key={section.id}>
-                  <Card
-                    title={section.title}
-                    extra={
-                      <Space>
-                        <Button 
-                          icon={<EditOutlined />} 
-                          onClick={() => handleEdit(section)}
+          <Row gutter={[20, 20]}>
+            {sections.map((section) => (
+              <Col
+                key={section.id}
+                xs={24}
+                md={12}
+              >
+                <Card
+                  hoverable
+                  className="apex-card"
+                  title={
+                    <Title
+                      level={5}
+                      style={{
+                        margin: 0,
+                        color: '#0b1b3d',
+                      }}
+                    >
+                      {section.title}
+                    </Title>
+                  }
+                  extra={
+                    <Space size="small">
+                      <Tooltip title="Edit Section">
+                        <Button
+                          type="text"
+                          icon={
+                            <EditOutlined
+                              style={{
+                                color: '#1e3a8a',
+                              }}
+                            />
+                          }
+                          onClick={() =>
+                            openEditModal(section)
+                          }
+                          style={{
+                            borderRadius: 6,
+                            background: '#f1f5f9',
+                          }}
                         />
-                        <Popconfirm
-                          title="Are you sure to delete this section?"
-                          onConfirm={() => handleDeleteSection(section.id)}
-                          okText="Yes"
-                          cancelText="No"
-                        >
-                          <Button danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
-                      </Space>
-                    }
+                      </Tooltip>
+
+                      <Popconfirm
+                        title="Delete Section"
+                        description="Are you sure you want to delete this section?"
+                        onConfirm={() =>
+                          handleDeleteSection(
+                            section.id
+                          )
+                        }
+                        okText="Yes"
+                        cancelText="No"
+                        okButtonProps={{
+                          danger: true,
+                        }}
+                      >
+                        <Tooltip title="Delete Section">
+                          <Button
+                            type="text"
+                            danger
+                            icon={
+                              <DeleteOutlined />
+                            }
+                            style={{
+                              borderRadius: 6,
+                              background: '#fef2f2',
+                            }}
+                          />
+                        </Tooltip>
+                      </Popconfirm>
+                    </Space>
+                  }
+                >
+                  <Paragraph
+                    style={{
+                      color: '#334155',
+                      minHeight: 60,
+                      marginBottom: 0,
+                    }}
                   >
-                    <Text>{section.description}</Text>
-                    {section.images?.length > 0 && (
-                      <>
-                        <Divider />
-                        <Title level={5}>Section Images</Title>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {section.images.map((img, index) => (
-                            <div key={img.id} style={{ position: 'relative' }}>
-                              {viewingImage?.id === img.id ? (
-                                <div style={{ 
-                                  position: 'relative',
-                                  width: 300,
-                                  height: 200,
-                                  border: '1px solid #f0f0f0',
-                                  borderRadius: '4px',
-                                  padding: '8px',
-                                  backgroundColor: '#f9f9f9'
-                                }}>
+                    {section.content ||
+                      'No text content.'}
+                  </Paragraph>
+
+                  {section.images &&
+                    section.images.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: 16,
+                        }}
+                      >
+                        <Text
+                          strong
+                          style={{
+                            color: '#0b1b3d',
+                            display: 'block',
+                            marginBottom: 8,
+                            fontSize: 12,
+                          }}
+                        >
+                          Section Images (
+                          {section.images.length})
+                        </Text>
+
+                        <Row gutter={[8, 8]}>
+                          {section.images.map(
+                            (img) => (
+                              <Col
+                                key={img.id}
+                                xs={12}
+                                sm={8}
+                              >
+                                <div
+                                  style={{
+                                    position:
+                                      'relative',
+                                    borderRadius: 8,
+                                    overflow:
+                                      'hidden',
+                                    border:
+                                      '1px solid #cbd5e1',
+                                  }}
+                                >
                                   <Image
-                                    src={img.full_image_url || `${BASE_IMAGE_URL}${img.image_path}`}
-                                    style={{ 
+                                    src={
+                                      img.full_image_url
+                                    }
+                                    alt="Section"
+                                    style={{
                                       width: '100%',
-                                      height: '100%',
-                                      objectFit: 'contain'
+                                      height: 90,
+                                      objectFit:
+                                        'cover',
+                                    }}
+                                    preview={{
+                                      mask: (
+                                        <EyeOutlined />
+                                      ),
                                     }}
                                   />
-                                  <Button 
-                                    type="text"
-                                    icon={<CloseOutlined />}
-                                    style={{ 
-                                      position: 'absolute',
+
+                                  <div
+                                    style={{
+                                      position:
+                                        'absolute',
                                       top: 4,
-                                      right: 4
-                                    }}
-                                    onClick={() => setViewingImage(null)}
-                                  />
-                                </div>
-                              ) : (
-                                <>
-                                  <Image
-                                    src={img.full_image_url || `${BASE_IMAGE_URL}${img.image_path}`}
-                                    width={100}
-                                    height={100}
-                                    style={{ 
-                                      objectFit: 'cover', 
-                                      borderRadius: '4px',
-                                      border: '1px solid #f0f0f0'
-                                    }}
-                                    preview={false}
-                                    onClick={() => setViewingImage(img)}
-                                  />
-                                  
-                                  {editingImage?.id === img.id ? (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: 0,
-                                      left: 0,
-                                      right: 0,
-                                      bottom: 0,
-                                      backgroundColor: 'rgba(255,255,255,0.9)',
-                                      padding: '8px',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px'
-                                    }}>
-                                      <Input
-                                        value={tempImageUrl}
-                                        onChange={(e) => setTempImageUrl(e.target.value)}
-                                        placeholder="New image URL"
-                                        addonBefore={BASE_IMAGE_URL}
-                                      />
-                                      <InputNumber
-                                        value={editingImage.image_order}
-                                        onChange={(value) => setEditingImage({
-                                          ...editingImage,
-                                          image_order: value
-                                        })}
-                                        min={1}
-                                        placeholder="Order"
-                                      />
-                                      <Space>
-                                        <Button 
-                                          type="primary" 
-                                          size="small"
-                                          icon={<CheckOutlined />}
-                                          onClick={handleUpdateImage}
-                                        />
-                                        <Button 
-                                          size="small"
-                                          icon={<CloseOutlined />}
-                                          onClick={() => {
-                                            setEditingImage(null);
-                                            setTempImageUrl('');
-                                          }}
-                                        />
-                                      </Space>
-                                    </div>
-                                  ) : (
-                                    <div style={{ 
-                                      position: 'absolute', 
-                                      top: 4, 
                                       right: 4,
-                                      display: 'flex',
-                                      gap: '4px'
-                                    }}>
-                                      <Button 
-                                        size="small" 
-                                        icon={<EditOutlined />}
-                                        onClick={() => {
-                                          setEditingImage(img);
-                                          setTempImageUrl(img.full_image_url || `${BASE_IMAGE_URL}${img.image_path}`);
+                                      background:
+                                        'rgba(0,0,0,0.6)',
+                                      borderRadius: 4,
+                                      padding: 4,
+                                    }}
+                                  >
+                                    <Popconfirm
+                                      title="Delete Image"
+                                      description="Are you sure you want to delete this image?"
+                                      onConfirm={() =>
+                                        handleDeleteImage(
+                                          img.id
+                                        )
+                                      }
+                                      okText="Delete"
+                                      cancelText="Cancel"
+                                      okButtonProps={{
+                                        danger: true,
+                                      }}
+                                    >
+                                      <DeleteOutlined
+                                        style={{
+                                          color:
+                                            '#ef4444',
+                                          cursor:
+                                            'pointer',
+                                          fontSize: 12,
                                         }}
                                       />
-                                      <Popconfirm
-                                        title="Are you sure to delete this image?"
-                                        onConfirm={() => handleDeleteImage(img.id, section.id)}
-                                        okText="Yes"
-                                        cancelText="No"
-                                      >
-                                        <Button 
-                                          danger 
-                                          size="small" 
-                                          icon={imageLoading[img.id] ? <LoadingOutlined /> : <DeleteOutlined />}
-                                          disabled={imageLoading[img.id]}
-                                        />
-                                      </Popconfirm>
-                                    </div>
-                                  )}
-                                  <div style={{ 
-                                    textAlign: 'center',
-                                    marginTop: '4px',
-                                    fontSize: '12px'
-                                  }}>
-                                    Order: {img.image_order}
+                                    </Popconfirm>
                                   </div>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                                </div>
+                              </Col>
+                            )
+                          )}
+                        </Row>
+                      </div>
                     )}
-                  </Card>
-                </Col>
-              ))
-            ) : (
-              <Col span={24}>
-                <div style={{ textAlign: 'center', padding: '24px' }}>
-                  <Text type="secondary">No sections found. Add a new section to get started.</Text>
-                </div>
+                </Card>
               </Col>
-            )}
+            ))}
           </Row>
         )}
       </Card>
 
+      {/* Create / Edit Modal */}
+
       <Modal
-        title={currentSection ? 'Edit Section' : 'Add New Section'}
-        visible={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          form.resetFields();
-          setFileList([]);
-        }}
+        title={
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <InfoCircleOutlined
+              style={{
+                color: '#d4af37',
+              }}
+            />
+
+            <span>
+              {currentSection
+                ? `Edit Section #${currentSection.id}`
+                : 'Create About Section'}
+            </span>
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={closeModal}
         footer={null}
-        destroyOnClose
-        width={800}
+        width={600}
+        centered
       >
         <Form
           form={form}
           layout="vertical"
-          onFinish={handleSubmit}
+          onFinish={handleCreateOrUpdateSection}
+          style={{
+            paddingTop: 12,
+          }}
         >
           <Form.Item
             name="title"
-            label="Title"
+            label={
+              <Text strong>
+                Section Title
+              </Text>
+            }
             rules={[
-              { required: true, message: 'Please input the title!' },
-              { min: 3, message: 'Title must be at least 3 characters' }
+              {
+                required: true,
+                message:
+                  'Enter section title',
+              },
             ]}
           >
-            <Input placeholder="Enter section title" />
+            <Input
+              placeholder="e.g. Our Legacy & History"
+              style={{
+                borderRadius: 8,
+              }}
+            />
           </Form.Item>
-          
+
           <Form.Item
-            name="description"
-            label="Description"
-            rules={[
-              { required: true, message: 'Please input the description!' },
-              { min: 10, message: 'Description must be at least 10 characters' }
-            ]}
+            name="content"
+            label={
+              <Text strong>
+                Section Content
+              </Text>
+            }
           >
-            <TextArea rows={4} placeholder="Enter section description" />
+            <TextArea
+              rows={4}
+              placeholder="Enter section body text"
+              style={{
+                borderRadius: 8,
+              }}
+            />
           </Form.Item>
-          
-          <Form.Item label="Images (Optional)">
+
+          <Form.Item
+            label={
+              <Text strong>
+                Section Image (Optional)
+              </Text>
+            }
+          >
             <Upload
-              listType="picture-card"
+              beforeUpload={() => false}
               fileList={fileList}
-              beforeUpload={beforeUpload}
-              onChange={handleUploadChange}
-              multiple
-              maxCount={5}
+              onChange={({ fileList: newFileList }) =>
+                setFileList(newFileList)
+              }
+              maxCount={1}
               accept="image/*"
             >
-              {fileList.length >= 5 ? null : (
-                <div>
-                  <PlusOutlined />
-                  <div style={{ marginTop: 8 }}>Upload</div>
-                </div>
-              )}
+              <Button
+                icon={<UploadOutlined />}
+                style={{
+                  borderRadius: 8,
+                }}
+              >
+                Select Image File
+              </Button>
             </Upload>
-            <Text type="secondary">Max 5 images (JPEG, PNG, WEBP), 5MB each</Text>
           </Form.Item>
-          
-          <Form.Item>
-            <Button 
-              type="primary" 
-              htmlType="submit"
-              loading={uploading}
-              disabled={uploading}
-            >
-              {currentSection ? 'Update' : 'Add'}
-            </Button>
-            <Button 
-              style={{ marginLeft: '8px' }}
-              onClick={() => {
-                setIsModalVisible(false);
-                form.resetFields();
-                setFileList([]);
-              }}
-              disabled={uploading}
-            >
-              Cancel
-            </Button>
-          </Form.Item>
+
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={uploading}
+            block
+            className="apex-btn-gold"
+            style={{
+              height: 40,
+              marginTop: 8,
+            }}
+          >
+            {currentSection
+              ? 'Save Changes'
+              : 'Create Section'}
+          </Button>
         </Form>
+      </Modal>
+
+      {/* Image URL editor */}
+      <Modal
+        title="Update Image URL"
+        open={!!editingImage}
+        onCancel={() => {
+          setEditingImage(null);
+          setTempImageUrl('');
+        }}
+        onOk={handleUpdateImage}
+        okText="Update"
+      >
+        <Input
+          value={tempImageUrl}
+          onChange={(e) =>
+            setTempImageUrl(e.target.value)
+          }
+          placeholder="Enter image URL"
+        />
       </Modal>
     </div>
   );

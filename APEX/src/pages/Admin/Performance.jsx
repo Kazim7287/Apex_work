@@ -1,1083 +1,2161 @@
-import { useEffect, useState } from "react";
-import { Button, Layout, Row, Col, Typography, Table, Modal, Space, message, Card, Spin, Select, Divider, Statistic, Grid } from 'antd';
-import Sidebar from "./Sidebar";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { PrinterOutlined, DownloadOutlined, StarFilled, StarOutlined, FilterOutlined } from '@ant-design/icons';
-import './Performance.css';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Layout,
+  Row,
+  Col,
+  Typography,
+  Table,
+  Modal,
+  Space,
+  message,
+  Card,
+  Spin,
+  Select,
+  Divider,
+  Grid,
+  Tag,
+  Empty,
+} from "antd";
 
-const { useBreakpoint } = Grid;
+import Sidebar from "./Sidebar";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+
+import {
+  PrinterOutlined,
+  DownloadOutlined,
+  StarFilled,
+  FilterOutlined,
+  BarChartOutlined,
+  TableOutlined,
+  TrophyOutlined,
+  RiseOutlined,
+  FallOutlined,
+  TeamOutlined,
+  FileTextOutlined,
+  UserOutlined,
+  CalendarOutlined,
+  ReloadOutlined,
+  EyeOutlined,
+} from "@ant-design/icons";
+
+import { useNavigate } from "react-router-dom";
+import "./Performance.css";
+
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
+const { useBreakpoint } = Grid;
 
-// Color palette for charts
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const CHART_COLORS = [
+  "#1677ff",
+  "#52c41a",
+  "#faad14",
+  "#ff7a45",
+  "#722ed1",
+  "#eb2f96",
+];
 
 const Performance = () => {
-    const [sections, setSections] = useState([]);
-    const [performances, setPerformances] = useState([]);
-    const [selectedSection, setSelectedSection] = useState(null);
-    const [selectedSectionName, setSelectedSectionName] = useState('');
-    const [columns, setColumns] = useState([]);
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const [selectedStudent, setSelectedStudent] = useState(null);
-    const [studentDetails, setStudentDetails] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState('table'); // 'table' or 'graph'
-    const [sortConfig, setSortConfig] = useState({ key: 'total_marks', direction: 'desc' });
-    const [filteredSubjects, setFilteredSubjects] = useState([]);
-    const navigate = useNavigate();
+  const screens = useBreakpoint();
+  const navigate = useNavigate();
 
-    const screens = useBreakpoint();
-    const isMobile = !screens.md;
-    const isSmallMobile = !screens.sm;
+  const isMobile = !screens.md;
+  const isSmallMobile = !screens.sm;
 
-    // Get current academic session (current year - next year)
-    const getAcademicSession = () => {
-        const currentYear = new Date().getFullYear();
-        const nextYear = currentYear + 1;
-        return `${currentYear}-${nextYear}`;
-    };
+  const [sections, setSections] = useState([]);
+  const [performances, setPerformances] = useState([]);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [selectedSectionName, setSelectedSectionName] = useState("");
 
-    // College logo path - corrected to use the absolute path from assets
-    const collegeLogo = '../assets/images.png';
+  const [columns, setColumns] = useState([]);
+  const [filteredSubjects, setFilteredSubjects] = useState([]);
 
-    const fetchWithAuth = async (url, options = {}) => {
-        try {
-            setLoading(true);
-            const response = await fetch(url, {
-                ...options,
-                credentials: 'include',
-                headers: {
-                    ...options.headers,
-                    'Content-Type': 'application/json',
-                },
-            });
-    
-            if (url.includes('Sec_Read.php') && response.status === 401) {
-                message.error('Admin access required. Please login as admin.');
-                navigate('/admin-signIn');
-                return null;
-            }
-    
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-    
-            return await response.json();
-        } catch (error) {
-            console.error('Fetch error:', error);
-            message.error('Failed to fetch data');
-            return null;
-        } finally {
-            setLoading(false);
+  const [loading, setLoading] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("table");
+
+  const [sortConfig, setSortConfig] = useState({
+    key: "total_marks",
+    direction: "desc",
+  });
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentDetails, setStudentDetails] = useState([]);
+
+  const getAcademicSession = () => {
+    const currentYear = new Date().getFullYear();
+    return `${currentYear}-${currentYear + 1}`;
+  };
+
+  const collegeLogo = "../assets/images.png";
+
+  /* =========================================================
+     AUTHENTICATED API REQUEST
+     ========================================================= */
+
+  const fetchWithAuth = async (url, options = {}) => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(url, {
+        ...options,
+        credentials: "include",
+        headers: {
+          ...options.headers,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (
+        url.includes("Sec_Read.php") &&
+        response.status === 401
+      ) {
+        message.error(
+          "Admin access required. Please login as admin."
+        );
+
+        navigate("/admin-signIn");
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Fetch error:", error);
+      message.error("Failed to fetch data");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* =========================================================
+     FETCH SECTIONS
+     ========================================================= */
+
+  useEffect(() => {
+    const fetchSections = async () => {
+      const data = await fetchWithAuth(
+        "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php"
+      );
+
+      if (data) {
+        setSections(data);
+
+        if (data.length > 0) {
+          fetchPerformanceData(data[0].id, data[0].name);
         }
+      }
     };
 
-    useEffect(() => {
-        const fetchSections = async () => {
-            const data = await fetchWithAuth("https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php");
-            if (data) {
-                setSections(data);
-                // Set default section if available
-                if (data.length > 0) {
-                    fetchPerformanceData(data[0].id, data[0].name);
-                }
-            }
-        };
-        fetchSections();
-    }, []);
+    fetchSections();
+  }, []);
 
-    const fetchPerformanceData = async (sectionId, sectionName) => {
-        setPerformances([]);
-        setColumns([]);
-        setFilteredSubjects([]);
+  /* =========================================================
+     FETCH PERFORMANCE DATA
+     ========================================================= */
 
-        const data = await fetchWithAuth(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Clg_performance.php?section_id=${sectionId}`);
-        if (data && Array.isArray(data)) {
-            const subjects = {};
-            data.forEach(item => {
-                const subjectKey = `${item.subject_name} (${item.exam_name})`;
-                if (!subjects[subjectKey]) {
-                    subjects[subjectKey] = [];
-                }
-                subjects[subjectKey].push(item);
-            });
+  const fetchPerformanceData = async (
+    sectionId,
+    sectionName
+  ) => {
+    setPerformances([]);
+    setColumns([]);
+    setFilteredSubjects([]);
 
-            // Set filtered subjects (all subjects initially)
-            setFilteredSubjects(Object.keys(subjects));
+    const data = await fetchWithAuth(
+      `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Clg_performance.php?section_id=${sectionId}`
+    );
 
-            const columns = [
-                {
-                    title: 'Student Name',
-                    dataIndex: 'student_name',
-                    key: 'student_name',
-                    fixed: isMobile ? 'left' : false,
-                    width: isMobile ? 120 : undefined,
-                    sorter: (a, b) => a.student_name.localeCompare(b.student_name),
-                    sortDirections: ['ascend', 'descend'],
-                    render: (text) => (
-                        <Text style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                            {text}
-                        </Text>
-                    ),
-                },
-                ...Object.keys(subjects).map(subject => ({
-                    title: (
-                        <div style={{ 
-                            fontSize: isSmallMobile ? '10px' : (isMobile ? '11px' : '14px'),
-                            lineHeight: '1.2',
-                            textAlign: 'center'
-                        }}>
-                            {subject}
-                        </div>
-                    ),
-                    dataIndex: subject,
-                    key: subject,
-                    width: isSmallMobile ? 80 : (isMobile ? 100 : 120),
-                    render: (value, record) => (
-                        <div style={{ textAlign: 'center' }}>
-                            <Text style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                                {value ?? '-'}
-                            </Text>
-                            {value && value >= (record[`${subject}_total`] * 0.9) ? (
-                                <StarFilled style={{ color: 'gold', marginLeft: 2, fontSize: isSmallMobile ? 10 : 12 }} />
-                            ) : null}
-                        </div>
-                    ),
-                    sorter: (a, b) => (a[subject] || 0) - (b[subject] || 0),
-                    sortDirections: ['ascend', 'descend'],
-                })),
-                {
-                    title: 'Total',
-                    dataIndex: 'total_marks',
-                    key: 'total_marks',
-                    fixed: isMobile ? 'right' : false,
-                    width: isMobile ? 70 : 90,
-                    sorter: (a, b) => a.total_marks - b.total_marks,
-                    sortDirections: ['ascend', 'descend'],
-                    render: (text) => (
-                        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                            {text}
-                        </Text>
-                    ),
-                },
-                {
-                    title: 'Action',
-                    key: 'action',
-                    fixed: isMobile ? 'right' : false,
-                    width: isMobile ? 80 : 100,
-                    render: (_, record) => (
-                        <Button 
-                            type="link" 
-                            onClick={() => showStudentDetails(record.student_name, data)}
-                            size={isSmallMobile ? 'small' : (isMobile ? 'middle' : 'middle')}
-                            loading={loading}
-                            style={{ 
-                                padding: isSmallMobile ? '4px 0' : '4px 8px',
-                                fontSize: isSmallMobile ? '11px' : '13px'
-                            }}
-                        >
-                            View DMC
-                        </Button>
-                    ),
-                },
-            ];
-
-            const rows = Array.from(new Set(data.map(item => item.student_name))).map(student_name => {
-                let total = 0;
-                const rowData = { key: student_name, student_name };
-
-                Object.keys(subjects).forEach(subject => {
-                    const subjectData = subjects[subject].find(i => i.student_name === student_name);
-                    if (subjectData) {
-                        rowData[subject] = subjectData.obtained_marks;
-                        rowData[`${subject}_total`] = subjectData.total_marks;
-                        total += parseFloat(subjectData.obtained_marks);
-                    } else {
-                        rowData[subject] = '-';
-                    }
-                });
-
-                rowData.total_marks = total;
-                return rowData;
-            });
-
-            setColumns(columns);
-            setPerformances(rows);
-            setSelectedSection(sectionId);
-            setSelectedSectionName(sectionName);
-        } else if (data) {
-            console.error("Unexpected API response:", data);
-        }
-    };
-
-    const showStudentDetails = (studentName, allData) => {
-        const details = allData.filter(item => item.student_name === studentName);
-        setSelectedStudent(studentName);
-        setStudentDetails(details);
-        setIsModalVisible(true);
-    };
-
-    const handlePrint = () => {
-        const printContent = document.getElementById('dmc-print-content');
-        if (!printContent) {
-            message.error('Print content not found');
-            return;
-        }
-
-        const printWindow = window.open('', '_blank', 'width=1000,height=800');
-        const currentDate = new Date().toLocaleDateString();
-        const currentTime = new Date().toLocaleTimeString();
-
-        // Get the absolute URL for the logo for printing
-        const logoUrl = window.location.origin + collegeLogo;
-
-        printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>DMC - ${selectedStudent}</title>
-                <style>
-                    body { 
-                        font-family: 'Arial', sans-serif; 
-                        margin: 0; 
-                        padding: 20px; 
-                        background: white;
-                        color: black;
-                    }
-                    .print-header { 
-                        text-align: center; 
-                        margin-bottom: 30px;
-                        border-bottom: 2px solid #000;
-                        padding-bottom: 20px;
-                    }
-                    .college-logo {
-                        height: 80px;
-                        margin-bottom: 10px;
-                    }
-                    .college-name {
-                        font-size: 24px;
-                        font-weight: bold;
-                        margin: 10px 0 5px 0;
-                    }
-                    .dmc-title {
-                        font-size: 18px;
-                        font-weight: bold;
-                        margin: 5px 0;
-                    }
-                    .academic-session {
-                        font-size: 14px;
-                        color: #666;
-                    }
-                    .student-info {
-                        margin: 20px 0;
-                        padding: 15px;
-                        background: #f9f9f9;
-                        border-radius: 5px;
-                    }
-                    .info-row {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-bottom: 8px;
-                    }
-                    .info-label {
-                        font-weight: bold;
-                        min-width: 120px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 20px 0;
-                        font-size: 12px;
-                    }
-                    th, td {
-                        border: 1px solid #ddd;
-                        padding: 8px;
-                        text-align: left;
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                        font-weight: bold;
-                    }
-                    .summary-row {
-                        background-color: #e8f4fd !important;
-                        font-weight: bold;
-                    }
-                    .footer {
-                        margin-top: 30px;
-                        padding-top: 20px;
-                        border-top: 1px solid #000;
-                    }
-                    .footer-content {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                    }
-                    .grading-system {
-                        flex: 1;
-                    }
-                    .signature {
-                        text-align: right;
-                        flex: 1;
-                    }
-                    .signature-line {
-                        border-top: 1px solid #000;
-                        width: 200px;
-                        margin-top: 60px;
-                        margin-left: auto;
-                    }
-                    .print-date {
-                        text-align: right;
-                        margin-bottom: 20px;
-                        font-size: 12px;
-                        color: #666;
-                    }
-                    @media print {
-                        body { margin: 0; padding: 15px; }
-                        .no-print { display: none; }
-                        table { page-break-inside: auto; }
-                        tr { page-break-inside: avoid; page-break-after: auto; }
-                        @page { margin: 1cm; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="print-date">
-                    Printed on: ${currentDate} at ${currentTime}
-                </div>
-                ${printContent.innerHTML.replace(/src="\/assets\/images.png"/g, `src="${logoUrl}"`)}
-            </body>
-            </html>
-        `);
-        
-        printWindow.document.close();
-        
-        // Wait for images to load before printing
-        printWindow.onload = function() {
-            setTimeout(() => {
-                printWindow.focus();
-                printWindow.print();
-                printWindow.onafterprint = function() {
-                    printWindow.close();
-                };
-            }, 1000);
-        };
-    };
-
-    const handleDownloadPDF = () => {
-        message.info('PDF download functionality would be implemented here');
-        // For actual PDF generation, you would use libraries like:
-        // jsPDF, html2canvas, or @react-pdf/renderer
-    };
-
-    const handleCancel = () => {
-        setIsModalVisible(false);
-    };
-
-    const handleSubjectFilter = (selectedSubjects) => {
-        setFilteredSubjects(selectedSubjects);
-    };
-
-    const handleSort = (key, direction) => {
-        setSortConfig({ key, direction });
-    };
-
-    const sortedPerformances = [...performances].sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-            return sortConfig.direction === 'ascend' ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-            return sortConfig.direction === 'ascend' ? 1 : -1;
-        }
-        return 0;
-    });
-
-    const getGrade = (percentage) => {
-        if (percentage >= 90) return 'A+';
-        if (percentage >= 80) return 'A';
-        if (percentage >= 70) return 'B';
-        if (percentage >= 60) return 'C';
-        if (percentage >= 50) return 'D';
-        return 'F';
-    };
-
-    const getGradeColor = (percentage) => {
-        if (percentage >= 90) return '#52c41a';
-        if (percentage >= 80) return '#389e0d';
-        if (percentage >= 70) return '#d4b106';
-        if (percentage >= 60) return '#d48806';
-        if (percentage >= 50) return '#d46b08';
-        return '#cf1322';
-    };
-
-    const calculateStatistics = () => {
-        if (performances.length === 0) return null;
-        
-        const totals = performances.map(p => p.total_marks);
-        const max = Math.max(...totals);
-        const min = Math.min(...totals);
-        const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
-        
-        return { max, min, avg };
-    };
-
-    const stats = calculateStatistics();
-    const modalWidth = isSmallMobile ? '95%' : isMobile ? '90%' : '80%';
-
-    // Prepare data for pie chart (grade distribution)
-    const gradeData = [
-        { name: 'A+ (90-100%)', value: 0 },
-        { name: 'A (80-89%)', value: 0 },
-        { name: 'B (70-79%)', value: 0 },
-        { name: 'C (60-69%)', value: 0 },
-        { name: 'D (50-59%)', value: 0 },
-        { name: 'F (Below 50%)', value: 0 },
-    ];
-
-    if (performances.length > 0 && studentDetails.length > 0) {
-        performances.forEach(performance => {
-            const totalPossible = studentDetails.reduce((sum, item) => sum + parseFloat(item.total_marks), 0);
-            const percentage = totalPossible > 0 ? (performance.total_marks / totalPossible) * 100 : 0;
-            const grade = getGrade(percentage);
-            
-            switch(grade) {
-                case 'A+': gradeData[0].value++; break;
-                case 'A': gradeData[1].value++; break;
-                case 'B': gradeData[2].value++; break;
-                case 'C': gradeData[3].value++; break;
-                case 'D': gradeData[4].value++; break;
-                case 'F': gradeData[5].value++; break;
-                default: break;
-            }
-        });
+    if (!data || !Array.isArray(data)) {
+      console.error("Unexpected API response:", data);
+      return;
     }
 
-    // Calculate overall result for DMC
-    const calculateOverallResult = () => {
-        if (studentDetails.length === 0) return { totalObtained: 0, totalPossible: 0, percentage: 0 };
-        
-        const totalObtained = studentDetails.reduce((sum, item) => sum + parseFloat(item.obtained_marks || 0), 0);
-        const totalPossible = studentDetails.reduce((sum, item) => sum + parseFloat(item.total_marks || 0), 0);
-        const percentage = totalPossible > 0 ? (totalObtained / totalPossible * 100) : 0;
-        
-        return { totalObtained, totalPossible, percentage: percentage.toFixed(2) };
+    const subjects = {};
+
+    data.forEach((item) => {
+      const subjectKey = `${item.subject_name} (${item.exam_name})`;
+
+      if (!subjects[subjectKey]) {
+        subjects[subjectKey] = [];
+      }
+
+      subjects[subjectKey].push(item);
+    });
+
+    const subjectNames = Object.keys(subjects);
+
+    setFilteredSubjects(subjectNames);
+
+    const tableColumns = [
+      {
+        title: "Student",
+        dataIndex: "student_name",
+        key: "student_name",
+        fixed: isMobile ? "left" : false,
+        width: isMobile ? 170 : 220,
+        sorter: (a, b) =>
+          a.student_name.localeCompare(b.student_name),
+        render: (text) => (
+          <div className="student-cell">
+            <div className="student-avatar">
+              <UserOutlined />
+            </div>
+
+            <div>
+              <div className="student-name">
+                {text}
+              </div>
+
+              <div className="student-label">
+                Student
+              </div>
+            </div>
+          </div>
+        ),
+      },
+
+      ...subjectNames.map((subject) => ({
+        title: (
+          <div className="subject-column-title">
+            {subject}
+          </div>
+        ),
+
+        dataIndex: subject,
+        key: subject,
+
+        width: isSmallMobile
+          ? 105
+          : isMobile
+          ? 120
+          : 145,
+
+        sorter: (a, b) =>
+          (a[subject] || 0) - (b[subject] || 0),
+
+        render: (value, record) => {
+          if (value === "-" || value === undefined) {
+            return (
+              <span className="empty-mark">
+                —
+              </span>
+            );
+          }
+
+          const total =
+            Number(record[`${subject}_total`]) || 0;
+
+          const percentage =
+            total > 0
+              ? (Number(value) / total) * 100
+              : 0;
+
+          return (
+            <div className="marks-cell">
+              <span>{value}</span>
+
+              {percentage >= 90 && (
+                <StarFilled className="top-score-icon" />
+              )}
+            </div>
+          );
+        },
+      })),
+
+      {
+        title: "Total",
+        dataIndex: "total_marks",
+        key: "total_marks",
+        fixed: isMobile ? "right" : false,
+        width: 110,
+
+        sorter: (a, b) =>
+          a.total_marks - b.total_marks,
+
+        render: (value) => (
+          <div className="total-score">
+            {value}
+          </div>
+        ),
+      },
+
+      {
+        title: "Action",
+        key: "action",
+        fixed: isMobile ? "right" : false,
+        width: 110,
+
+        render: (_, record) => (
+          <Button
+            type="text"
+            className="view-dmc-btn"
+            icon={<EyeOutlined />}
+            onClick={() =>
+              showStudentDetails(
+                record.student_name,
+                data
+              )
+            }
+          >
+            {!isSmallMobile && "View"}
+          </Button>
+        ),
+      },
+    ];
+
+    const rows = Array.from(
+      new Set(data.map((item) => item.student_name))
+    ).map((student_name) => {
+      let total = 0;
+
+      const rowData = {
+        key: student_name,
+        student_name,
+      };
+
+      subjectNames.forEach((subject) => {
+        const subjectData = subjects[subject].find(
+          (item) =>
+            item.student_name === student_name
+        );
+
+        if (subjectData) {
+          rowData[subject] =
+            subjectData.obtained_marks;
+
+          rowData[`${subject}_total`] =
+            subjectData.total_marks;
+
+          total += parseFloat(
+            subjectData.obtained_marks || 0
+          );
+        } else {
+          rowData[subject] = "-";
+        }
+      });
+
+      rowData.total_marks = total;
+
+      return rowData;
+    });
+
+    setColumns(tableColumns);
+    setPerformances(rows);
+    setSelectedSection(sectionId);
+    setSelectedSectionName(sectionName);
+  };
+
+  /* =========================================================
+     STUDENT DETAILS
+     ========================================================= */
+
+  const showStudentDetails = (
+    studentName,
+    allData
+  ) => {
+    const details = allData.filter(
+      (item) =>
+        item.student_name === studentName
+    );
+
+    setSelectedStudent(studentName);
+    setStudentDetails(details);
+    setIsModalVisible(true);
+  };
+
+  /* =========================================================
+     PRINT DMC
+     ========================================================= */
+
+  const handlePrint = () => {
+    const printContent =
+      document.getElementById(
+        "dmc-print-content"
+      );
+
+    if (!printContent) {
+      message.error("Print content not found");
+      return;
+    }
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=1000,height=800"
+    );
+
+    const currentDate =
+      new Date().toLocaleDateString();
+
+    const currentTime =
+      new Date().toLocaleTimeString();
+
+    const logoUrl =
+      window.location.origin + collegeLogo;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>DMC - ${selectedStudent}</title>
+
+        <style>
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 30px;
+            color: #111827;
+            background: white;
+          }
+
+          .print-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 20px;
+          }
+
+          .college-name {
+            font-size: 25px;
+            font-weight: 800;
+            margin-bottom: 8px;
+          }
+
+          .dmc-title {
+            font-size: 18px;
+            font-weight: 700;
+          }
+
+          .academic-session {
+            margin-top: 6px;
+            color: #6b7280;
+          }
+
+          .student-info {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 25px;
+          }
+
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+          }
+
+          th,
+          td {
+            border: 1px solid #d1d5db;
+            padding: 10px;
+            text-align: left;
+          }
+
+          th {
+            background: #f1f5f9;
+            font-weight: 700;
+          }
+
+          .summary-row {
+            background: #eff6ff;
+            font-weight: bold;
+          }
+
+          .footer {
+            margin-top: 40px;
+            border-top: 1px solid #d1d5db;
+            padding-top: 20px;
+          }
+
+          .footer-content {
+            display: flex;
+            justify-content: space-between;
+          }
+
+          .signature {
+            text-align: right;
+          }
+
+          .signature-line {
+            border-top: 1px solid #111827;
+            width: 200px;
+            margin-top: 60px;
+            margin-left: auto;
+          }
+
+          .print-date {
+            text-align: right;
+            color: #6b7280;
+            font-size: 12px;
+            margin-bottom: 15px;
+          }
+
+          @media print {
+            body {
+              padding: 15px;
+            }
+
+            @page {
+              margin: 1cm;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+
+        <div class="print-date">
+          Printed on:
+          ${currentDate}
+          at
+          ${currentTime}
+        </div>
+
+        ${printContent.innerHTML.replace(
+          /src="\/assets\/images.png"/g,
+          `src="${logoUrl}"`
+        )}
+
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+      }, 1000);
+    };
+  };
+
+  /* =========================================================
+     PDF
+     ========================================================= */
+
+  const handleDownloadPDF = () => {
+    message.info(
+      "PDF download functionality would be implemented here"
+    );
+  };
+
+  /* =========================================================
+     FILTER
+     ========================================================= */
+
+  const handleSubjectFilter = (
+    selectedSubjects
+  ) => {
+    setFilteredSubjects(selectedSubjects);
+  };
+
+  /* =========================================================
+     SORT
+     ========================================================= */
+
+  const handleSort = (
+    key,
+    direction
+  ) => {
+    setSortConfig({
+      key,
+      direction,
+    });
+  };
+
+  const sortedPerformances = useMemo(() => {
+    return [...performances].sort(
+      (a, b) => {
+        if (
+          a[sortConfig.key] <
+          b[sortConfig.key]
+        ) {
+          return sortConfig.direction ===
+            "ascend"
+            ? -1
+            : 1;
+        }
+
+        if (
+          a[sortConfig.key] >
+          b[sortConfig.key]
+        ) {
+          return sortConfig.direction ===
+            "ascend"
+            ? 1
+            : -1;
+        }
+
+        return 0;
+      }
+    );
+  }, [
+    performances,
+    sortConfig,
+  ]);
+
+  /* =========================================================
+     GRADES
+     ========================================================= */
+
+  const getGrade = (percentage) => {
+    if (percentage >= 90) return "A+";
+    if (percentage >= 80) return "A";
+    if (percentage >= 70) return "B";
+    if (percentage >= 60) return "C";
+    if (percentage >= 50) return "D";
+    return "F";
+  };
+
+  const getGradeColor = (percentage) => {
+    if (percentage >= 90) return "#16a34a";
+    if (percentage >= 80) return "#22c55e";
+    if (percentage >= 70) return "#eab308";
+    if (percentage >= 60) return "#f59e0b";
+    if (percentage >= 50) return "#f97316";
+    return "#dc2626";
+  };
+
+  /* =========================================================
+     STATISTICS
+     ========================================================= */
+
+  const stats = useMemo(() => {
+    if (!performances.length) {
+      return {
+        max: 0,
+        min: 0,
+        avg: 0,
+      };
+    }
+
+    const totals = performances.map(
+      (item) =>
+        Number(item.total_marks) || 0
+    );
+
+    const max = Math.max(...totals);
+    const min = Math.min(...totals);
+
+    const avg =
+      totals.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) / totals.length;
+
+    return {
+      max,
+      min,
+      avg,
+    };
+  }, [performances]);
+
+  /* =========================================================
+     GRADE DISTRIBUTION
+     ========================================================= */
+
+  const gradeData = useMemo(() => {
+    const distribution = {
+      "A+": 0,
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0,
+      F: 0,
     };
 
-    const overallResult = calculateOverallResult();
+    performances.forEach(
+      (performance) => {
+        let totalPossible = 0;
 
-    return (
-        <Layout className="performance-layout">
-            <Sidebar />
-            <Layout style={{ marginLeft: isMobile ? 80 : 200 }}>
-                <Content style={{ 
-                    padding: isSmallMobile ? '8px' : (isMobile ? '12px' : '24px'), 
-                    minHeight: '100vh',
-                    background: '#f5f7fa'
-                }}>
-                    <Card 
-                        title={
-                            <div style={{ 
-                                display: 'flex', 
-                                flexDirection: isMobile ? 'column' : 'row', 
-                                alignItems: isMobile ? 'flex-start' : 'center',
-                                gap: isMobile ? '8px' : '16px'
-                            }}>
-                                <span style={{ fontSize: isSmallMobile ? '16px' : (isMobile ? '18px' : '20px') }}>
-                                    Performance Dashboard
-                                </span>
-                                {selectedSectionName && (
-                                    <Text type="secondary" style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                        Section: {selectedSectionName}
-                                    </Text>
-                                )}
-                            </div>
+        Object.keys(performance).forEach(
+          (key) => {
+            if (key.endsWith("_total")) {
+              totalPossible +=
+                Number(
+                  performance[key]
+                ) || 0;
+            }
+          }
+        );
+
+        const percentage =
+          totalPossible > 0
+            ? (Number(
+                performance.total_marks
+              ) /
+                totalPossible) *
+              100
+            : 0;
+
+        const grade =
+          getGrade(percentage);
+
+        distribution[grade]++;
+      }
+    );
+
+    return [
+      {
+        name: "A+",
+        value: distribution["A+"],
+      },
+      {
+        name: "A",
+        value: distribution.A,
+      },
+      {
+        name: "B",
+        value: distribution.B,
+      },
+      {
+        name: "C",
+        value: distribution.C,
+      },
+      {
+        name: "D",
+        value: distribution.D,
+      },
+      {
+        name: "F",
+        value: distribution.F,
+      },
+    ].filter(
+      (item) => item.value > 0
+    );
+  }, [performances]);
+
+  /* =========================================================
+     OVERALL DMC RESULT
+     ========================================================= */
+
+  const overallResult = useMemo(() => {
+    if (!studentDetails.length) {
+      return {
+        totalObtained: 0,
+        totalPossible: 0,
+        percentage: 0,
+      };
+    }
+
+    const totalObtained =
+      studentDetails.reduce(
+        (sum, item) =>
+          sum +
+          parseFloat(
+            item.obtained_marks || 0
+          ),
+        0
+      );
+
+    const totalPossible =
+      studentDetails.reduce(
+        (sum, item) =>
+          sum +
+          parseFloat(
+            item.total_marks || 0
+          ),
+        0
+      );
+
+    const percentage =
+      totalPossible > 0
+        ? (totalObtained /
+            totalPossible) *
+          100
+        : 0;
+
+    return {
+      totalObtained,
+      totalPossible,
+      percentage:
+        Number(percentage).toFixed(2),
+    };
+  }, [studentDetails]);
+
+  const modalWidth = isSmallMobile
+    ? "96%"
+    : isMobile
+    ? "92%"
+    : 1050;
+
+  const visibleColumns =
+    columns.filter(
+      (column) =>
+        column.key ===
+          "student_name" ||
+        column.key ===
+          "total_marks" ||
+        column.key === "action" ||
+        filteredSubjects.includes(
+          column.key
+        )
+    );
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
+  return (
+    <Layout className="performance-page">
+
+     
+
+      <Layout className="performance-main-layout">
+
+        <Content className="performance-content">
+
+          {/* =================================================
+              PAGE HEADER
+             ================================================= */}
+
+          <div className="performance-header">
+
+            <div className="header-left">
+
+              <div className="page-icon">
+                <TrophyOutlined />
+              </div>
+
+              <div>
+                <Text className="eyebrow">
+                  ACADEMIC MANAGEMENT
+                </Text>
+
+                <Title
+                  level={2}
+                  className="page-title"
+                >
+                  Performance
+                </Title>
+
+                <Text className="page-subtitle">
+                  Monitor student results,
+                  marks and academic
+                  performance.
+                </Text>
+              </div>
+
+            </div>
+
+            <div className="header-actions">
+
+              <Button
+                icon={<ReloadOutlined />}
+                className="refresh-btn"
+                onClick={() => {
+                  if (selectedSection) {
+                    fetchPerformanceData(
+                      selectedSection,
+                      selectedSectionName
+                    );
+                  }
+                }}
+              >
+                {!isMobile &&
+                  "Refresh"}
+              </Button>
+
+              <Select
+                value={
+                  selectedSection ||
+                  undefined
+                }
+                placeholder="Select Section"
+                className="section-select"
+                suffixIcon={
+                  <FilterOutlined />
+                }
+                loading={loading}
+                onChange={(
+                  value,
+                  option
+                ) =>
+                  fetchPerformanceData(
+                    value,
+                    option.children
+                  )
+                }
+              >
+                {sections.map(
+                  (section) => (
+                    <Option
+                      key={section.id}
+                      value={section.id}
+                    >
+                      {section.name}
+                    </Option>
+                  )
+                )}
+              </Select>
+
+            </div>
+
+          </div>
+
+          {/* =================================================
+              OVERVIEW CARDS
+             ================================================= */}
+
+          {selectedSection && (
+            <Row
+              gutter={[
+                16,
+                16,
+              ]}
+              className="overview-row"
+            >
+
+              <Col
+                xs={24}
+                sm={12}
+                lg={6}
+              >
+                <Card className="overview-card">
+                  <div className="overview-card-top">
+                    <div className="overview-icon blue">
+                      <TeamOutlined />
+                    </div>
+
+                    <Tag className="overview-tag">
+                      Students
+                    </Tag>
+                  </div>
+
+                  <div className="overview-value">
+                    {performances.length}
+                  </div>
+
+                  <Text className="overview-label">
+                    Total Students
+                  </Text>
+                </Card>
+              </Col>
+
+              <Col
+                xs={24}
+                sm={12}
+                lg={6}
+              >
+                <Card className="overview-card">
+                  <div className="overview-card-top">
+                    <div className="overview-icon green">
+                      <TrophyOutlined />
+                    </div>
+
+                    <Tag className="overview-tag success">
+                      Highest
+                    </Tag>
+                  </div>
+
+                  <div className="overview-value">
+                    {stats.max}
+                  </div>
+
+                  <Text className="overview-label">
+                    Highest Score
+                  </Text>
+                </Card>
+              </Col>
+
+              <Col
+                xs={24}
+                sm={12}
+                lg={6}
+              >
+                <Card className="overview-card">
+                  <div className="overview-card-top">
+                    <div className="overview-icon orange">
+                      <RiseOutlined />
+                    </div>
+
+                    <Tag className="overview-tag warning">
+                      Average
+                    </Tag>
+                  </div>
+
+                  <div className="overview-value">
+                    {stats.avg.toFixed(1)}
+                  </div>
+
+                  <Text className="overview-label">
+                    Average Score
+                  </Text>
+                </Card>
+              </Col>
+
+              <Col
+                xs={24}
+                sm={12}
+                lg={6}
+              >
+                <Card className="overview-card">
+                  <div className="overview-card-top">
+                    <div className="overview-icon red">
+                      <FallOutlined />
+                    </div>
+
+                    <Tag className="overview-tag danger">
+                      Lowest
+                    </Tag>
+                  </div>
+
+                  <div className="overview-value">
+                    {stats.min}
+                  </div>
+
+                  <Text className="overview-label">
+                    Lowest Score
+                  </Text>
+                </Card>
+              </Col>
+
+            </Row>
+          )}
+
+          {/* =================================================
+              MAIN PERFORMANCE CARD
+             ================================================= */}
+
+          <Card
+            className="performance-card"
+            bordered={false}
+          >
+
+            <div className="performance-card-header">
+
+              <div>
+                <div className="section-heading">
+                  Performance Overview
+                </div>
+
+                <div className="section-description">
+                  {selectedSectionName
+                    ? `Results for ${selectedSectionName}`
+                    : "Select a section to view performance"}
+                </div>
+              </div>
+
+              {selectedSection && (
+                <div className="session-badge">
+                  <CalendarOutlined />
+
+                  <span>
+                    {getAcademicSession()}
+                  </span>
+                </div>
+              )}
+
+            </div>
+
+            <Divider />
+
+            {!selectedSection ? (
+              <div className="empty-performance">
+                <Empty
+                  description="Select a section to view student performance"
+                />
+              </div>
+            ) : (
+              <>
+
+                {/* =========================================
+                    VIEW CONTROLS
+                   ========================================= */}
+
+                <div className="performance-toolbar">
+
+                  <div className="view-switcher">
+
+                    <Button
+                      className={
+                        activeTab === "table"
+                          ? "view-switch active"
+                          : "view-switch"
+                      }
+                      icon={
+                        <TableOutlined />
+                      }
+                      onClick={() =>
+                        setActiveTab(
+                          "table"
+                        )
+                      }
+                    >
+                      {!isSmallMobile &&
+                        "Table"}
+                    </Button>
+
+                    <Button
+                      className={
+                        activeTab === "graph"
+                          ? "view-switch active"
+                          : "view-switch"
+                      }
+                      icon={
+                        <BarChartOutlined />
+                      }
+                      onClick={() =>
+                        setActiveTab(
+                          "graph"
+                        )
+                      }
+                    >
+                      {!isSmallMobile &&
+                        "Analytics"}
+                    </Button>
+
+                  </div>
+
+                  {activeTab === "table" && (
+                    <Select
+                      mode="multiple"
+                      className="subject-filter"
+                      placeholder="Filter subjects"
+                      value={
+                        filteredSubjects
+                      }
+                      onChange={
+                        handleSubjectFilter
+                      }
+                      allowClear
+                      maxTagCount={
+                        isMobile
+                          ? 1
+                          : 3
+                      }
+                      suffixIcon={
+                        <FilterOutlined />
+                      }
+                    >
+                      {columns
+                        .filter(
+                          (column) =>
+                            column.key !==
+                              "student_name" &&
+                            column.key !==
+                              "total_marks" &&
+                            column.key !==
+                              "action"
+                        )
+                        .map(
+                          (column) => (
+                            <Option
+                              key={
+                                column.key
+                              }
+                              value={
+                                column.key
+                              }
+                            >
+                              {column.title
+                                ?.props
+                                ?.children ||
+                                column.title}
+                            </Option>
+                          )
+                        )}
+                    </Select>
+                  )}
+
+                </div>
+
+                {/* =========================================
+                    TABLE
+                   ========================================= */}
+
+                {activeTab === "table" ? (
+                  <div className="modern-table-wrapper">
+
+                    <Spin
+                      spinning={loading}
+                    >
+                      <Table
+                        className="modern-performance-table"
+                        columns={
+                          visibleColumns
+                        }
+                        dataSource={
+                          sortedPerformances
                         }
                         bordered={false}
-                        extra={
-                            <Select
-                                defaultValue={selectedSectionName || undefined}
-                                style={{ width: isMobile ? '100%' : 200, marginTop: isMobile ? '8px' : 0 }}
-                                onChange={(value, option) => fetchPerformanceData(value, option.children)}
-                                loading={loading}
-                                size={isSmallMobile ? 'small' : 'middle'}
-                                suffixIcon={<FilterOutlined />}
+                        pagination={{
+                          pageSize: 10,
+                          showSizeChanger:
+                            false,
+                          showTotal:
+                            (total) =>
+                              `${total} students`,
+                        }}
+                        scroll={{
+                          x: "max-content",
+                        }}
+                        onChange={(
+                          pagination,
+                          filters,
+                          sorter
+                        ) => {
+                          if (
+                            sorter.field
+                          ) {
+                            handleSort(
+                              sorter.field,
+                              sorter.order
+                            );
+                          }
+                        }}
+                      />
+                    </Spin>
+
+                  </div>
+                ) : (
+
+                  /* =========================================
+                     ANALYTICS
+                     ========================================= */
+
+                  <div className="analytics-container">
+
+                    <Row
+                      gutter={[
+                        18,
+                        18,
+                      ]}
+                    >
+
+                      <Col
+                        xs={24}
+                        xl={15}
+                      >
+
+                        <Card
+                          className="chart-card"
+                          bordered={false}
+                        >
+
+                          <div className="chart-header">
+
+                            <div>
+                              <div className="chart-title">
+                                Student Score
+                                Distribution
+                              </div>
+
+                              <div className="chart-description">
+                                Total marks by
+                                student
+                              </div>
+                            </div>
+
+                            <div className="chart-icon">
+                              <BarChartOutlined />
+                            </div>
+
+                          </div>
+
+                          <div className="chart-area">
+
+                            <ResponsiveContainer
+                              width="100%"
+                              height="100%"
                             >
-                                {sections.map(section => (
-                                    <Option key={section.id} value={section.id}>{section.name}</Option>
-                                ))}
-                            </Select>
-                        }
-                        style={{ marginBottom: 16 }}
+                              <BarChart
+                                data={
+                                  performances
+                                }
+                                margin={{
+                                  top: 15,
+                                  right: 15,
+                                  left: 0,
+                                  bottom: 55,
+                                }}
+                              >
+
+                                <CartesianGrid
+                                  strokeDasharray="4 4"
+                                  vertical={false}
+                                  stroke="#edf0f5"
+                                />
+
+                                <XAxis
+                                  dataKey="student_name"
+                                  angle={-40}
+                                  textAnchor="end"
+                                  height={70}
+                                  tick={{
+                                    fontSize: 11,
+                                    fill: "#6b7280",
+                                  }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+
+                                <YAxis
+                                  tick={{
+                                    fontSize: 11,
+                                    fill: "#6b7280",
+                                  }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+
+                                <Tooltip />
+
+                                <Bar
+                                  dataKey="total_marks"
+                                  name="Total Marks"
+                                  fill="#1677ff"
+                                  radius={[
+                                    6,
+                                    6,
+                                    0,
+                                    0,
+                                  ]}
+                                  animationDuration={
+                                    900
+                                  }
+                                />
+
+                              </BarChart>
+                            </ResponsiveContainer>
+
+                          </div>
+
+                        </Card>
+
+                      </Col>
+
+                      <Col
+                        xs={24}
+                        xl={9}
+                      >
+
+                        <Card
+                          className="chart-card"
+                          bordered={false}
+                        >
+
+                          <div className="chart-header">
+
+                            <div>
+                              <div className="chart-title">
+                                Grade
+                                Distribution
+                              </div>
+
+                              <div className="chart-description">
+                                Overall academic
+                                performance
+                              </div>
+                            </div>
+
+                            <div className="chart-icon purple">
+                              <TrophyOutlined />
+                            </div>
+
+                          </div>
+
+                          <div className="pie-chart-area">
+
+                            {gradeData.length ===
+                            0 ? (
+                              <Empty
+                                description="No grade data"
+                              />
+                            ) : (
+                              <ResponsiveContainer
+                                width="100%"
+                                height="100%"
+                              >
+                                <PieChart>
+
+                                  <Pie
+                                    data={
+                                      gradeData
+                                    }
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={
+                                      isSmallMobile
+                                        ? 55
+                                        : 70
+                                    }
+                                    outerRadius={
+                                      isSmallMobile
+                                        ? 90
+                                        : 115
+                                    }
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                  >
+                                    {gradeData.map(
+                                      (
+                                        entry,
+                                        index
+                                      ) => (
+                                        <Cell
+                                          key={
+                                            `cell-${index}`
+                                          }
+                                          fill={
+                                            CHART_COLORS[
+                                              index %
+                                                CHART_COLORS.length
+                                            ]
+                                          }
+                                        />
+                                      )
+                                    )}
+                                  </Pie>
+
+                                  <Tooltip />
+
+                                  <Legend />
+
+                                </PieChart>
+                              </ResponsiveContainer>
+                            )}
+
+                          </div>
+
+                        </Card>
+
+                      </Col>
+
+                    </Row>
+
+                  </div>
+                )}
+
+              </>
+            )}
+
+          </Card>
+
+        </Content>
+      </Layout>
+
+      {/* =====================================================
+          DMC MODAL
+         ===================================================== */}
+
+      <Modal
+        open={isModalVisible}
+        onCancel={() =>
+          setIsModalVisible(false)
+        }
+        footer={null}
+        width={modalWidth}
+        className="modern-dmc-modal"
+        title={
+          <div className="dmc-modal-title">
+
+            <div>
+              <div className="dmc-modal-heading">
+                Detailed Marks Certificate
+              </div>
+
+              <div className="dmc-modal-subtitle">
+                {selectedStudent}
+              </div>
+            </div>
+
+            <Space>
+
+              <Button
+                icon={
+                  <DownloadOutlined />
+                }
+                onClick={
+                  handleDownloadPDF
+                }
+              >
+                {!isMobile &&
+                  "Download"}
+              </Button>
+
+              <Button
+                type="primary"
+                icon={
+                  <PrinterOutlined />
+                }
+                onClick={handlePrint}
+              >
+                {!isMobile &&
+                  "Print"}
+              </Button>
+
+            </Space>
+
+          </div>
+        }
+      >
+
+        <Spin spinning={loading}>
+
+          <div className="dmc-container">
+
+            {/* ===========================================
+                PRINT VERSION
+               =========================================== */}
+
+            <div
+              id="dmc-print-content"
+              style={{
+                display: "none",
+              }}
+            >
+
+              <div className="print-header">
+                <div className="college-name">
+                  APEX MODEL COLLEGE
+                  HARICHAND
+                </div>
+
+                <div className="dmc-title">
+                  DETAILED MARKS
+                  CERTIFICATE
+                </div>
+
+                <div className="academic-session">
+                  Academic Session{" "}
+                  {getAcademicSession()}
+                </div>
+              </div>
+
+              <div className="student-info">
+
+                <div className="info-row">
+                  <span>
+                    <strong>
+                      Student Name:
+                    </strong>
+                  </span>
+
+                  <span>
+                    {selectedStudent}
+                  </span>
+                </div>
+
+                <div className="info-row">
+                  <span>
+                    <strong>
+                      Section:
+                    </strong>
+                  </span>
+
+                  <span>
+                    {selectedSectionName}
+                  </span>
+                </div>
+
+                <div className="info-row">
+                  <span>
+                    <strong>
+                      Issue Date:
+                    </strong>
+                  </span>
+
+                  <span>
+                    {new Date().toLocaleDateString()}
+                  </span>
+                </div>
+
+              </div>
+
+              <table>
+
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Exam</th>
+                    <th>Obtained</th>
+                    <th>Total</th>
+                    <th>Percentage</th>
+                    <th>Grade</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+
+                  {studentDetails.map(
+                    (
+                      record,
+                      index
+                    ) => {
+
+                      const percentage =
+                        (
+                          record.obtained_marks /
+                          record.total_marks
+                        ) *
+                        100;
+
+                      return (
+                        <tr
+                          key={index}
+                        >
+                          <td>
+                            {
+                              record.subject_name
+                            }
+                          </td>
+
+                          <td>
+                            {
+                              record.exam_name
+                            }
+                          </td>
+
+                          <td>
+                            {
+                              record.obtained_marks
+                            }
+                          </td>
+
+                          <td>
+                            {
+                              record.total_marks
+                            }
+                          </td>
+
+                          <td>
+                            {percentage.toFixed(
+                              2
+                            )}
+                            %
+                          </td>
+
+                          <td>
+                            {getGrade(
+                              percentage
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+
+                  <tr className="summary-row">
+
+                    <td
+                      colSpan="2"
                     >
-                        {selectedSection && (
-                            <>
-                                {stats && (
-                                    <div className="performance-stats" style={{ marginBottom: 16 }}>
-                                        <Row gutter={[8, 8]}>
-                                            <Col xs={8} sm={8}>
-                                                <Statistic 
-                                                    title="Highest Score" 
-                                                    value={stats.max} 
-                                                    valueStyle={{ fontSize: isSmallMobile ? '14px' : '16px' }}
-                                                />
-                                            </Col>
-                                            <Col xs={8} sm={8}>
-                                                <Statistic 
-                                                    title="Average Score" 
-                                                    value={stats.avg.toFixed(1)} 
-                                                    valueStyle={{ fontSize: isSmallMobile ? '14px' : '16px' }}
-                                                />
-                                            </Col>
-                                            <Col xs={8} sm={8}>
-                                                <Statistic 
-                                                    title="Lowest Score" 
-                                                    value={stats.min} 
-                                                    valueStyle={{ fontSize: isSmallMobile ? '14px' : '16px' }}
-                                                />
-                                            </Col>
-                                        </Row>
-                                    </div>
-                                )}
+                      <strong>
+                        Overall Result
+                      </strong>
+                    </td>
 
-                                <Divider style={{ margin: '16px 0' }} />
+                    <td>
+                      <strong>
+                        {
+                          overallResult.totalObtained
+                        }
+                      </strong>
+                    </td>
 
-                                <div className="performance-tabs" style={{ marginBottom: 16 }}>
-                                    <Button 
-                                        type={activeTab === 'table' ? 'primary' : 'default'} 
-                                        onClick={() => setActiveTab('table')}
-                                        size={isSmallMobile ? 'small' : 'middle'}
-                                        style={{ marginRight: 8 }}
-                                    >
-                                        Tabular View
-                                    </Button>
-                                    <Button 
-                                        type={activeTab === 'graph' ? 'primary' : 'default'} 
-                                        onClick={() => setActiveTab('graph')}
-                                        size={isSmallMobile ? 'small' : 'middle'}
-                                    >
-                                        Graphical View
-                                    </Button>
-                                </div>
+                    <td>
+                      <strong>
+                        {
+                          overallResult.totalPossible
+                        }
+                      </strong>
+                    </td>
 
-                                {activeTab === 'table' ? (
-                                    <div className="performance-table-container">
-                                        <div className="table-controls">
-                                            <Select
-                                                mode="multiple"
-                                                placeholder="Filter Subjects"
-                                                value={filteredSubjects}
-                                                onChange={handleSubjectFilter}
-                                                style={{ width: '100%', marginBottom: 16 }}
-                                                allowClear
-                                                size={isSmallMobile ? 'small' : 'middle'}
-                                                maxTagCount={isMobile ? 1 : undefined}
-                                                maxTagTextLength={isMobile ? 10 : undefined}
-                                            >
-                                                {columns
-                                                    .filter(col => col.key !== 'student_name' && col.key !== 'total_marks' && col.key !== 'action')
-                                                    .map(col => (
-                                                        <Option key={col.key} value={col.key}>
-                                                            {col.title.props?.children || col.title}
-                                                        </Option>
-                                                    ))}
-                                            </Select>
-                                        </div>
-                                        <Spin spinning={loading}>
-                                            <Table
-                                                columns={columns.filter(col => 
-                                                    col.key === 'student_name' || 
-                                                    col.key === 'total_marks' || 
-                                                    col.key === 'action' ||
-                                                    filteredSubjects.includes(col.key)
-                                                )}
-                                                dataSource={sortedPerformances}
-                                                bordered
-                                                pagination={{ 
-                                                    pageSize: 10, 
-                                                    size: isSmallMobile ? 'small' : 'default',
-                                                    showSizeChanger: false
-                                                }}
-                                                scroll={{ x: true }}
-                                                size={isSmallMobile ? 'small' : (isMobile ? 'middle' : 'default')}
-                                                loading={loading}
-                                                onChange={(pagination, filters, sorter) => {
-                                                    if (sorter.field) {
-                                                        handleSort(sorter.field, sorter.order);
-                                                    }
-                                                }}
-                                            />
-                                        </Spin>
-                                    </div>
-                                ) : (
-                                    <div className="performance-graphs">
-                                        <Row gutter={[16, 16]}>
-                                            <Col xs={24} lg={12}>
-                                                <Card 
-                                                    title="Total Marks Distribution" 
-                                                    bordered={false}
-                                                    bodyStyle={{ padding: isSmallMobile ? 8 : 16 }}
-                                                >
-                                                    <div style={{ height: isSmallMobile ? 300 : 400 }}>
-                                                        <ResponsiveContainer width="100%" height="100%">
-                                                            <BarChart 
-                                                                data={performances}
-                                                                margin={{ 
-                                                                    top: 20, 
-                                                                    right: isSmallMobile ? 10 : 30, 
-                                                                    left: isSmallMobile ? 10 : 20, 
-                                                                    bottom: isSmallMobile ? 40 : 60 
-                                                                }}
-                                                            >
-                                                                <CartesianGrid strokeDasharray="3 3" />
-                                                                <XAxis 
-                                                                    dataKey="student_name" 
-                                                                    angle={-45} 
-                                                                    textAnchor="end" 
-                                                                    height={isSmallMobile ? 60 : 70}
-                                                                    tick={{ fontSize: isSmallMobile ? 10 : 12 }}
-                                                                />
-                                                                <YAxis 
-                                                                    label={{ 
-                                                                        value: 'Total Marks', 
-                                                                        angle: -90, 
-                                                                        position: 'insideLeft',
-                                                                        style: { fontSize: isSmallMobile ? 10 : 12 }
-                                                                    }} 
-                                                                    tick={{ fontSize: isSmallMobile ? 10 : 12 }}
-                                                                />
-                                                                <Tooltip />
-                                                                <Legend />
-                                                                <Bar 
-                                                                    dataKey="total_marks" 
-                                                                    name="Total Marks" 
-                                                                    fill="#1890ff" 
-                                                                    animationDuration={1500}
-                                                                />
-                                                            </BarChart>
-                                                        </ResponsiveContainer>
-                                                    </div>
-                                                </Card>
-                                            </Col>
-                                            <Col xs={24} lg={12}>
-                                                <Card 
-                                                    title="Grade Distribution" 
-                                                    bordered={false}
-                                                    bodyStyle={{ padding: isSmallMobile ? 8 : 16 }}
-                                                >
-                                                    <div style={{ height: isSmallMobile ? 300 : 400 }}>
-                                                        <ResponsiveContainer width="100%" height="100%">
-                                                            <PieChart>
-                                                                <Pie
-                                                                    data={gradeData.filter(g => g.value > 0)}
-                                                                    cx="50%"
-                                                                    cy="50%"
-                                                                    labelLine={false}
-                                                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                                                    outerRadius={isSmallMobile ? 80 : 120}
-                                                                    fill="#8884d8"
-                                                                    dataKey="value"
-                                                                    animationDuration={1500}
-                                                                >
-                                                                    {gradeData.map((entry, index) => (
-                                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                                    ))}
-                                                                </Pie>
-                                                                <Tooltip />
-                                                                <Legend 
-                                                                    wrapperStyle={{ 
-                                                                        fontSize: isSmallMobile ? 10 : 12,
-                                                                        paddingTop: isSmallMobile ? 5 : 10
-                                                                    }}
-                                                                />
-                                                            </PieChart>
-                                                        </ResponsiveContainer>
-                                                    </div>
-                                                </Card>
-                                            </Col>
-                                        </Row>
-                                    </div>
-                                )}
-                            </>
+                    <td>
+                      <strong>
+                        {
+                          overallResult.percentage
+                        }
+                        %
+                      </strong>
+                    </td>
+
+                    <td>
+                      <strong>
+                        {getGrade(
+                          overallResult.percentage
                         )}
-                    </Card>
+                      </strong>
+                    </td>
 
-                    {/* DMC Modal */}
-                    <Modal
-                        title={
-                            <div style={{ 
-                                display: 'flex', 
-                                flexDirection: isMobile ? 'column' : 'row', 
-                                justifyContent: 'space-between', 
-                                alignItems: isMobile ? 'flex-start' : 'center',
-                                gap: isMobile ? '8px' : '0'
-                            }}>
-                                <span style={{ fontSize: isSmallMobile ? '14px' : (isMobile ? '16px' : '18px') }}>
-                                    Detailed Marks Certificate - {selectedStudent}
-                                </span>
-                                <Space size={isSmallMobile ? 'small' : 'middle'}>
-                                    <Button 
-                                        icon={<DownloadOutlined />} 
-                                        onClick={handleDownloadPDF}
-                                        size={isSmallMobile ? 'small' : 'middle'}
-                                    >
-                                        {isMobile ? 'PDF' : 'Download PDF'}
-                                    </Button>
-                                    <Button 
-                                        icon={<PrinterOutlined />} 
-                                        onClick={handlePrint} 
-                                        type="primary"
-                                        size={isSmallMobile ? 'small' : 'middle'}
-                                    >
-                                        {isMobile ? 'Print' : 'Print DMC'}
-                                    </Button>
-                                </Space>
-                            </div>
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+              <div className="footer">
+
+                <div className="footer-content">
+
+                  <div>
+                    <strong>
+                      Grading System:
+                    </strong>
+
+                    <ul>
+                      <li>
+                        A+ (90-100%) -
+                        Outstanding
+                      </li>
+
+                      <li>
+                        A (80-89%) -
+                        Excellent
+                      </li>
+
+                      <li>
+                        B (70-79%) -
+                        Good
+                      </li>
+
+                      <li>
+                        C (60-69%) -
+                        Average
+                      </li>
+
+                      <li>
+                        D (50-59%) -
+                        Below Average
+                      </li>
+
+                      <li>
+                        F (Below 50%) -
+                        Fail
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="signature">
+                    Issued on:{" "}
+                    {new Date().toLocaleDateString()}
+
+                    <div className="signature-line" />
+
+                    Principal's Signature
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* ===========================================
+                SCREEN DMC
+               =========================================== */}
+
+            <div className="screen-dmc">
+
+              <div className="dmc-top">
+
+                <div className="dmc-college">
+
+                  <div className="dmc-logo">
+                    <img
+                      src={collegeLogo}
+                      alt="College Logo"
+                      onError={(e) => {
+                        e.currentTarget.style.display =
+                          "none";
+                      }}
+                    />
+                  </div>
+
+                  <div>
+
+                    <div className="dmc-college-name">
+                      APEX MODEL COLLEGE
+                      HARICHAND
+                    </div>
+
+                    <div className="dmc-title-screen">
+                      Detailed Marks
+                      Certificate
+                    </div>
+
+                    <div className="dmc-session">
+                      Academic Session{" "}
+                      {getAcademicSession()}
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className="dmc-document-badge">
+                  <FileTextOutlined />
+                  OFFICIAL RESULT
+                </div>
+
+              </div>
+
+              <div className="dmc-student-card">
+
+                <div>
+                  <Text className="dmc-label">
+                    STUDENT
+                  </Text>
+
+                  <div className="dmc-value">
+                    {selectedStudent}
+                  </div>
+                </div>
+
+                <div>
+                  <Text className="dmc-label">
+                    SECTION
+                  </Text>
+
+                  <div className="dmc-value">
+                    {selectedSectionName}
+                  </div>
+                </div>
+
+                <div>
+                  <Text className="dmc-label">
+                    ISSUE DATE
+                  </Text>
+
+                  <div className="dmc-value">
+                    {new Date().toLocaleDateString()}
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="dmc-result-highlight">
+
+                <div>
+                  <span>
+                    Overall Percentage
+                  </span>
+
+                  <strong>
+                    {
+                      overallResult.percentage
+                    }
+                    %
+                  </strong>
+                </div>
+
+                <div className="result-grade">
+
+                  <span>
+                    Grade
+                  </span>
+
+                  <strong
+                    style={{
+                      color:
+                        getGradeColor(
+                          overallResult.percentage
+                        ),
+                    }}
+                  >
+                    {getGrade(
+                      overallResult.percentage
+                    )}
+                  </strong>
+
+                </div>
+
+                <div>
+                  <span>
+                    Marks
+                  </span>
+
+                  <strong>
+                    {
+                      overallResult.totalObtained
+                    }
+                    /
+                    {
+                      overallResult.totalPossible
+                    }
+                  </strong>
+                </div>
+
+              </div>
+
+              <div className="dmc-table">
+
+                <Table
+                  dataSource={
+                    studentDetails
+                  }
+                  rowKey={(_, index) =>
+                    index
+                  }
+                  pagination={false}
+                  scroll={
+                    isMobile
+                      ? {
+                          x: 700,
                         }
-                        open={isModalVisible}
-                        onCancel={handleCancel}
-                        footer={null}
-                        width={modalWidth}
-                        bodyStyle={{ padding: isSmallMobile ? '8px' : (isMobile ? '12px' : '20px') }}
-                        className="dmc-modal"
-                    >
-                        <Spin spinning={loading}>
-                            <div className="dmc-container">
-                                {/* Print-specific content */}
-                                <div id="dmc-print-content" style={{ display: 'none' }}>
-                                    <div className="print-header">
-                                        {/* <img src={collegeLogo} alt="College Logo" className="college-logo" /> */}
-                                        <div className="college-name">APEX MODEL COLLEGE HARICHAND</div>
-                                        <div className="dmc-title">DETAILED MARKS CERTIFICATE</div>
-                                        <div className="academic-session">Academic Session {getAcademicSession()}</div>
-                                    </div>
+                      : undefined
+                  }
+                  columns={[
+                    {
+                      title:
+                        "Subject",
+                      dataIndex:
+                        "subject_name",
+                      key:
+                        "subject_name",
+                      render:
+                        (text) => (
+                          <strong>
+                            {text}
+                          </strong>
+                        ),
+                    },
 
-                                    <div className="student-info">
-                                        <div className="info-row">
-                                            <span className="info-label">Student Name:</span>
-                                            <span>{selectedStudent}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Section:</span>
-                                            <span>{selectedSectionName}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span className="info-label">Issue Date:</span>
-                                            <span>{new Date().toLocaleDateString()}</span>
-                                        </div>
-                                    </div>
+                    {
+                      title: "Exam",
+                      dataIndex:
+                        "exam_name",
+                      key:
+                        "exam_name",
+                    },
 
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Subject</th>
-                                                <th>Exam</th>
-                                                <th>Obtained</th>
-                                                <th>Total</th>
-                                                <th>Percentage</th>
-                                                <th>Grade</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {studentDetails.map((record, index) => {
-                                                const percentage = (record.obtained_marks / record.total_marks * 100).toFixed(2);
-                                                const grade = getGrade(percentage);
-                                                return (
-                                                    <tr key={index}>
-                                                        <td>{record.subject_name}</td>
-                                                        <td>{record.exam_name}</td>
-                                                        <td>{record.obtained_marks}</td>
-                                                        <td>{record.total_marks}</td>
-                                                        <td>{percentage}%</td>
-                                                        <td style={{ color: getGradeColor(percentage) }}>{grade}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            <tr className="summary-row">
-                                                <td colSpan="2"><strong>Overall Result</strong></td>
-                                                <td><strong>{overallResult.totalObtained}</strong></td>
-                                                <td><strong>{overallResult.totalPossible}</strong></td>
-                                                <td style={{ color: overallResult.percentage >= 50 ? 'green' : 'red' }}>
-                                                    <strong>{overallResult.percentage}%</strong>
-                                                </td>
-                                                <td style={{ color: getGradeColor(overallResult.percentage) }}>
-                                                    <strong>{getGrade(overallResult.percentage)}</strong>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                    {
+                      title:
+                        "Obtained",
+                      dataIndex:
+                        "obtained_marks",
+                      key:
+                        "obtained_marks",
+                    },
 
-                                    <div className="footer">
-                                        <div className="footer-content">
-                                            <div className="grading-system">
-                                                <strong>Grading System:</strong>
-                                                <ul style={{ margin: '5px 0 0 0', paddingLeft: '20px', fontSize: '11px' }}>
-                                                    <li>A+ (90-100%) - Outstanding</li>
-                                                    <li>A (80-89%) - Excellent</li>
-                                                    <li>B (70-79%) - Good</li>
-                                                    <li>C (60-69%) - Average</li>
-                                                    <li>D (50-59%) - Below Average</li>
-                                                    <li>F (Below 50%) - Fail</li>
-                                                </ul>
-                                            </div>
-                                            <div className="signature">
-                                                <div>Issued on: {new Date().toLocaleDateString()}</div>
-                                                <div className="signature-line"></div>
-                                                <div>Principal's Signature</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                    {
+                      title:
+                        "Total",
+                      dataIndex:
+                        "total_marks",
+                      key:
+                        "total_marks",
+                    },
 
-                                {/* Screen display content */}
-                                <div className="dmc-header" style={{ 
-                                    display: 'flex', 
-                                    flexDirection: isMobile ? 'column' : 'row', 
-                                    alignItems: 'center',
-                                    textAlign: isMobile ? 'center' : 'left',
-                                    marginBottom: isMobile ? '12px' : '20px'
-                                }}>
-                                    <img 
-                                        src={collegeLogo} 
-                                        alt="College Logo" 
-                                        style={{ 
-                                            height: isSmallMobile ? 60 : 80, 
-                                            marginRight: isMobile ? 0 : 20,
-                                            marginBottom: isMobile ? '8px' : 0
-                                        }} 
-                                        onError={(e) => {
-                                            e.target.src = 'https://via.placeholder.com/80/1890ff/ffffff?text=APEX';
-                                            e.target.style.backgroundColor = '#f0f0f0';
-                                            e.target.style.padding = '10px';
-                                        }}
-                                    />
-                                    <div style={{ textAlign: isMobile ? 'center' : 'left', flexGrow: 1 }}>
-                                        <Title level={isSmallMobile ? 4 : (isMobile ? 3 : 3)} style={{ marginBottom: 4 }}>
-                                            APEX MODEL COLLEGE HARICHAND
-                                        </Title>
-                                        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                            Detailed Marks Certificate
-                                        </Text>
-                                        <div style={{ marginTop: 4 }}>
-                                            <Text type="secondary" style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                                                Academic Session {getAcademicSession()}
-                                            </Text>
-                                        </div>
-                                    </div>
-                                </div>
+                    {
+                      title:
+                        "Percentage",
+                      key:
+                        "percentage",
 
-                                <Divider style={{ margin: '12px 0' }} />
+                      render:
+                        (_, record) => {
+                          const percentage =
+                            (
+                              record.obtained_marks /
+                              record.total_marks
+                            ) *
+                            100;
 
-                                <div className="dmc-student-info" style={{ marginBottom: '16px' }}>
-                                    <Row gutter={[8, 8]}>
-                                        <Col xs={24} sm={12}>
-                                            <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                Student Name: 
-                                            </Text> 
-                                            <span style={{ fontSize: isSmallMobile ? '12px' : '14px', marginLeft: 4 }}>
-                                                {selectedStudent}
-                                            </span>
-                                        </Col>
-                                        <Col xs={24} sm={12}>
-                                            <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                Section: 
-                                            </Text> 
-                                            <span style={{ fontSize: isSmallMobile ? '12px' : '14px', marginLeft: 4 }}>
-                                                {selectedSectionName}
-                                            </span>
-                                        </Col>
-                                    </Row>
-                                </div>
+                          return (
+                            <strong
+                              style={{
+                                color:
+                                  percentage >=
+                                  50
+                                    ? "#16a34a"
+                                    : "#dc2626",
+                              }}
+                            >
+                              {percentage.toFixed(
+                                2
+                              )}
+                              %
+                            </strong>
+                          );
+                        },
+                    },
 
-                                <Divider style={{ margin: '12px 0' }} />
+                    {
+                      title:
+                        "Grade",
+                      key:
+                        "grade",
 
-                                <div className="dmc-marks-table">
-                                    <Table 
-                                        dataSource={studentDetails}
-                                        columns={[
-                                            {
-                                                title: 'Subject',
-                                                dataIndex: 'subject_name',
-                                                key: 'subject_name',
-                                                render: (text) => (
-                                                    <Text strong style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                                                        {text}
-                                                    </Text>
-                                                ),
-                                                width: isSmallMobile ? 100 : undefined,
-                                            },
-                                            {
-                                                title: 'Exam',
-                                                dataIndex: 'exam_name',
-                                                key: 'exam_name',
-                                                render: (text) => (
-                                                    <Text style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                                                        {text}
-                                                    </Text>
-                                                ),
-                                                width: isSmallMobile ? 80 : undefined,
-                                            },
-                                            {
-                                                title: 'Obtained',
-                                                dataIndex: 'obtained_marks',
-                                                key: 'obtained_marks',
-                                                render: (text, record) => (
-                                                    <Text 
-                                                        strong 
-                                                        type={text / record.total_marks >= 0.5 ? 'success' : 'danger'}
-                                                        style={{ fontSize: isSmallMobile ? '11px' : '13px' }}
-                                                    >
-                                                        {text}
-                                                    </Text>
-                                                ),
-                                                width: isSmallMobile ? 70 : undefined,
-                                            },
-                                            {
-                                                title: 'Total',
-                                                dataIndex: 'total_marks',
-                                                key: 'total_marks',
-                                                render: (text) => (
-                                                    <Text style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                                                        {text}
-                                                    </Text>
-                                                ),
-                                                width: isSmallMobile ? 60 : undefined,
-                                            },
-                                            {
-                                                title: 'Percentage',
-                                                key: 'percentage',
-                                                render: (_, record) => {
-                                                    const percentage = (record.obtained_marks / record.total_marks * 100).toFixed(2);
-                                                    return (
-                                                        <Text 
-                                                            strong 
-                                                            type={percentage >= 50 ? 'success' : 'danger'}
-                                                            style={{ fontSize: isSmallMobile ? '11px' : '13px' }}
-                                                        >
-                                                            {percentage}%
-                                                        </Text>
-                                                    );
-                                                },
-                                                width: isSmallMobile ? 80 : undefined,
-                                            },
-                                            {
-                                                title: 'Grade',
-                                                key: 'grade',
-                                                render: (_, record) => {
-                                                    const percentage = (record.obtained_marks / record.total_marks * 100);
-                                                    return (
-                                                        <Text 
-                                                            strong 
-                                                            style={{ 
-                                                                color: getGradeColor(percentage),
-                                                                fontSize: isSmallMobile ? '11px' : '13px'
-                                                            }}
-                                                        >
-                                                            {getGrade(percentage)}
-                                                        </Text>
-                                                    );
-                                                },
-                                                width: isSmallMobile ? 60 : undefined,
-                                            },
-                                        ]}
-                                        bordered
-                                        pagination={false}
-                                        size={isSmallMobile ? 'small' : (isMobile ? 'middle' : 'default')}
-                                        scroll={isMobile ? { x: true } : undefined}
-                                        summary={() => {
-                                            return (
-                                                <Table.Summary.Row style={{ background: '#fafafa' }}>
-                                                    <Table.Summary.Cell index={0} colSpan={2}>
-                                                        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                            Overall Result
-                                                        </Text>
-                                                    </Table.Summary.Cell>
-                                                    <Table.Summary.Cell index={1}>
-                                                        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                            {overallResult.totalObtained}
-                                                        </Text>
-                                                    </Table.Summary.Cell>
-                                                    <Table.Summary.Cell index={2}>
-                                                        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                            {overallResult.totalPossible}
-                                                        </Text>
-                                                    </Table.Summary.Cell>
-                                                    <Table.Summary.Cell index={3}>
-                                                        <Text strong 
-                                                            type={overallResult.percentage >= 50 ? 'success' : 'danger'} 
-                                                            style={{ fontSize: isSmallMobile ? '12px' : '14px' }}
-                                                        >
-                                                            {overallResult.percentage}%
-                                                        </Text>
-                                                    </Table.Summary.Cell>
-                                                    <Table.Summary.Cell index={4}>
-                                                        <Text 
-                                                            strong 
-                                                            style={{ 
-                                                                color: getGradeColor(overallResult.percentage),
-                                                                fontSize: isSmallMobile ? '12px' : '14px'
-                                                            }}
-                                                        >
-                                                            {getGrade(overallResult.percentage)}
-                                                        </Text>
-                                                    </Table.Summary.Cell>
-                                                </Table.Summary.Row>
-                                            );
-                                        }}
-                                    />
-                                </div>
+                      render:
+                        (_, record) => {
+                          const percentage =
+                            (
+                              record.obtained_marks /
+                              record.total_marks
+                            ) *
+                            100;
 
-                                <Divider style={{ margin: '16px 0' }} />
+                          return (
+                            <Tag
+                              className="grade-tag"
+                              style={{
+                                color:
+                                  getGradeColor(
+                                    percentage
+                                  ),
+                                borderColor:
+                                  getGradeColor(
+                                    percentage
+                                  ),
+                              }}
+                            >
+                              {getGrade(
+                                percentage
+                              )}
+                            </Tag>
+                          );
+                        },
+                    },
+                  ]}
+                  summary={() => (
+                    <Table.Summary.Row>
 
-                                <div className="dmc-footer">
-                                    <Row gutter={[16, 16]}>
-                                        <Col xs={24} md={12}>
-                                            <div className="grading-system">
-                                                <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                    Grading System:
-                                                </Text>
-                                                <ul style={{ 
-                                                    marginTop: 8, 
-                                                    marginBottom: 0, 
-                                                    paddingLeft: 16,
-                                                    fontSize: isSmallMobile ? '11px' : '13px'
-                                                }}>
-                                                    <li>A+ (90-100%) - Outstanding</li>
-                                                    <li>A (80-89%) - Excellent</li>
-                                                    <li>B (70-79%) - Good</li>
-                                                    <li>C (60-69%) - Average</li>
-                                                    <li>D (50-59%) - Below Average</li>
-                                                    <li>F (Below 50%) - Fail</li>
-                                                </ul>
-                                            </div>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                                                <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                                    Issued on: {new Date().toLocaleDateString()}
-                                                </Text>
-                                                <div style={{ marginTop: 30 }}>
-                                                    <div style={{ 
-                                                        borderTop: '1px solid #000', 
-                                                        width: isMobile ? '150px' : '200px',
-                                                        marginLeft: isMobile ? 0 : 'auto'
-                                                    }}></div>
-                                                    <Text style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                                                        Principal's Signature
-                                                    </Text>
-                                                </div>
-                                            </div>
-                                        </Col>
-                                    </Row>
-                                </div>
-                            </div>
-                        </Spin>
-                    </Modal>
-                </Content>
-            </Layout>
-        </Layout>
-    );
-}
+                      <Table.Summary.Cell
+                        index={0}
+                        colSpan={2}
+                      >
+                        <strong>
+                          Overall Result
+                        </strong>
+                      </Table.Summary.Cell>
+
+                      <Table.Summary.Cell
+                        index={1}
+                      >
+                        <strong>
+                          {
+                            overallResult.totalObtained
+                          }
+                        </strong>
+                      </Table.Summary.Cell>
+
+                      <Table.Summary.Cell
+                        index={2}
+                      >
+                        <strong>
+                          {
+                            overallResult.totalPossible
+                          }
+                        </strong>
+                      </Table.Summary.Cell>
+
+                      <Table.Summary.Cell
+                        index={3}
+                      >
+                        <strong>
+                          {
+                            overallResult.percentage
+                          }
+                          %
+                        </strong>
+                      </Table.Summary.Cell>
+
+                      <Table.Summary.Cell
+                        index={4}
+                      >
+                        <strong
+                          style={{
+                            color:
+                              getGradeColor(
+                                overallResult.percentage
+                              ),
+                          }}
+                        >
+                          {getGrade(
+                            overallResult.percentage
+                          )}
+                        </strong>
+                      </Table.Summary.Cell>
+
+                    </Table.Summary.Row>
+                  )}
+                />
+
+              </div>
+
+              <div className="dmc-bottom">
+
+                <div>
+
+                  <Text className="dmc-label">
+                    GRADING SYSTEM
+                  </Text>
+
+                  <div className="grading-tags">
+
+                    <Tag>A+ 90-100</Tag>
+                    <Tag>A 80-89</Tag>
+                    <Tag>B 70-79</Tag>
+                    <Tag>C 60-69</Tag>
+                    <Tag>D 50-59</Tag>
+                    <Tag>F &lt;50</Tag>
+
+                  </div>
+
+                </div>
+
+                <div className="signature-area">
+
+                  <div className="signature-line-screen" />
+
+                  <Text>
+                    Principal's
+                    Signature
+                  </Text>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </Spin>
+
+      </Modal>
+
+    </Layout>
+  );
+};
 
 export default Performance;

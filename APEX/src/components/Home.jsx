@@ -61,13 +61,81 @@ const GlobalStyle = createGlobalStyle`
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
   
   html {
-    scroll-behavior: smooth;
+  scroll-behavior: smooth;
+  width: 100%;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1e293b;
+  background-color: #0b1b3d;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+  * {
+    box-sizing: border-box;
   }
 
-  body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #1e293b;
-    background-color: #0b1b3d;
+  /* Mobile Navigation Drawer Custom Styling */
+  .apex-drawer .ant-drawer-content {
+    background-color: #0b1b3d !important;
+    color: #ffffff !important;
+  }
+
+  .apex-drawer .ant-drawer-header {
+    background-color: #061129 !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+    padding: 16px 20px !important;
+  }
+
+  .apex-drawer .ant-drawer-title {
+    color: #ffffff !important;
+    font-family: 'Cinzel', serif !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .apex-drawer .ant-drawer-close {
+    color: #cbd5e1 !important;
+    font-size: 18px !important;
+    &:hover {
+      color: #d4af37 !important;
+    }
+  }
+
+  .apex-drawer .ant-drawer-body {
+    background-color: #0b1b3d !important;
+    padding: 12px 0 !important;
+  }
+
+  .apex-drawer-menu {
+    background: transparent !important;
+    border-right: none !important;
+
+    .ant-menu-item {
+      color: #e2e8f0 !important;
+      font-size: 0.95rem !important;
+      font-weight: 500 !important;
+      height: 48px !important;
+      line-height: 48px !important;
+      margin: 4px 12px !important;
+      width: calc(100% - 24px) !important;
+      border-radius: 6px !important;
+
+      &:hover, &.ant-menu-item-selected {
+        color: #d4af37 !important;
+        background: rgba(212, 175, 55, 0.12) !important;
+      }
+
+      .anticon {
+        font-size: 1.1rem !important;
+        margin-right: 12px !important;
+      }
+    }
   }
 `;
 
@@ -81,6 +149,7 @@ const zoomSlow = keyframes`
 const StyledLayout = styled(Layout)`
   min-height: 100vh;
   background: #f8fafc;
+  width:100%
 `;
 
 // Top Bar
@@ -88,48 +157,110 @@ const TopBar = styled.div`
   background: #061129;
   color: #cbd5e1;
   font-size: 13px;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid rgba(212, 175, 55, 0.2);
-
-  @media (max-width: 768px) {
-    display: none;
-  }
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const TopBarContainer = styled.div`
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
+  width: 100%;
+  padding: 0 clamp(12px, 2.5vw, 24px);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  box-sizing: border-box;
+
+  @media (max-width: 768px) {
+    justify-content: center;
+  }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 6px;
+  }
+`;
+
+const TopAnnouncement = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  .announcement-text {
+    font-size: clamp(11px, 1.4vw, 13px);
+    color: #cbd5e1;
+    white-space: nowrap;
+
+    @media (max-width: 640px) {
+      white-space: normal;
+      text-align: center;
+    }
+  }
+
+  @media (max-width: 768px) {
+    justify-content: center;
+  }
 `;
 
 const TopContactInfo = styled.div`
   display: flex;
-  gap: 20px;
+  gap: clamp(10px, 1.5vw, 20px);
   align-items: center;
+  flex-wrap: wrap;
 
-  a {
+  a, span {
     color: #cbd5e1;
+    font-size: clamp(11px, 1.4vw, 13px);
+    white-space: nowrap;
     transition: color 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
     &:hover { color: #d4af37; }
+  }
+
+  @media (max-width: 768px) {
+    justify-content: center;
+  }
+
+  @media (max-width: 380px) {
+    gap: 6px 10px;
   }
 `;
 
 // Header
+
 const StyledHeader = styled(Header)`
   position: sticky;
   top: 0;
   z-index: 1000;
+
   width: 100%;
   height: 76px;
-  line-height: 76px;
+
+  line-height: normal;
+
   background: rgba(11, 27, 61, 0.94) !important;
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+
   padding: 0;
+
+  display: flex;
+  align-items: center;
+
+  box-sizing: border-box;
+
+  @media (max-width: 576px) {
+    height: 66px;
+  }
 `;
 
 const HeaderContainer = styled.div`
@@ -137,45 +268,75 @@ const HeaderContainer = styled.div`
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 clamp(12px, 2.5vw, 24px);
+  box-sizing: border-box;
+  gap: 12px;
+  min-width: 0;
 `;
 
 const BrandWrapper = styled.div`
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: clamp(8px, 1.5vw, 14px);
   cursor: pointer;
+  flex-shrink: 0;
+  min-width: 0;
 `;
 
-const LogoImage = styled(Image)`
-  object-fit: contain;
-  border-radius: 8px;
+const LogoImageWrapper = styled.div`
+  flex-shrink: 0;
+  width: clamp(38px, 4.5vw, 48px);
+  height: clamp(38px, 4.5vw, 48px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #fff;
-  padding: 4px;
+  border-radius: 8px;
+  padding: 3px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
 `;
 
 const BrandTitle = styled.div`
   display: flex;
   flex-direction: column;
+  flex-shrink: 1;
+  min-width: 0;
+  justify-content: center;
 
   .name {
     font-family: 'Cinzel', serif;
-    font-size: 1.25rem;
+    font-size: clamp(0.95rem, 2.2vw, 1.25rem);
     font-weight: 700;
     color: #ffffff;
     letter-spacing: 0.5px;
-    line-height: 1.1;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tagline {
-    font-size: 0.72rem;
+    font-size: clamp(0.55rem, 1.2vw, 0.72rem);
     color: #d4af37;
-    letter-spacing: 1.5px;
+    letter-spacing: clamp(0.5px, 0.2vw, 1.5px);
     text-transform: uppercase;
     font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 360px) {
+    .tagline {
+      display: none;
+    }
   }
 `;
 
@@ -184,13 +345,20 @@ const StyledMenu = styled(Menu)`
   border-bottom: none !important;
   flex: 1;
   justify-content: flex-end;
-  margin-right: 20px;
+  margin-right: clamp(8px, 1.5vw, 20px);
+  min-width: 0;
+  display: flex;
+  align-items: center;
 
   .ant-menu-item {
     color: #e2e8f0 !important;
     font-weight: 500;
-    font-size: 0.95rem;
-    padding: 0 16px !important;
+    font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+    padding: 0 clamp(8px, 1.2vw, 16px) !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    flex-shrink: 0;
 
     &:hover, &.ant-menu-item-selected {
       color: #d4af37 !important;
@@ -203,24 +371,62 @@ const StyledMenu = styled(Menu)`
   }
 
   @media (max-width: 992px) {
-    display: none;
+    display: none !important;
   }
 `;
 
+const ActionsGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 14px);
+  flex-shrink: 0;
+`;
+
 const SignInButton = styled(Button)`
-  height: 42px;
-  padding: 0 24px;
+  height: clamp(36px, 4vw, 42px);
+  padding: 0 clamp(12px, 2vw, 24px);
   font-weight: 600;
   border-radius: 6px;
   background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
   border: none;
   color: #0b1b3d;
   box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+  flex-shrink: 0;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.8rem, 1.1vw, 0.9rem);
+  transition: all 0.3s ease;
 
   &:hover {
     transform: translateY(-2px);
     background: linear-gradient(135deg, #f39c12 0%, #d4af37 100%) !important;
     color: #0b1b3d !important;
+  }
+`;
+
+const MenuToggleButton = styled(Button)`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(36px, 4vw, 42px);
+  width: clamp(36px, 4vw, 42px);
+  padding: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba(212, 175, 55, 0.2) !important;
+    border-color: #d4af37 !important;
+    color: #d4af37 !important;
+  }
+
+  @media (min-width: 993px) {
+    display: none !important;
   }
 `;
 
@@ -591,6 +797,18 @@ const Home = () => {
     fetchBlogImages();
   }, []);
 
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileDrawerVisible) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileDrawerVisible]);
+
   const handleLoginClick = () => {
     navigate('/choose-user');
   };
@@ -620,84 +838,87 @@ const Home = () => {
     <>
       <GlobalStyle />
       <StyledLayout>
-        {/* ==================== TOP ANNOUNCEMENT BAR ==================== */}
-        <TopBar>
-          <TopBarContainer>
-            <Space size="large">
-              <Tag color="#d4af37" style={{ color: '#0b1b3d', fontWeight: 700, borderRadius: 4 }}>
-                ADMISSIONS 2026
-              </Tag>
-              <span><CalendarOutlined /> Admissions are open for F.Sc, ICS & FA Programs</span>
-            </Space>
-            <TopContactInfo>
-              <a href="tel:+921234567890"><PhoneOutlined /> +92 123 4567890</a>
-              <a href="mailto:info@apexcollege.edu.pk"><MailOutlined /> info@apexcollege.edu.pk</a>
-              <span style={{ cursor: 'pointer', color: '#d4af37' }} onClick={handleLoginClick}>
-                <UserOutlined /> Student & Faculty Portal
-              </span>
-            </TopContactInfo>
-          </TopBarContainer>
-        </TopBar>
+      {/* ==================== FIXED HEADER CONTAINER ==================== */}
 
-        {/* ==================== HEADER ==================== */}
-        <StyledHeader>
-          <HeaderContainer>
-            <BrandWrapper onClick={() => scrollToSection('home')}>
-              <LogoImage
-                width={48}
-                height={48}
-                src={logo}
-                preview={false}
-                alt="Apex Logo"
-              />
-              <BrandTitle>
-                <span className="name">Apex College</span>
-                <span className="tagline">Harichand • Higher Education</span>
-              </BrandTitle>
-            </BrandWrapper>
+  {/* TOP ANNOUNCEMENT BAR */}
+  <TopBar>
+    <TopBarContainer>
+      <TopAnnouncement>
+        <Tag color="#d4af37" style={{ color: '#0b1b3d', fontWeight: 700, borderRadius: 4, margin: 0 }}>
+          ADMISSIONS 2026
+        </Tag>
+        <span className="announcement-text">
+          <CalendarOutlined style={{ marginRight: 6 }} /> 
+          Admissions are open for F.Sc, ICS & FA Programs
+        </span>
+      </TopAnnouncement>
+      <TopContactInfo>
+        <a href="tel:+921234567890"><PhoneOutlined /> +92 123 4567890</a>
+        <a href="mailto:info@apexcollege.edu.pk"><MailOutlined /> info@apexcollege.edu.pk</a>
+        <span style={{ cursor: 'pointer', color: '#d4af37' }} onClick={handleLoginClick}>
+          <UserOutlined /> Student & Faculty Portal
+        </span>
+      </TopContactInfo>
+    </TopBarContainer>
+  </TopBar>
 
-            {screens.lg ? (
-              <StyledMenu mode="horizontal" defaultSelectedKeys={['1']}>
-                <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => scrollToSection('home')}>
-                  Home
-                </Menu.Item>
-                <Menu.Item key="2" icon={<InfoCircleOutlined />} onClick={() => scrollToSection('about')}>
-                  About Apex
-                </Menu.Item>
-                <Menu.Item key="3" icon={<PictureOutlined />} onClick={() => scrollToSection('about')}>
-                  Campus Life
-                </Menu.Item>
-                <Menu.Item key="4" icon={<ContactsOutlined />} onClick={() => scrollToSection('contact')}>
-                  Contact
-                </Menu.Item>
-              </StyledMenu>
-            ) : null}
+  {/* MAIN HEADER */}
+  <StyledHeader>
+    <HeaderContainer>
+      <BrandWrapper onClick={() => scrollToSection('home')}>
+        <LogoImageWrapper>
+          <img src={logo} alt="Apex Logo" />
+        </LogoImageWrapper>
+        <BrandTitle>
+          <span className="name">Apex College</span>
+          <span className="tagline">Harichand • Higher Education</span>
+        </BrandTitle>
+      </BrandWrapper>
 
-            <Space>
-              <SignInButton icon={<LoginOutlined />} onClick={handleLoginClick}>
-                {screens.sm ? 'Portal Login' : ''}
-              </SignInButton>
+      {screens.lg ? (
+        <StyledMenu mode="horizontal" defaultSelectedKeys={['1']}>
+          <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => scrollToSection('home')}>
+            Home
+          </Menu.Item>
+          <Menu.Item key="2" icon={<InfoCircleOutlined />} onClick={() => scrollToSection('about')}>
+            About Apex
+          </Menu.Item>
+          <Menu.Item key="3" icon={<PictureOutlined />} onClick={() => scrollToSection('about')}>
+            Campus Life
+          </Menu.Item>
+          <Menu.Item key="4" icon={<ContactsOutlined />} onClick={() => scrollToSection('contact')}>
+            Contact
+          </Menu.Item>
+        </StyledMenu>
+      ) : null}
 
-              {!screens.lg && (
-                <Button 
-                  type="text" 
-                  icon={<MenuOutlined style={{ color: '#fff', fontSize: '20px' }} />}
-                  onClick={() => setMobileDrawerVisible(true)}
-                />
-              )}
-            </Space>
-          </HeaderContainer>
-        </StyledHeader>
+      <ActionsGroup>
+        <SignInButton icon={<LoginOutlined />} onClick={handleLoginClick}>
+          Portal Login
+        </SignInButton>
+
+        {!screens.lg && (
+          <MenuToggleButton 
+            type="text" 
+            icon={<MenuOutlined style={{ fontSize: '20px' }} />}
+            onClick={() => setMobileDrawerVisible(true)}
+            aria-label="Toggle navigation menu"
+          />
+        )}
+      </ActionsGroup>
+    </HeaderContainer>
+  </StyledHeader>
 
         {/* ==================== MOBILE NAVIGATION DRAWER ==================== */}
         <Drawer
-          title="Apex College Menu"
+          title="Apex College"
           placement="right"
           onClose={() => setMobileDrawerVisible(false)}
           open={mobileDrawerVisible}
-          bodyStyle={{ padding: 0 }}
+          className="apex-drawer"
+          width={280}
         >
-          <Menu mode="inline" style={{ borderRight: 'none' }}>
+          <Menu mode="inline" className="apex-drawer-menu" defaultSelectedKeys={['1']}>
             <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => scrollToSection('home')}>
               Home
             </Menu.Item>
@@ -709,6 +930,9 @@ const Home = () => {
             </Menu.Item>
             <Menu.Item key="4" icon={<ContactsOutlined />} onClick={() => scrollToSection('contact')}>
               Contact Us
+            </Menu.Item>
+            <Menu.Item key="5" icon={<UserOutlined />} onClick={() => { setMobileDrawerVisible(false); handleLoginClick(); }} style={{ color: '#d4af37' }}>
+              Student & Faculty Portal
             </Menu.Item>
           </Menu>
         </Drawer>

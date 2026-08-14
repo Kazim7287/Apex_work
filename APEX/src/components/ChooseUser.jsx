@@ -44,38 +44,59 @@ const PortalHeader = styled(Header)`
   background: rgba(11, 27, 61, 0.8) !important;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  height: 76px;
-  line-height: 76px;
-  padding: 0 24px;
+  height: auto;
+  min-height: 76px;
+  line-height: normal;
+  width: 100%;
+  padding: 14px clamp(12px, 2.5vw, 24px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+
+  @media (max-width: 480px) {
+    min-height: 64px;
+    padding: 10px 14px;
+  }
 `;
 
 const HeaderContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
 `;
 
 const BrandWrapper = styled(Link)`
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: clamp(8px, 2vw, 12px);
   text-decoration: none;
+  flex-shrink: 1;
+  min-width: 0;
 
   .brand-logo {
-    width: 42px;
-    height: 42px;
+    width: clamp(34px, 8vw, 42px);
+    height: clamp(34px, 8vw, 42px);
     border-radius: 8px;
     background: #fff;
     padding: 3px;
+    flex-shrink: 0;
+    object-fit: contain;
   }
 
   .brand-name {
     font-family: 'Cinzel', serif;
-    font-size: 1.2rem;
+    font-size: clamp(0.82rem, 3.6vw, 1.2rem);
     font-weight: 700;
     color: #fff;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 `;
 
@@ -85,11 +106,23 @@ const BackButton = styled(Button)`
   color: #cbd5e1;
   border-radius: 6px;
   font-weight: 500;
+  flex-shrink: 0;
+  font-size: clamp(0.75rem, 2.8vw, 0.9rem);
+  padding: 0 clamp(10px, 2.5vw, 15px);
+  height: clamp(32px, 7vw, 38px);
+  display: inline-flex;
+  align-items: center;
 
   &:hover {
     background: #d4af37 !important;
     color: #0b1b3d !important;
     border-color: #d4af37 !important;
+  }
+
+  .back-btn-text {
+    @media (max-width: 400px) {
+      display: none;
+    }
   }
 `;
 
@@ -251,7 +284,7 @@ const ChooseUser = () => {
             
             <Link to="/">
               <BackButton icon={<ArrowLeftOutlined />}>
-                Back to Website
+                <span className="back-btn-text">Back to Website</span>
               </BackButton>
             </Link>
           </HeaderContainer>
@@ -332,7 +365,7 @@ const ChooseUser = () => {
         <PortalFooter>
           <div>© {new Date().getFullYear()} Apex College Harichand. All rights reserved.</div>
           <span className="developer-credit">
-            Powered by MUHAMMAD KAZIM AHMAD AND YOUSAF SHAH
+            Powered by MUHAMMAD KAZIM AHMAD AND MUHAMMAD RAYYAN
           </span>
         </PortalFooter>
       </PortalLayout>

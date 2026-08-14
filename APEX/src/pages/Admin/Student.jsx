@@ -6,7 +6,6 @@ import {
   Card,
   Row,
   Col,
-  Layout,
   Typography,
   Spin,
   message,
@@ -17,13 +16,11 @@ import {
   Descriptions,
   Statistic,
   Avatar,
-  Badge,
   Tabs,
   Grid,
-  Dropdown,
   Space,
-  Drawer,
-  Popconfirm
+  Popconfirm,
+  Tooltip
 } from 'antd';
 import {
   UserOutlined,
@@ -31,19 +28,15 @@ import {
   BookOutlined,
   CheckCircleOutlined,
   TeamOutlined,
-  MessageOutlined,
-  SmileOutlined,
   CalendarOutlined,
   PrinterOutlined,
-  MenuOutlined,
-  DownloadOutlined,
-  FilePdfOutlined,
-  FileTextOutlined,
   DeleteOutlined,
-  DeleteFilled
+  DeleteFilled,
+  EyeOutlined,
+  FileTextOutlined,
+  StarOutlined
 } from '@ant-design/icons';
 
-const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 const { useBreakpoint } = Grid;
@@ -56,7 +49,6 @@ const StudentReports = () => {
     const [selectedReport, setSelectedReport] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [activeTab, setActiveTab] = useState('performance');
-    const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);
     
     // State for bulk selection and deletion
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -113,9 +105,6 @@ const StudentReports = () => {
         try {
             const response = await publicApi.get(`adstdreports_read.php?section_id=${sectionId}`);
             setReports(response.data.data || []);
-            if (isMobile) {
-                setMobileDrawerVisible(false);
-            }
         } catch (error) {
             message.error("Error fetching reports");
             console.error("Error:", error);
@@ -124,39 +113,24 @@ const StudentReports = () => {
         }
     };
 
-    const showReportDetails = (report) => {
-        setSelectedReport(report);
-        setModalVisible(true);
-        setActiveTab('performance');
-    };
-
-    // Handle single delete - Immediate removal
-    const handleDelete = async (id) => {
+    const handleSingleDelete = async (reportId) => {
         try {
-            const response = await publicApi.delete(`admin_std_reports_delete.php?id=${id}`);
-            
-            if (response.data.success) {
-                message.success(response.data.message || 'Report deleted successfully');
-                
-                // Remove the deleted report from the list immediately
-                setReports(prevReports => prevReports.filter(report => report.id !== id));
-                setSelectedRowKeys(prevKeys => prevKeys.filter(key => key !== id));
-                
-                // If the deleted report was the one being viewed in the modal, close it
-                if (selectedReport && selectedReport.id === id) {
-                    setModalVisible(false);
-                    setSelectedReport(null);
-                }
+            const response = await authApi.delete(`adstdreports_bulk_delete.php`, {
+                data: { ids: [reportId] }
+            });
+
+            if (response.data.status === 'success') {
+                message.success('Report deleted successfully');
+                fetchReportsBySection(selectedSection);
             } else {
-                throw new Error(response.data.message || 'Delete failed');
+                message.error(response.data.message || 'Failed to delete report');
             }
         } catch (error) {
-            message.error(error.response?.data?.message || error.message || 'Failed to delete report');
-            console.error('Delete error:', error);
+            message.error('Error deleting report');
+            console.error("Error:", error);
         }
     };
 
-    // Handle bulk delete - Immediate removal
     const handleBulkDelete = () => {
         if (selectedRowKeys.length === 0) {
             message.warning('Please select at least one report to delete');
@@ -166,799 +140,344 @@ const StudentReports = () => {
     };
 
     const confirmBulkDelete = async () => {
+        setBulkDeleteLoading(true);
         try {
-            setBulkDeleteLoading(true);
-            setIsBulkDeleteModalVisible(false);
-            
-            const idsParam = selectedRowKeys.join(',');
-            const response = await publicApi.delete(`admin_std_reports_delete.php?ids=${idsParam}`);
+            const response = await authApi.delete(`adstdreports_bulk_delete.php`, {
+                data: { ids: selectedRowKeys }
+            });
 
-            if (response.data.success) {
-                message.success(response.data.message);
-                
-                // Remove all selected reports from the list immediately
-                setReports(prevReports => 
-                    prevReports.filter(report => !selectedRowKeys.includes(report.id))
-                );
+            if (response.data.status === 'success') {
+                message.success(`Successfully deleted ${selectedRowKeys.length} report(s)`);
                 setSelectedRowKeys([]);
-                
-                // If the selected report was deleted, close the modal
-                if (selectedReport && selectedRowKeys.includes(selectedReport.id)) {
-                    setModalVisible(false);
-                    setSelectedReport(null);
-                }
+                setIsBulkDeleteModalVisible(false);
+                fetchReportsBySection(selectedSection);
             } else {
-                throw new Error(response.data.message || 'Bulk delete failed');
+                message.error(response.data.message || 'Failed to delete reports');
             }
         } catch (error) {
-            message.error(error.response?.data?.message || error.message || 'Error performing bulk delete');
-            console.error('Bulk delete error:', error);
+            message.error('Error deleting reports');
+            console.error("Error:", error);
         } finally {
             setBulkDeleteLoading(false);
         }
     };
 
-    // Print functionality
-    const handlePrint = () => {
-        if (!selectedReport) return;
-        
-        const printWindow = window.open('', '_blank');
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Student Report - ${selectedReport.student.name}</title>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        margin: 20px; 
-                        color: #333;
-                    }
-                    .header { 
-                        text-align: center; 
-                        margin-bottom: 30px;
-                        border-bottom: 2px solid #1890ff;
-                        padding-bottom: 20px;
-                    }
-                    .student-info { 
-                        margin-bottom: 20px; 
-                    }
-                    .metrics-grid { 
-                        display: grid; 
-                        grid-template-columns: repeat(3, 1fr); 
-                        gap: 20px; 
-                        margin-bottom: 30px;
-                    }
-                    .metric-card { 
-                        border: 1px solid #ddd; 
-                        padding: 15px; 
-                        border-radius: 8px;
-                        text-align: center;
-                    }
-                    .progress-circle {
-                        width: 100px;
-                        height: 100px;
-                        border-radius: 50%;
-                        background: conic-gradient(#1890ff 0% ${selectedReport.performance_metrics.academic_performance * 20}%, #f0f0f0 0% 100%);
-                        margin: 0 auto 10px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        position: relative;
-                    }
-                    .progress-value {
-                        font-size: 18px;
-                        font-weight: bold;
-                    }
-                    .remarks { 
-                        background: #f9f9f9; 
-                        padding: 20px; 
-                        border-radius: 8px;
-                        margin-top: 20px;
-                    }
-                    .footer { 
-                        margin-top: 30px; 
-                        text-align: right; 
-                        font-size: 12px; 
-                        color: #666;
-                    }
-                    @media print {
-                        body { margin: 0; padding: 15px; }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>Student Performance Report</h1>
-                    <h2>${selectedReport.student.name}</h2>
-                    <p>${selectedReport.section.name} • ${selectedReport.subject.name}</p>
-                    <p>Report Date: ${new Date(selectedReport.report_date).toLocaleDateString()}</p>
-                </div>
-                
-                <div class="student-info">
-                    <h3>Student Information</h3>
-                    <p><strong>Name:</strong> ${selectedReport.student.name}</p>
-                    <p><strong>Section:</strong> ${selectedReport.section.name}</p>
-                    <p><strong>Subject:</strong> ${selectedReport.subject.name}</p>
-                    <p><strong>Report Date:</strong> ${new Date(selectedReport.report_date).toLocaleDateString()}</p>
-                </div>
-                
-                <h3>Performance Metrics</h3>
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <h4>Academic Performance</h4>
-                        <div class="progress-circle">
-                            <span class="progress-value">${selectedReport.performance_metrics.academic_performance}/5</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <h4>Punctuality</h4>
-                        <div class="progress-circle">
-                            <span class="progress-value">${selectedReport.performance_metrics.punctuality}/5</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <h4>Homework Completion</h4>
-                        <div class="progress-circle">
-                            <span class="progress-value">${selectedReport.performance_metrics.homework_completion}/5</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="remarks">
-                    <h3>Overall Remarks</h3>
-                    <p>${selectedReport.overall_remarks}</p>
-                </div>
-                
-                <div class="footer">
-                    <p>Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
-                    <p>Apex School Management System</p>
-                </div>
-                
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(function() {
-                            window.close();
-                        }, 500);
-                    }
-                </script>
-            </body>
-            </html>
-        `;
-        
-        printWindow.document.write(printContent);
-        printWindow.document.close();
+    const handleViewReport = (report) => {
+        setSelectedReport(report);
+        setModalVisible(true);
     };
 
-    // Row selection configuration
-    const rowSelection = {
-        selectedRowKeys,
-        onChange: (selectedKeys) => {
-            setSelectedRowKeys(selectedKeys);
-        },
-        selections: [
-            Table.SELECTION_ALL,
-            Table.SELECTION_INVERT,
-            Table.SELECTION_NONE,
-        ],
+    const handlePrint = () => {
+        const printContent = document.getElementById('report-print-content');
+        const WinPrint = window.open('', '', 'left=0,top=0,width=800,height=900,toolbar=0,scrollbars=0,status=0');
+        WinPrint.document.write(`
+            <html>
+                <head>
+                    <title>Student Report - ${selectedReport?.student?.name}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                        h1 { color: #0b1b3d; border-bottom: 2px solid #d4af37; padding-bottom: 10px; }
+                        .metric { margin-bottom: 15px; }
+                        .label { font-weight: bold; }
+                        .score { color: #1e3a8a; font-weight: bold; }
+                        .remarks { background: #f8fafc; padding: 15px; border-left: 4px solid #d4af37; margin-top: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <h1>APEX COLLEGE - STUDENT PERFORMANCE REPORT</h1>
+                    <p><strong>Student Name:</strong> ${selectedReport?.student?.name}</p>
+                    <p><strong>Section:</strong> ${selectedReport?.section?.name}</p>
+                    <p><strong>Subject:</strong> ${selectedReport?.subject?.name}</p>
+                    <p><strong>Date:</strong> ${new Date(selectedReport?.report_date).toLocaleDateString()}</p>
+                    <hr/>
+                    <h3>Performance Metrics</h3>
+                    <div class="metric"><span class="label">Academic Performance:</span> <span class="score">${selectedReport?.performance_metrics?.academic_performance}/5.0</span></div>
+                    <div class="metric"><span class="label">Punctuality:</span> <span class="score">${selectedReport?.performance_metrics?.punctuality}/5.0</span></div>
+                    <div class="metric"><span class="label">Homework Completion:</span> <span class="score">${selectedReport?.performance_metrics?.homework_completion}/5.0</span></div>
+                    <div class="remarks">
+                        <h3>Overall Remarks</h3>
+                        <p>${selectedReport?.overall_remarks}</p>
+                    </div>
+                </body>
+            </html>
+        `);
+        WinPrint.document.close();
+        WinPrint.focus();
+        WinPrint.print();
+        WinPrint.close();
+    };
+
+    const getProgressColor = (score) => {
+        if (score >= 4.0) return '#10b981';
+        if (score >= 3.0) return '#3b82f6';
+        if (score >= 2.0) return '#f59e0b';
+        return '#ef4444';
     };
 
     const columns = [
         {
-            title: 'Student',
+            title: 'Student Name',
             dataIndex: ['student', 'name'],
             key: 'student_name',
-            render: (text, record) => (
-                <Button 
-                    type="link" 
-                    onClick={() => showReportDetails(record)}
-                    style={{ 
-                        padding: 0, 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        height: 'auto'
-                    }}
-                >
-                    <Avatar 
-                        size={isSmallMobile ? "small" : "default"}
-                        icon={<UserOutlined />} 
-                        style={{ 
-                            marginRight: 8, 
-                            backgroundColor: '#1890ff',
-                            flexShrink: 0
-                        }} 
-                    />
-                    <span style={{ 
-                        fontSize: isSmallMobile ? '12px' : '14px',
-                        textAlign: 'left'
-                    }}>
-                        {text}
-                    </span>
-                </Button>
-            ),
-            fixed: isMobile ? 'left' : false,
-            width: isMobile ? 120 : undefined,
-        },
-        {
-            title: 'Section',
-            dataIndex: ['section', 'name'],
-            key: 'section_name',
+            sorter: (a, b) => a.student.name.localeCompare(b.student.name),
             render: (text) => (
-                <Tag 
-                    icon={<TeamOutlined />} 
-                    color="blue"
-                    style={{ fontSize: isSmallMobile ? '10px' : '12px' }}
-                >
-                    {text}
-                </Tag>
-            ),
-            responsive: ['md'],
+                <Space>
+                    <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }} icon={<UserOutlined />} />
+                    <Text strong style={{ color: '#0f172a' }}>{text}</Text>
+                </Space>
+            )
         },
         {
             title: 'Subject',
             dataIndex: ['subject', 'name'],
             key: 'subject_name',
             render: (text) => (
-                <Tag 
-                    icon={<BookOutlined />} 
-                    color="purple"
-                    style={{ fontSize: isSmallMobile ? '10px' : '12px' }}
-                >
+                <Tag icon={<BookOutlined />} color="processing" style={{ borderRadius: 12, padding: '2px 10px' }}>
                     {text}
                 </Tag>
-            ),
-            responsive: ['lg'],
+            )
+        },
+        {
+            title: 'Academic Score',
+            dataIndex: ['performance_metrics', 'academic_performance'],
+            key: 'academic_performance',
+            sorter: (a, b) => a.performance_metrics.academic_performance - b.performance_metrics.academic_performance,
+            render: (score) => (
+                <Progress 
+                    percent={(score / 5) * 100} 
+                    format={() => `${score}/5`}
+                    strokeColor={getProgressColor(score)}
+                    size="small"
+                    style={{ minWidth: 120 }}
+                />
+            )
+        },
+        {
+            title: 'Punctuality',
+            dataIndex: ['performance_metrics', 'punctuality'],
+            key: 'punctuality',
+            responsive: ['md'],
+            render: (score) => (
+                <Text style={{ fontWeight: 600, color: getProgressColor(score) }}>
+                    {score} / 5.0
+                </Text>
+            )
         },
         {
             title: 'Report Date',
             dataIndex: 'report_date',
             key: 'report_date',
-            render: (date) => (
-                <div style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-                    <CalendarOutlined style={{ marginRight: 5 }} />
-                    {new Date(date).toLocaleDateString()}
-                </div>
-            ),
-            responsive: ['md'],
-        },
-        {
-            title: 'Score',
-            key: 'status',
-            render: (_, record) => {
-                const avgScore = (
-                    (record.performance_metrics.academic_performance +
-                     record.performance_metrics.punctuality +
-                     record.performance_metrics.homework_completion) / 3
-                ).toFixed(1);
-                
-                let color = '';
-                if (avgScore >= 4) color = 'green';
-                else if (avgScore >= 2.5) color = 'orange';
-                else color = 'red';
-                
-                return (
-                    <Badge 
-                        count={avgScore} 
-                        style={{ 
-                            backgroundColor: color,
-                            fontSize: isSmallMobile ? '0.8em' : '0.9em',
-                            padding: '0 6px',
-                            height: 20,
-                            lineHeight: '20px'
-                        }} 
-                    />
-                );
-            },
+            responsive: ['lg'],
+            render: (date) => new Date(date).toLocaleDateString()
         },
         {
             title: 'Actions',
             key: 'actions',
-            width: 80,
+            align: 'center',
+            width: 140,
             render: (_, record) => (
-                <Popconfirm
-                    title="Are you sure to delete this report?"
-                    onConfirm={() => handleDelete(record.id)}
-                    okText="Yes"
-                    cancelText="No"
-                    placement="left"
-                >
-                    <Button
-                        type="text"
-                        icon={<DeleteOutlined />}
-                        danger
-                        size="small"
-                    />
-                </Popconfirm>
-            ),
+                <Space size="small">
+                    <Tooltip title="View Report Details">
+                        <Button 
+                            type="primary" 
+                            icon={<EyeOutlined />} 
+                            onClick={() => handleViewReport(record)}
+                            size="small"
+                            style={{ background: '#0b1b3d', borderRadius: 6 }}
+                        />
+                    </Tooltip>
+                    <Popconfirm
+                        title="Delete Report"
+                        description="Are you sure to delete this report?"
+                        onConfirm={() => handleSingleDelete(record.id)}
+                        okText="Yes"
+                        cancelText="No"
+                        okButtonProps={{ danger: true }}
+                    >
+                        <Tooltip title="Delete Report">
+                            <Button 
+                                type="primary" 
+                                danger 
+                                icon={<DeleteOutlined />} 
+                                size="small"
+                                style={{ borderRadius: 6 }}
+                            />
+                        </Tooltip>
+                    </Popconfirm>
+                </Space>
+            )
         }
     ];
 
-    const getProgressColor = (value) => {
-        if (value >= 4) return '#52c41a';
-        if (value >= 2.5) return '#faad14';
-        return '#f5222d';
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (keys) => setSelectedRowKeys(keys)
     };
-
-    const getPerformanceTag = (value) => {
-        if (value >= 4) return <Tag icon={<CheckCircleOutlined />} color="success">Excellent</Tag>;
-        if (value >= 2.5) return <Tag icon={<SmileOutlined />} color="warning">Good</Tag>;
-        return <Tag icon={<ClockCircleOutlined />} color="error">Needs Improvement</Tag>;
-    };
-
-    const renderMetricCard = (value, title, icon, maxValue = 5) => {
-        const percentage = (value / maxValue) * 100;
-        return (
-            <Card 
-                bordered={false} 
-                style={{ 
-                    boxShadow: '0 4px 12px 0 rgba(0,0,0,0.08)',
-                    borderRadius: 8,
-                    height: '100%'
-                }}
-                bodyStyle={{ padding: isSmallMobile ? '12px' : '16px' }}
-            >
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ 
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 12,
-                        color: '#1890ff'
-                    }}>
-                        {icon}
-                        <Title level={isSmallMobile ? 5 : 4} style={{ margin: '0 0 0 8px' }}>
-                            {title}
-                        </Title>
-                    </div>
-                    <Progress
-                        type="dashboard"
-                        percent={percentage}
-                        strokeColor={getProgressColor(value)}
-                        strokeWidth={8}
-                        format={() => (
-                            <div style={{ 
-                                fontSize: isSmallMobile ? 18 : 24, 
-                                fontWeight: 'bold' 
-                            }}>
-                                {value.toFixed(1)}<span style={{ fontSize: isSmallMobile ? 12 : 14 }}>/{maxValue}</span>
-                            </div>
-                        )}
-                        width={isSmallMobile ? 100 : 120}
-                    />
-                    <div style={{ marginTop: 12 }}>
-                        {getPerformanceTag(value)}
-                    </div>
-                </div>
-            </Card>
-        );
-    };
-
-    const renderScoreDisplay = (value, title, icon) => {
-        return (
-            <Card 
-                size="small" 
-                title={
-                    <span style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                        {icon} {title}
-                    </span>
-                }
-                bodyStyle={{ padding: isSmallMobile ? '8px' : '12px' }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text strong style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                        {value}/5
-                    </Text>
-                    {getPerformanceTag(value)}
-                </div>
-            </Card>
-        );
-    };
-
-    const renderPerformanceTab = () => (
-        <>
-            <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-                <Col xs={24} sm={8}>
-                    {renderMetricCard(
-                        selectedReport.performance_metrics.academic_performance,
-                        'Academic',
-                        <BookOutlined />
-                    )}
-                </Col>
-                <Col xs={24} sm={8}>
-                    {renderMetricCard(
-                        selectedReport.performance_metrics.punctuality,
-                        'Punctuality',
-                        <ClockCircleOutlined />
-                    )}
-                </Col>
-                <Col xs={24} sm={8}>
-                    {renderMetricCard(
-                        selectedReport.performance_metrics.homework_completion,
-                        'Homework',
-                        <CheckCircleOutlined />
-                    )}
-                </Col>
-            </Row>
-
-            <Divider orientation="left" style={{ marginTop: 0 }}>Additional Metrics</Divider>
-            
-            <Row gutter={[12, 12]}>
-                <Col xs={24} sm={12}>
-                    {renderScoreDisplay(
-                        selectedReport.performance_metrics.class_participation,
-                        'Class Participation',
-                        <TeamOutlined style={{ marginRight: 4 }} />
-                    )}
-                </Col>
-                <Col xs={24} sm={12}>
-                    {renderScoreDisplay(
-                        selectedReport.performance_metrics.behavior,
-                        'Behavior',
-                        <SmileOutlined style={{ marginRight: 4 }} />
-                    )}
-                </Col>
-                <Col xs={24} sm={12}>
-                    {renderScoreDisplay(
-                        selectedReport.performance_metrics.grooming,
-                        'Grooming',
-                        <UserOutlined style={{ marginRight: 4 }} />
-                    )}
-                </Col>
-                <Col xs={24} sm={12}>
-                    {renderScoreDisplay(
-                        selectedReport.performance_metrics.communication_skills,
-                        'Communication',
-                        <MessageOutlined style={{ marginRight: 4 }} />
-                    )}
-                </Col>
-                <Col xs={24}>
-                    <Card 
-                        size="small" 
-                        title={
-                            <span>
-                                <CalendarOutlined style={{ marginRight: 4 }} />
-                                Attendance
-                            </span>
-                        }
-                        bodyStyle={{ padding: isSmallMobile ? '8px' : '12px' }}
-                    >
-                        <Text strong style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                            {selectedReport.performance_metrics.attendance}
-                        </Text>
-                    </Card>
-                </Col>
-            </Row>
-        </>
-    );
-
-    const renderDetailsTab = () => (
-        <Descriptions 
-            bordered 
-            column={1} 
-            size="small"
-            labelStyle={{ 
-                width: 120,
-                fontSize: isSmallMobile ? '12px' : '14px'
-            }}
-            contentStyle={{ fontSize: isSmallMobile ? '12px' : '14px' }}
-        >
-            <Descriptions.Item label="Student Name">
-                <Avatar 
-                    size="small" 
-                    icon={<UserOutlined />} 
-                    style={{ marginRight: 8, backgroundColor: '#1890ff' }} 
-                />
-                {selectedReport.student.name}
-            </Descriptions.Item>
-            <Descriptions.Item label="Section">
-                <Tag icon={<TeamOutlined />} color="blue">
-                    {selectedReport.section.name}
-                </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Subject">
-                <Tag icon={<BookOutlined />} color="purple">
-                    {selectedReport.subject.name}
-                </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Report Date">
-                <CalendarOutlined style={{ marginRight: 8 }} />
-                {new Date(selectedReport.report_date).toLocaleDateString()}
-            </Descriptions.Item>
-            <Descriptions.Item label="Last Updated">
-                <ClockCircleOutlined style={{ marginRight: 8 }} />
-                {new Date(selectedReport.updated_at).toLocaleDateString()}
-            </Descriptions.Item>
-        </Descriptions>
-    );
-
-    const renderRemarksTab = () => (
-        <Card 
-            style={{ 
-                background: '#fafafa',
-                border: '1px solid #f0f0f0'
-            }}
-            bodyStyle={{ padding: isSmallMobile ? 16 : 24 }}
-        >
-            <Text style={{ 
-                fontSize: isSmallMobile ? 13 : 15, 
-                lineHeight: 1.6,
-                display: 'block'
-            }}>
-                {selectedReport.overall_remarks}
-            </Text>
-        </Card>
-    );
-
-    const SectionButtons = () => (
-        <Row gutter={[8, 8]} style={{ marginBottom: 16 }}>
-            {sections.map(section => (
-                <Col key={section.id}>
-                    <Button
-                        type={selectedSection === section.id ? 'primary' : 'default'}
-                        onClick={() => fetchReportsBySection(section.id)}
-                        icon={<TeamOutlined />}
-                        size={isSmallMobile ? 'small' : 'middle'}
-                        style={{ 
-                            minWidth: isSmallMobile ? 80 : 100,
-                            fontSize: isSmallMobile ? '12px' : '14px'
-                        }}
-                    >
-                        {section.name}
-                    </Button>
-                </Col>
-            ))}
-        </Row>
-    );
 
     return (
-        <Layout style={{ minHeight: '100vh' }}>
-            <Content style={{ 
-                padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '24px'),
-                background: '#f5f7fa'
-            }}>
-                <Card
-                    title={
-                        <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: '8px'
-                        }}>
-                            {isMobile && (
-                                <Button 
-                                    icon={<MenuOutlined />}
-                                    type="text"
-                                    onClick={() => setMobileDrawerVisible(true)}
-                                    style={{ marginRight: 8 }}
-                                />
-                            )}
-                            <Title level={isSmallMobile ? 4 : 2} style={{ margin: 0 }}>
-                                Student Reports
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+            <Card
+                className="apex-card"
+                title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                            <FileTextOutlined />
+                        </div>
+                        <div>
+                            <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                                Student Performance Reports
                             </Title>
+                            <Text style={{ color: '#64748b', fontSize: 12 }}>Filter performance evaluation reports by section</Text>
                         </div>
-                    }
-                    extra={
-                        <Space>
-                            {selectedRowKeys.length > 0 && (
-                                <Button 
-                                    danger
-                                    icon={<DeleteFilled />}
-                                    onClick={handleBulkDelete}
-                                    loading={bulkDeleteLoading}
-                                    size={isSmallMobile ? 'small' : 'middle'}
-                                >
-                                    Delete Selected ({selectedRowKeys.length})
-                                </Button>
-                            )}
-                            {!isMobile && (
-                                <Text type="secondary" style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                                    {new Date().toLocaleDateString('en-US', { 
-                                        weekday: 'long', 
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric' 
-                                    })}
-                                </Text>
-                            )}
-                        </Space>
-                    }
-                    bordered={false}
-                    style={{ 
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.09)',
-                        borderRadius: '8px'
-                    }}
-                    bodyStyle={{ 
-                        padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '24px')
-                    }}
-                >
-                    {isMobile ? (
-                        <>
-                            <Button 
-                                icon={<TeamOutlined />}
-                                onClick={() => setMobileDrawerVisible(true)}
-                                style={{ marginBottom: 16 }}
-                                block
-                            >
-                                Select Section
-                            </Button>
-                            <Drawer
-                                title="Select Section"
-                                placement="left"
-                                onClose={() => setMobileDrawerVisible(false)}
-                                open={mobileDrawerVisible}
-                                width={250}
-                            >
-                                <SectionButtons />
-                            </Drawer>
-                        </>
-                    ) : (
-                        <SectionButtons />
-                    )}
-
-                    {selectedSection && (
-                        <>
-                            {selectedRowKeys.length > 0 && (
-                                <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
-                                    <Text>
-                                        Selected <strong>{selectedRowKeys.length}</strong> report(s)
-                                    </Text>
-                                </div>
-                            )}
-                            <Spin spinning={loading}>
-                                <Table 
-                                    columns={columns} 
-                                    dataSource={reports} 
-                                    rowKey="id"
-                                    rowSelection={rowSelection}
-                                    bordered
-                                    size={isSmallMobile ? 'small' : 'middle'}
-                                    locale={{ emptyText: 'No reports found for this section' }}
-                                    pagination={{
-                                        pageSize: 10,
-                                        showSizeChanger: false,
-                                        showTotal: (total) => `Total ${total} students`,
-                                        simple: isMobile,
-                                        size: isSmallMobile ? 'small' : 'default'
-                                    }}
-                                    scroll={{ x: isMobile ? 500 : true }}
-                                />
-                            </Spin>
-                        </>
-                    )}
-                </Card>
-
-                {/* Bulk Delete Confirmation Modal */}
-                <Modal
-                    title="Confirm Bulk Delete"
-                    open={isBulkDeleteModalVisible}
-                    onOk={confirmBulkDelete}
-                    onCancel={() => setIsBulkDeleteModalVisible(false)}
-                    okText="Yes, Delete All"
-                    cancelText="Cancel"
-                    okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
-                >
-                    <p>
-                        Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected report(s)?
-                    </p>
-                    <p style={{ color: '#ff4d4f' }}>
-                        This action cannot be undone.
-                    </p>
-                    <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
-                        {reports
-                            .filter(r => selectedRowKeys.includes(r.id))
-                            .map(r => (
-                                <div key={r.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <Text>
-                                        {r.student.name} - {r.section.name} ({r.subject.name})
-                                    </Text>
-                                </div>
-                            ))
-                        }
                     </div>
-                </Modal>
-
-                {/* Report Details Modal */}
-                <Modal
-                    title={
-                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <Avatar 
-                                size={isSmallMobile ? "default" : "large"}
-                                icon={<UserOutlined />} 
-                                style={{ 
-                                    marginRight: 12,
-                                    backgroundColor: '#1890ff',
-                                    flexShrink: 0
-                                }} 
-                            />
-                            <span>
-                                <div style={{ 
-                                    fontSize: isSmallMobile ? '14px' : '16px',
-                                    fontWeight: 'bold'
-                                }}>
-                                    {selectedReport?.student?.name || 'Student Report'}
-                                </div>
-                                <div style={{ 
-                                    fontSize: isSmallMobile ? '12px' : '14px', 
-                                    fontWeight: 'normal', 
-                                    color: '#666' 
-                                }}>
-                                    {selectedReport?.section?.name} • {selectedReport?.subject?.name}
-                                </div>
-                            </span>
-                        </div>
-                    }
-                    visible={modalVisible}
-                    onCancel={() => setModalVisible(false)}
-                    footer={[
-                        <Button key="print" icon={<PrinterOutlined />} onClick={handlePrint}>
-                            Print Report
-                        </Button>,
-                        <Button key="close" onClick={() => setModalVisible(false)}>
-                            Close
+                }
+                extra={
+                    selectedRowKeys.length > 0 && (
+                        <Button 
+                            danger
+                            icon={<DeleteFilled />}
+                            onClick={handleBulkDelete}
+                            loading={bulkDeleteLoading}
+                            style={{ borderRadius: 8 }}
+                        >
+                            Delete Selected ({selectedRowKeys.length})
                         </Button>
-                    ]}
-                    width={isMobile ? '95%' : 800}
-                    bodyStyle={{ 
-                        padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '24px'),
-                        maxHeight: '70vh',
-                        overflowY: 'auto'
-                    }}
-                    centered
-                >
-                    {selectedReport && (
-                        <>
-                            <Tabs 
-                                activeKey={activeTab} 
-                                onChange={setActiveTab}
-                                animated
-                                size={isSmallMobile ? 'small' : 'default'}
-                            >
-                                <TabPane tab="Performance" key="performance">
-                                    {renderPerformanceTab()}
-                                </TabPane>
-                                <TabPane tab="Details" key="details">
-                                    {renderDetailsTab()}
-                                </TabPane>
-                                <TabPane tab="Remarks" key="remarks">
-                                    {renderRemarksTab()}
-                                </TabPane>
-                            </Tabs>
-
-                            <Divider style={{ margin: '16px 0' }} />
-
-                            <Row justify="space-between" align="middle">
-                                <Col>
-                                    <Statistic
-                                        title="Overall Score"
-                                        value={(
-                                            (selectedReport.performance_metrics.academic_performance +
-                                             selectedReport.performance_metrics.punctuality +
-                                             selectedReport.performance_metrics.homework_completion) / 3
-                                        ).toFixed(1)}
-                                        suffix="/ 5.0"
-                                        valueStyle={{ 
-                                            color: getProgressColor((
-                                                selectedReport.performance_metrics.academic_performance +
-                                                selectedReport.performance_metrics.punctuality +
-                                                selectedReport.performance_metrics.homework_completion
-                                            ) / 3),
-                                            fontSize: isSmallMobile ? '16px' : '20px'
+                    )
+                }
+            >
+                {/* Section Buttons */}
+                <div style={{ marginBottom: 20 }}>
+                    <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 10, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Select Section:
+                    </Text>
+                    <Row gutter={[10, 10]}>
+                        {sections.map(section => {
+                            const isSelected = selectedSection === section.id;
+                            return (
+                                <Col key={section.id}>
+                                    <Button
+                                        type={isSelected ? 'primary' : 'default'}
+                                        onClick={() => fetchReportsBySection(section.id)}
+                                        icon={<TeamOutlined />}
+                                        className={isSelected ? 'apex-btn-gold' : ''}
+                                        style={{ 
+                                            borderRadius: 8,
+                                            fontWeight: 600,
+                                            borderColor: isSelected ? '#d4af37' : '#cbd5e1'
                                         }}
-                                    />
+                                    >
+                                        Section {section.name}
+                                    </Button>
                                 </Col>
-                                <Col>
-                                    <Text type="secondary" style={{ fontSize: isSmallMobile ? '11px' : '12px' }}>
-                                        Last updated: {new Date(selectedReport.updated_at).toLocaleDateString()}
-                                    </Text>
-                                </Col>
-                            </Row>
-                        </>
-                    )}
-                </Modal>
-            </Content>
-        </Layout>
+                            );
+                        })}
+                    </Row>
+                </div>
+
+                {/* Table Content */}
+                {selectedSection ? (
+                    <Table 
+                        columns={columns} 
+                        dataSource={reports} 
+                        rowKey="id"
+                        rowSelection={rowSelection}
+                        loading={loading}
+                        scroll={{ x: 'max-content' }}
+                        pagination={{
+                            pageSize: 10,
+                            showTotal: (total) => `Total ${total} student reports`
+                        }}
+                    />
+                ) : (
+                    <div style={{ padding: '40px 0', textAlign: 'center', background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+                        <TeamOutlined style={{ fontSize: 36, color: '#94a3b8', marginBottom: 12 }} />
+                        <Title level={5} style={{ color: '#64748b', margin: 0 }}>Please select a section above to view reports</Title>
+                    </div>
+                )}
+            </Card>
+
+            {/* Bulk Delete Modal */}
+            <Modal
+                title="Confirm Bulk Deletion"
+                open={isBulkDeleteModalVisible}
+                onOk={confirmBulkDelete}
+                onCancel={() => setIsBulkDeleteModalVisible(false)}
+                okText="Yes, Delete All"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
+                centered
+            >
+                <p>Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected student report(s)?</p>
+                <p style={{ color: '#ef4444', fontWeight: 600 }}>This action cannot be undone.</p>
+            </Modal>
+
+            {/* View Details Modal */}
+            <Modal
+                title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Avatar size="large" style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }} icon={<UserOutlined />} />
+                        <div>
+                            <div style={{ fontSize: 16, fontWeight: 'bold', color: '#0b1b3d' }}>
+                                {selectedReport?.student?.name || 'Student Report'}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>
+                                Section: {selectedReport?.section?.name} • Subject: {selectedReport?.subject?.name}
+                            </div>
+                        </div>
+                    </div>
+                }
+                open={modalVisible}
+                onCancel={() => setModalVisible(false)}
+                footer={[
+                    <Button key="print" icon={<PrinterOutlined />} onClick={handlePrint} className="apex-btn-gold">
+                        Print Report
+                    </Button>,
+                    <Button key="close" onClick={() => setModalVisible(false)} style={{ borderRadius: 8 }}>
+                        Close
+                    </Button>
+                ]}
+                width={750}
+                centered
+            >
+                {selectedReport && (
+                    <div id="report-print-content" style={{ paddingTop: 12 }}>
+                        <Descriptions title="Student Report Overview" bordered size="small" column={{ xs: 1, sm: 2 }}>
+                            <Descriptions.Item label="Student Name">{selectedReport.student.name}</Descriptions.Item>
+                            <Descriptions.Item label="Section">{selectedReport.section.name}</Descriptions.Item>
+                            <Descriptions.Item label="Subject">{selectedReport.subject.name}</Descriptions.Item>
+                            <Descriptions.Item label="Report Date">{new Date(selectedReport.report_date).toLocaleDateString()}</Descriptions.Item>
+                        </Descriptions>
+
+                        <Divider style={{ margin: '16px 0' }} />
+                        <Title level={5} style={{ color: '#0b1b3d' }}>Performance Breakdown</Title>
+                        
+                        <Row gutter={[16, 16]}>
+                            <Col xs={24} sm={8}>
+                                <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, textAlign: 'center' }}>
+                                    <Statistic title="Academic" value={selectedReport.performance_metrics.academic_performance} suffix="/ 5" valueStyle={{ color: getProgressColor(selectedReport.performance_metrics.academic_performance) }} />
+                                </Card>
+                            </Col>
+                            <Col xs={24} sm={8}>
+                                <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, textAlign: 'center' }}>
+                                    <Statistic title="Punctuality" value={selectedReport.performance_metrics.punctuality} suffix="/ 5" valueStyle={{ color: getProgressColor(selectedReport.performance_metrics.punctuality) }} />
+                                </Card>
+                            </Col>
+                            <Col xs={24} sm={8}>
+                                <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, textAlign: 'center' }}>
+                                    <Statistic title="Homework" value={selectedReport.performance_metrics.homework_completion} suffix="/ 5" valueStyle={{ color: getProgressColor(selectedReport.performance_metrics.homework_completion) }} />
+                                </Card>
+                            </Col>
+                        </Row>
+
+                        <Divider style={{ margin: '16px 0' }} />
+                        <Title level={5} style={{ color: '#0b1b3d' }}>Teacher Remarks</Title>
+                        <Card size="small" style={{ background: '#f8fafc', borderLeft: '4px solid #d4af37', borderRadius: '0 8px 8px 0' }}>
+                            <Text style={{ fontSize: 14 }}>{selectedReport.overall_remarks || 'No remarks provided.'}</Text>
+                        </Card>
+                    </div>
+                )}
+            </Modal>
+        </div>
     );
 };
 

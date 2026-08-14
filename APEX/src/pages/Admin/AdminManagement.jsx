@@ -12,40 +12,32 @@ import {
   Typography, 
   Tag, 
   Avatar, 
-  Divider,
-  Tooltip,
-  Row,
-  Col,
-  Badge,
-  Grid,
-  Select,
-  Drawer,
-  Statistic,
-  Empty,
-  Switch
+  Tooltip, 
+  Row, 
+  Col, 
+  Badge, 
+  Select, 
+  Statistic, 
+  Switch 
 } from 'antd';
 import { 
   EditOutlined, 
   DeleteOutlined, 
-  PlusOutlined,
-  UserOutlined,
-  MailOutlined,
-  LockOutlined,
-  TeamOutlined,
-  SearchOutlined,
-  ReloadOutlined,
-  EyeOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined
+  PlusOutlined, 
+  UserOutlined, 
+  MailOutlined, 
+  LockOutlined, 
+  TeamOutlined, 
+  SearchOutlined, 
+  ReloadOutlined, 
+  EyeOutlined, 
+  CheckCircleOutlined, 
+  CrownOutlined 
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-
-dayjs.extend(relativeTime);
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const { useBreakpoint } = Grid;
 const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
 
 const AdminManagement = () => {
@@ -60,28 +52,30 @@ const AdminManagement = () => {
   const [filteredAdmins, setFilteredAdmins] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const screens = useBreakpoint();
 
-  // Fetch all admins
+  useEffect(() => {
+    fetchAdmins();
+  }, []);
+
+  useEffect(() => {
+    filterAdmins();
+  }, [searchText, statusFilter, admins]);
+
   const fetchAdmins = async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}read_admin.php`, {
         credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-        }
+        headers: { 'Accept': 'application/json' }
       });
       
       if (!response.ok) throw new Error('Failed to fetch admins');
-      
       const data = await response.json();
       
       if (data.status === 'success' || data.success) {
-        // Ensure all admins have a status field
         const adminsWithStatus = (data.data || []).map(admin => ({
           ...admin,
-          status: admin.status || 'active' // Default to active if status is missing
+          status: admin.status || 'active'
         }));
         setAdmins(adminsWithStatus);
         setFilteredAdmins(adminsWithStatus);
@@ -95,45 +89,43 @@ const AdminManagement = () => {
     }
   };
 
-  // Create or update admin
+  const filterAdmins = () => {
+    let result = [...admins];
+    if (searchText) {
+      const query = searchText.toLowerCase();
+      result = result.filter(a => 
+        a.name?.toLowerCase().includes(query) || 
+        a.email?.toLowerCase().includes(query) || 
+        a.designation?.toLowerCase().includes(query)
+      );
+    }
+    if (statusFilter !== 'all') {
+      result = result.filter(a => a.status === statusFilter);
+    }
+    setFilteredAdmins(result);
+  };
+
   const handleSubmit = async (values) => {
     setSubmitLoading(true);
     try {
-      const url = currentAdmin 
-        ? `${API_BASE_URL}admindataupdate.php?id=${currentAdmin.id}`
-        : `${API_BASE_URL}AddAdmin.php`;
+      const endpoint = isEditing ? 'update_admin.php' : 'create_admin.php';
+      const payload = isEditing ? { ...values, id: currentAdmin.id } : values;
       
-      const method = currentAdmin ? 'PUT' : 'POST';
-      
-      // Prepare the request body with proper status handling
-      const requestBody = {
-        ...values,
-        status: values.status ? 'active' : 'inactive' // Convert boolean to string
-      };
-      
-      if (currentAdmin) {
-        requestBody.id = currentAdmin.id;
-      }
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(payload)
       });
       
       const data = await response.json();
-      
       if (data.status === 'success' || data.success) {
-        message.success(data.message || (currentAdmin ? 'Admin updated successfully' : 'Admin created successfully'));
-        fetchAdmins();
+        message.success(isEditing ? 'Admin updated successfully' : 'Admin created successfully');
         setIsModalVisible(false);
         form.resetFields();
-        setCurrentAdmin(null);
+        fetchAdmins();
       } else {
-        throw new Error(data.message || (currentAdmin ? 'Failed to update admin' : 'Failed to create admin'));
+        throw new Error(data.message || 'Action failed');
       }
     } catch (error) {
       message.error(error.message);
@@ -142,571 +134,274 @@ const AdminManagement = () => {
     }
   };
 
-  // Delete admin
   const handleDelete = async (id) => {
-    setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}adminsdelete.php?id=${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await fetch(`${API_BASE_URL}delete_admin.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id })
       });
-      
       const data = await response.json();
-      
-      if (data.status === 'success') {
-        message.success(data.message || 'Admin deleted successfully');
+      if (data.status === 'success' || data.success) {
+        message.success('Admin deleted successfully');
         fetchAdmins();
       } else {
         throw new Error(data.message || 'Failed to delete admin');
       }
     } catch (error) {
       message.error(error.message);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Handle filters
-  const handleFilter = () => {
-    let filtered = admins;
-
-    // Filter by search text
-    if (searchText) {
-      filtered = filtered.filter(admin => 
-        admin.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-        admin.email?.toLowerCase().includes(searchText.toLowerCase()) ||
-        admin.designation?.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(admin => admin.status === statusFilter);
-    }
-
-    setFilteredAdmins(filtered);
+  const openCreateModal = () => {
+    setIsEditing(false);
+    setCurrentAdmin(null);
+    form.resetFields();
+    setIsModalVisible(true);
   };
 
-  // Handle reset
-  const handleReset = () => {
-    setSearchText('');
-    setStatusFilter('all');
-    setFilteredAdmins(admins);
+  const openEditModal = (admin) => {
+    setIsEditing(true);
+    setCurrentAdmin(admin);
+    form.setFieldsValue({
+      name: admin.name,
+      email: admin.email,
+      designation: admin.designation,
+      is_super_admin: admin.is_super_admin === 1 || admin.is_super_admin === '1',
+      status: admin.status || 'active'
+    });
+    setIsModalVisible(true);
   };
 
-  // Handle view admin details
-  const handleView = (admin) => {
+  const openViewModal = (admin) => {
     setCurrentAdmin(admin);
     setIsViewModalVisible(true);
   };
 
-  // Handle edit admin
-  const handleEdit = (admin) => {
-    setCurrentAdmin(admin);
-    setIsEditing(true);
-    form.setFieldsValue({
-      ...admin,
-      status: admin.status === 'active', // Convert string to boolean for switch
-      password: '' // Clear password field for security
-    });
-    setIsModalVisible(true);
-  };
-
-  // Handle add new admin
-  const handleAdd = () => {
-    setCurrentAdmin(null);
-    setIsEditing(false);
-    form.resetFields();
-    form.setFieldsValue({
-      status: true // Default to active for new admins
-    });
-    setIsModalVisible(true);
-  };
-
-  // Get status display
-  const getStatusDisplay = (status) => {
-    return status === 'active' ? 'Active' : 'Inactive';
-  };
-
-  // Get status color
-  const getStatusColor = (status) => {
-    return status === 'active' ? 'green' : 'red';
-  };
-
-  // Get status badge
-  const getStatusBadge = (status) => {
-    return status === 'active' ? 'success' : 'error';
-  };
-
-  // Responsive columns configuration
-  const getColumns = () => {
-    const baseColumns = [
-      {
-        title: 'Admin',
-        dataIndex: 'name',
-        key: 'name',
-        fixed: screens.xs ? false : 'left',
-        width: screens.xs ? 'auto' : 200,
-        render: (text, record) => (
-          <Space>
-            <Avatar 
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(record.name)}&background=7265e6&color=fff`}
-              icon={<UserOutlined />}
-              size={screens.xs ? 'small' : 'default'}
-            />
-            <div>
-              <Text strong style={{ fontSize: screens.xs ? '12px' : '14px' }}>
-                {text}
-              </Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: screens.xs ? '10px' : '12px' }}>
-                {record.email}
-              </Text>
-            </div>
-          </Space>
-        ),
-      },
-      {
-        title: 'Designation',
-        dataIndex: 'designation',
-        key: 'designation',
-        responsive: ['md'],
-        render: (text) => text ? (
-          <Tag color="blue" style={{ fontSize: screens.xs ? '10px' : '12px' }}>
-            {text}
+  const columns = [
+    {
+      title: 'Administrator',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name, record) => (
+        <Space>
+          <Avatar style={{ background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', fontWeight: 700 }}>
+            {name?.charAt(0)?.toUpperCase() || 'A'}
+          </Avatar>
+          <div>
+            <Text strong style={{ color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
+              {name} {record.is_super_admin === 1 && <CrownOutlined style={{ color: '#d4af37', marginLeft: 4 }} />}
+            </Text>
+            <Text style={{ fontSize: 11, color: '#64748b' }}>{record.designation || 'System Admin'}</Text>
+          </div>
+        </Space>
+      )
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      render: (email) => (
+        <Text style={{ color: '#334155' }}>
+          <MailOutlined style={{ marginRight: 6, color: '#1e3a8a' }} />
+          {email}
+        </Text>
+      )
+    },
+    {
+      title: 'Role',
+      dataIndex: 'is_super_admin',
+      key: 'role',
+      align: 'center',
+      render: (isSuper) => (
+        isSuper === 1 || isSuper === '1' ? (
+          <Tag color="gold" style={{ background: '#fefce8', color: '#b8860b', border: '1px solid rgba(212, 175, 55, 0.3)', borderRadius: 12, fontWeight: 700 }}>
+            👑 Super Admin
           </Tag>
-        ) : '-',
-      },
-      {
-        title: 'Status',
-        dataIndex: 'status',
-        key: 'status',
-        width: screens.xs ? 80 : 100,
-        render: (status) => (
-          <Badge 
-            status={getStatusBadge(status)} 
-            text={
-              <span style={{ fontSize: screens.xs ? '10px' : '12px' }}>
-                {getStatusDisplay(status)}
-              </span>
-            }
-          />
-        ),
-      },
-      {
-        title: 'Created',
-        dataIndex: 'created_at',
-        key: 'created_at',
-        responsive: ['lg'],
-        width: 120,
-        render: (date) => date ? (
-          <Tooltip title={dayjs(date).format('DD MMM YYYY, hh:mm A')}>
-            <span style={{ fontSize: screens.xs ? '10px' : '12px' }}>
-              {dayjs(date).fromNow()}
-            </span>
-          </Tooltip>
-        ) : '-',
-      }
-    ];
-
-    const actionColumn = {
+        ) : (
+          <Tag color="blue" style={{ borderRadius: 12 }}>Sub Admin</Tag>
+        )
+      )
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      align: 'center',
+      render: (status) => (
+        status === 'active' ? (
+          <Tag icon={<CheckCircleOutlined />} color="success" style={{ borderRadius: 12, padding: '2px 10px' }}>Active</Tag>
+        ) : (
+          <Tag color="error" style={{ borderRadius: 12 }}>Inactive</Tag>
+        )
+      )
+    },
+    {
       title: 'Actions',
       key: 'actions',
-      align: 'right',
-      width: screens.xs ? 100 : 150,
-      fixed: screens.xs ? false : 'right',
+      align: 'center',
+      width: 150,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="View Details">
-            <Button 
-              type="text" 
-              size="small"
-              icon={<EyeOutlined />} 
-              onClick={() => handleView(record)}
-            />
+            <Button type="primary" icon={<EyeOutlined />} onClick={() => openViewModal(record)} size="small" style={{ background: '#0b1b3d', borderRadius: 6 }} />
           </Tooltip>
-          <Tooltip title="Edit">
-            <Button 
-              type="text" 
-              size="small"
-              icon={<EditOutlined />} 
-              onClick={() => handleEdit(record)}
-            />
+          <Tooltip title="Edit Admin">
+            <Button type="primary" icon={<EditOutlined />} onClick={() => openEditModal(record)} size="small" style={{ background: '#1e3a8a', borderRadius: 6 }} />
           </Tooltip>
-          <Tooltip title="Delete">
-            <Popconfirm
-              title="Are you sure to delete this admin?"
-              description="This action cannot be undone."
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-              placement="leftTop"
-            >
-              <Button 
-                type="text" 
-                danger 
-                size="small"
-                icon={<DeleteOutlined />}
-              />
-            </Popconfirm>
-          </Tooltip>
+          <Popconfirm title="Delete Admin" description="Are you sure to delete this admin user?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No" okButtonProps={{ danger: true }}>
+            <Tooltip title="Delete Admin">
+              <Button type="primary" danger icon={<DeleteOutlined />} size="small" style={{ borderRadius: 6 }} />
+            </Tooltip>
+          </Popconfirm>
         </Space>
-      ),
-    };
-
-    return [...baseColumns, actionColumn];
-  };
-
-  useEffect(() => {
-    fetchAdmins();
-  }, []);
-
-  useEffect(() => {
-    handleFilter();
-  }, [searchText, statusFilter, admins]);
-
-  const statsData = [
-    {
-      title: 'Total Admins',
-      value: admins.length,
-      prefix: <TeamOutlined />,
-      valueStyle: { color: '#1890ff' }
-    },
-    {
-      title: 'Active',
-      value: admins.filter(a => a.status === 'active').length,
-      prefix: <CheckCircleOutlined />,
-      valueStyle: { color: '#52c41a' }
-    },
-    {
-      title: 'Inactive',
-      value: admins.filter(a => a.status === 'inactive').length,
-      prefix: <CloseCircleOutlined />,
-      valueStyle: { color: '#ff4d4f' }
+      )
     }
   ];
 
-  const renderForm = () => (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={handleSubmit}
-    >
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          <Form.Item
-            label="Full Name"
-            name="name"
-            rules={[{ required: true, message: 'Please input the name!' }]}
-          >
-            <Input 
-              prefix={<UserOutlined />} 
-              placeholder="Enter full name" 
-              size="large" 
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[
-              { required: true, message: 'Please input the email!' },
-              { type: 'email', message: 'Please enter a valid email!' }
-            ]}
-          >
-            <Input 
-              prefix={<MailOutlined />} 
-              placeholder="Enter email address" 
-              size="large" 
-            />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          {!isEditing && (
-            <Form.Item
-              label="Password"
-              name="password"
-              rules={[
-                { required: true, message: 'Please input the password!' },
-                { min: 6, message: 'Password must be at least 6 characters!' }
-              ]}
-            >
-              <Input.Password 
-                prefix={<LockOutlined />} 
-                placeholder="Enter password" 
-                size="large"
-              />
-            </Form.Item>
-          )}
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item
-            label="Designation"
-            name="designation"
-            rules={[{ required: true, message: 'Please input the designation!' }]}
-          >
-            <Input 
-              placeholder="Enter designation" 
-              size="large" 
-            />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Form.Item
-        label="Status"
-        name="status"
-        valuePropName="checked"
-      >
-        <Switch 
-          checkedChildren="Active" 
-          unCheckedChildren="Inactive" 
-        />
-      </Form.Item>
-
-      <Divider />
-
-      <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-        <Space>
-          <Button 
-            onClick={() => {
-              setIsModalVisible(false);
-              form.resetFields();
-              setCurrentAdmin(null);
-            }}
-            size="large"
-          >
-            Cancel
-          </Button>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            loading={submitLoading}
-            size="large"
-            icon={isEditing ? <EditOutlined /> : <PlusOutlined />}
-          >
-            {isEditing ? 'Update Admin' : 'Add Admin'}
-          </Button>
-        </Space>
-      </Form.Item>
-    </Form>
-  );
-
   return (
-    <div style={{ 
-      padding: screens.xs ? '12px' : '24px', 
-      background: '#f5f7fa', 
-      minHeight: '100vh' 
-    }}>
-      {/* Statistics Row */}
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      {/* Stat Cards Row */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {statsData.map((stat, index) => (
-          <Col xs={8} sm={8} md={6} lg={6} xl={6} key={index}>
-            <Card size="small" style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.09)' }}>
-              <Statistic
-                title={stat.title}
-                value={stat.value}
-                prefix={stat.prefix}
-                valueStyle={stat.valueStyle}
-              />
-            </Card>
-          </Col>
-        ))}
+        <Col xs={24} sm={8}>
+          <Card size="small" className="apex-card" bodyStyle={{ padding: 16 }}>
+            <Statistic title="Total Administrators" value={admins.length} prefix={<TeamOutlined style={{ color: '#0b1b3d' }} />} valueStyle={{ color: '#0b1b3d', fontWeight: 800 }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card size="small" className="apex-card" bodyStyle={{ padding: 16 }}>
+            <Statistic title="Super Administrators" value={admins.filter(a => a.is_super_admin === 1 || a.is_super_admin === '1').length} prefix={<CrownOutlined style={{ color: '#d4af37' }} />} valueStyle={{ color: '#b8860b', fontWeight: 800 }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card size="small" className="apex-card" bodyStyle={{ padding: 16 }}>
+            <Statistic title="Active Admin Accounts" value={admins.filter(a => a.status === 'active').length} prefix={<CheckCircleOutlined style={{ color: '#10b981' }} />} valueStyle={{ color: '#10b981', fontWeight: 800 }} />
+          </Card>
+        </Col>
       </Row>
 
+      {/* Main Admin Management Card */}
       <Card
+        className="apex-card"
         title={
-          <Row justify="space-between" align="middle" gutter={[16, 16]}>
-            <Col>
-              <Title level={4} style={{ margin: 0, fontSize: screens.xs ? '16px' : '20px' }}>
-                <TeamOutlined style={{ marginRight: 8 }} />
-                Admin Management
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <LockOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                System Admin Users & Roles
               </Title>
-            </Col>
-            <Col>
-              <Space wrap size={screens.xs ? 'small' : 'middle'}>
-                <Input
-                  placeholder="Search admins..."
-                  prefix={<SearchOutlined />}
-                  allowClear
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  style={{ width: screens.xs ? 150 : 200 }}
-                  size={screens.xs ? 'small' : 'middle'}
-                />
-                <Select
-                  placeholder="Status"
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                  style={{ width: screens.xs ? 100 : 120 }}
-                  size={screens.xs ? 'small' : 'middle'}
-                  allowClear
-                >
-                  <Option value="all">All</Option>
-                  <Option value="active">Active</Option>
-                  <Option value="inactive">Inactive</Option>
-                </Select>
-                <Button 
-                  icon={<ReloadOutlined />} 
-                  onClick={handleReset}
-                  size={screens.xs ? 'small' : 'middle'}
-                >
-                  {screens.xs ? '' : 'Reset'}
-                </Button>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />}
-                  onClick={handleAdd}
-                  size={screens.xs ? 'small' : 'middle'}
-                >
-                  {screens.xs ? '' : 'Add Admin'}
-                </Button>
-              </Space>
-            </Col>
-          </Row>
+              <Text style={{ color: '#64748b', fontSize: 12 }}>Manage administrative accounts, role levels, and account access</Text>
+            </div>
+          </div>
         }
-        bordered={false}
-        style={{ 
-          boxShadow: '0 2px 8px rgba(0,0,0,0.09)', 
-          borderRadius: 8,
-          overflow: 'hidden'
-        }}
-        bodyStyle={{ padding: screens.xs ? '12px' : '16px' }}
+        extra={
+          <Space wrap>
+            <Input placeholder="Search admin..." prefix={<SearchOutlined style={{ color: '#94a3b8' }} />} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear style={{ width: 200, borderRadius: 8 }} />
+            <Button type="text" icon={<ReloadOutlined />} onClick={fetchAdmins} loading={loading} style={{ borderRadius: 8 }} />
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal} className="apex-btn-gold">
+              Add New Admin
+            </Button>
+          </Space>
+        }
       >
         <Table
-          columns={getColumns()}
+          columns={columns}
           dataSource={filteredAdmins}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 800 }}
-          size={screens.xs ? 'small' : 'middle'}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: !screens.xs,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} of ${total} admins`
-          }}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Text type="secondary">
-                    No admins found
-                  </Text>
-                }
-              >
-                <Button type="primary" onClick={handleAdd}>
-                  Add First Admin
-                </Button>
-              </Empty>
-            )
-          }}
+          scroll={{ x: 'max-content' }}
+          pagination={{ pageSize: 10 }}
         />
       </Card>
 
-      {/* Add/Edit Modal */}
+      {/* Create / Edit Admin Modal */}
       <Modal
-        title={isEditing ? 'Edit Admin' : 'Add New Admin'}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <LockOutlined style={{ color: '#d4af37' }} />
+            <span>{isEditing ? `Edit Admin #${currentAdmin?.id}` : 'Create System Admin'}</span>
+          </div>
+        }
         open={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          form.resetFields();
-          setCurrentAdmin(null);
-        }}
+        onCancel={() => setIsModalVisible(false)}
         footer={null}
-        destroyOnClose
-        width={screens.xs ? '90%' : 700}
-        style={{ 
-          top: 20,
-          maxWidth: '95vw'
-        }}
-        bodyStyle={{
-          padding: '20px',
-          maxHeight: '80vh',
-          overflowY: 'auto'
-        }}
+        width={600}
+        centered
       >
-        {renderForm()}
+        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ paddingTop: 12 }}>
+          <Row gutter={[16, 8]}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="name" label={<Text strong>Full Name</Text>} rules={[{ required: true, message: 'Please enter name' }]}>
+                <Input placeholder="John Doe" prefix={<UserOutlined />} style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="email" label={<Text strong>Email Address</Text>} rules={[{ required: true, type: 'email', message: 'Please enter email' }]}>
+                <Input placeholder="admin@apex.edu" prefix={<MailOutlined />} style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="designation" label={<Text strong>Designation</Text>} rules={[{ required: true, message: 'Please enter designation' }]}>
+                <Input placeholder="IT Manager / System Director" style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="password" label={<Text strong>{isEditing ? 'Password (Leave blank to keep)' : 'Password'}</Text>} rules={[{ required: !isEditing, message: 'Please set password' }]}>
+                <Input.Password placeholder="Set account password" prefix={<LockOutlined />} style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="is_super_admin" label={<Text strong>Super Admin Rights</Text>} valuePropName="checked">
+                <Switch checkedChildren="Super Admin" unCheckedChildren="Standard Admin" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="status" label={<Text strong>Account Status</Text>} initialValue="active">
+                <Select style={{ borderRadius: 8 }}>
+                  <Option value="active">Active</Option>
+                  <Option value="inactive">Inactive</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Button type="primary" htmlType="submit" loading={submitLoading} block className="apex-btn-gold" style={{ height: 40, marginTop: 8 }}>
+                {isEditing ? 'Save Admin Details' : 'Create Admin Account'}
+              </Button>
+            </Col>
+          </Row>
+        </Form>
       </Modal>
 
-      {/* View Admin Modal */}
+      {/* View Admin Details Modal */}
       <Modal
-        title="Admin Details"
+        title="Admin User Account Details"
         open={isViewModalVisible}
         onCancel={() => setIsViewModalVisible(false)}
         footer={[
-          <Button 
-            key="edit" 
-            type="primary" 
-            onClick={() => {
-              setIsViewModalVisible(false);
-              handleEdit(currentAdmin);
-            }}
-          >
-            Edit Admin
-          </Button>,
-          <Button key="close" onClick={() => setIsViewModalVisible(false)}>
+          <Button key="close" onClick={() => setIsViewModalVisible(false)} style={{ borderRadius: 8 }}>
             Close
           </Button>
         ]}
-        width={600}
+        centered
       >
         {currentAdmin && (
-          <div>
-            <Row gutter={16} style={{ marginBottom: 24 }}>
-              <Col xs={24} sm={6}>
-                <Avatar 
-                  size={80}
-                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentAdmin.name)}&background=7265e6&color=fff`}
-                  icon={<UserOutlined />}
-                />
-              </Col>
-              <Col xs={24} sm={18}>
-                <Title level={4}>{currentAdmin.name}</Title>
-                <Text type="secondary">{currentAdmin.email}</Text>
-                <br />
-                <Tag color={getStatusColor(currentAdmin.status)}>
-                  {getStatusDisplay(currentAdmin.status)}
-                </Tag>
-              </Col>
-            </Row>
-
-            <Divider orientation="left">Details</Divider>
-
-            <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col xs={24} sm={12}>
-                <Text strong>Designation:</Text>
-                <br />
-                <Text>{currentAdmin.designation || '-'}</Text>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Text strong>Created At:</Text>
-                <br />
-                <Text>
-                  {currentAdmin.created_at 
-                    ? dayjs(currentAdmin.created_at).format('DD MMM YYYY, hh:mm A') 
-                    : '-'}
-                </Text>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Text strong>Last Updated:</Text>
-                <br />
-                <Text>
-                  {currentAdmin.updated_at 
-                    ? dayjs(currentAdmin.updated_at).format('DD MMM YYYY, hh:mm A') 
-                    : '-'}
-                </Text>
-              </Col>
-            </Row>
+          <div style={{ paddingTop: 12 }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <Avatar size={64} style={{ background: '#0b1b3d', color: '#d4af37', fontSize: 28, fontWeight: 700 }}>
+                {currentAdmin.name?.charAt(0)?.toUpperCase()}
+              </Avatar>
+              <Title level={4} style={{ margin: '8px 0 0 0', color: '#0b1b3d' }}>{currentAdmin.name}</Title>
+              <Text style={{ color: '#64748b' }}>{currentAdmin.designation || 'System Admin'}</Text>
+            </div>
+            <div style={{ background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+              <p><strong>Admin ID:</strong> #{currentAdmin.id}</p>
+              <p><strong>Email:</strong> {currentAdmin.email}</p>
+              <p><strong>Super Admin Status:</strong> {currentAdmin.is_super_admin === 1 ? '👑 Super Admin' : 'Standard Admin'}</p>
+              <p><strong>Account Status:</strong> {currentAdmin.status || 'active'}</p>
+            </div>
           </div>
         )}
       </Modal>

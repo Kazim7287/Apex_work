@@ -1,6 +1,3 @@
-/* eslint-disable no-unused-vars */
-/* eslint-disable react/no-unescaped-entities */
-/* eslint-disable react/prop-types */
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { BsPrinter } from 'react-icons/bs';
@@ -9,7 +6,10 @@ import {
   DeleteFilled, 
   CheckCircleOutlined, 
   ClockCircleOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  StarOutlined,
+  UserOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import { 
   Modal, 
@@ -28,11 +28,11 @@ import {
   Spin,
   Alert,
   Tooltip,
-  Grid
+  Progress,
+  Avatar
 } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
-const { useBreakpoint } = Grid;
 
 const TeacherEvaluations = () => {
   const [teachers, setTeachers] = useState([]);
@@ -53,12 +53,8 @@ const TeacherEvaluations = () => {
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   const printRef = useRef();
-  const screens = useBreakpoint();
-
-  // API Base URL
   const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
 
-  // Create axios instance
   const api = axios.create({
     baseURL: API_BASE,
     withCredentials: false,
@@ -67,38 +63,38 @@ const TeacherEvaluations = () => {
     }
   });
 
-  // Fetch teachers with evaluation status
   useEffect(() => {
-    const fetchTeachers = async () => {
-      setLoadingTeachers(true);
-      try {
-        const response = await api.get('teach_with_evaluation_status.php');
-        
-        if (response.data.success) {
-          setTeachers(response.data.data || []);
-          setEvaluatedTeachers(response.data.evaluated || []);
-          setNotEvaluatedTeachers(response.data.not_evaluated || []);
-        } else {
-          setError(response.data.error || 'Failed to fetch teachers');
-        }
-      } catch (err) {
-        setError(err.response?.data?.error || 'Network error. Please try again.');
-      } finally {
-        setLoadingTeachers(false);
-      }
-    };
-
     fetchTeachers();
   }, []);
+
+  const fetchTeachers = async () => {
+    setLoadingTeachers(true);
+    try {
+      const response = await api.get('teach_with_evaluation_status.php');
+      
+      if (response.data.success) {
+        setTeachers(response.data.data || []);
+        setEvaluatedTeachers(response.data.evaluated || []);
+        setNotEvaluatedTeachers(response.data.not_evaluated || []);
+      } else {
+        setError(response.data.error || 'Failed to fetch teachers');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Network error. Please try again.');
+    } finally {
+      setLoadingTeachers(false);
+    }
+  };
 
   const fetchEvaluations = async (id) => {
     if (!id) return;
     
     setLoading(true);
     setError('');
+    setSelectedRowKeys([]);
     
     try {
-      const response = await api.get(`fetch_evaluations.php`, {
+      const response = await api.get('fetch_evaluations.php', {
         params: {
           teacher_id: id,
           limit: 100,
@@ -106,77 +102,47 @@ const TeacherEvaluations = () => {
         }
       });
       
-      console.log('=== FETCH EVALUATIONS RESPONSE ===');
-      console.log('Full response:', response.data);
-      console.log('==================================');
-      
       if (response.data.success) {
-        // Extract data from response
-        const evaluationsData = response.data.data || [];
-        const teacherInfoData = response.data.teacher_info;
-        const averageRatingsData = response.data.average_ratings || {};
-        
-        console.log('Evaluations data length:', evaluationsData.length);
-        console.log('Teacher info:', teacherInfoData);
-        console.log('Average ratings:', averageRatingsData);
-        
-        // Update all states
-        setEvaluations(evaluationsData);
-        setTeacherInfo(teacherInfoData);
-        setAverageRatings(averageRatingsData);
-        setSelectedRowKeys([]);
-        
-        message.success(`Loaded ${evaluationsData.length} evaluations for ${teacherInfoData?.teach_name || 'teacher'}`);
+        setEvaluations(response.data.data || []);
+        setTeacherInfo(response.data.teacher_info || null);
+        setAverageRatings(response.data.average_ratings || {});
       } else {
         setError(response.data.error || 'Failed to fetch evaluations');
         setEvaluations([]);
-        message.warning('No evaluations found for this teacher');
+        setTeacherInfo(null);
+        setAverageRatings({});
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Network error. Please try again.');
       setEvaluations([]);
-      console.error('Fetch error:', err);
+      setTeacherInfo(null);
+      setAverageRatings({});
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTeacherSelect = (teacher) => {
-    console.log('Selected teacher:', teacher);
+  const handleSelectTeacher = (teacher) => {
     setSelectedTeacher(teacher);
-    setSelectedRowKeys([]);
-    setEvaluations([]);
-    setAverageRatings({});
-    setTeacherInfo(null);
     fetchEvaluations(teacher.id);
   };
 
-  // Handle single delete
-  const handleDelete = async (id) => {
+  const handleDeleteEvaluation = async (evaluationId) => {
     try {
-      const response = await api.delete(`delete_evaluation.php?id=${id}`);
+      const response = await api.delete(`delete_evaluation.php?id=${evaluationId}`);
       
       if (response.data.success) {
-        message.success(response.data.message || 'Evaluation deleted successfully');
-        
-        setEvaluations(prev => {
-          const newEvaluations = prev.filter(evaluation => evaluation.evaluation_id !== id);
-          console.log('After delete - evaluations count:', newEvaluations.length);
-          return newEvaluations;
-        });
-        setSelectedRowKeys(prev => prev.filter(key => key !== id));
-        
-        refreshTeacherStatus();
+        message.success('Evaluation deleted successfully');
+        fetchEvaluations(selectedTeacher?.id);
+        fetchTeachers();
       } else {
-        message.error(response.data.message || 'Delete failed');
+        message.error(response.data.error || 'Failed to delete evaluation');
       }
-    } catch (error) {
-      message.error('Error deleting evaluation');
-      console.error('Delete error:', error);
+    } catch (err) {
+      message.error(err.response?.data?.error || 'Network error. Please try again.');
     }
   };
 
-  // Handle bulk delete
   const handleBulkDelete = () => {
     if (selectedRowKeys.length === 0) {
       message.warning('Please select at least one evaluation to delete');
@@ -186,616 +152,298 @@ const TeacherEvaluations = () => {
   };
 
   const confirmBulkDelete = async () => {
+    setBulkDeleteLoading(true);
     try {
-      setBulkDeleteLoading(true);
-      setIsBulkDeleteModalVisible(false);
-      
       const idsParam = selectedRowKeys.join(',');
       const response = await api.delete(`delete_evaluation.php?ids=${idsParam}`);
 
       if (response.data.success) {
-        message.success(response.data.message);
-        
-        setEvaluations(prev => {
-          const newEvaluations = prev.filter(evaluation => !selectedRowKeys.includes(evaluation.evaluation_id));
-          console.log('After bulk delete - evaluations count:', newEvaluations.length);
-          return newEvaluations;
-        });
-        
+        message.success(`Successfully deleted ${selectedRowKeys.length} evaluation(s)`);
         setSelectedRowKeys([]);
-        refreshTeacherStatus();
+        setIsBulkDeleteModalVisible(false);
+        fetchEvaluations(selectedTeacher?.id);
+        fetchTeachers();
       } else {
-        message.error(response.data.message || 'Bulk delete failed');
+        message.error(response.data.error || 'Failed to delete evaluations');
       }
-    } catch (error) {
-      message.error('Error performing bulk delete');
-      console.error('Bulk delete error:', error);
+    } catch (err) {
+      message.error(err.response?.data?.error || 'Error deleting evaluations');
     } finally {
       setBulkDeleteLoading(false);
     }
   };
 
-  const refreshTeacherStatus = async () => {
-    try {
-      const response = await api.get('teach_with_evaluation_status.php');
-      if (response.data.success) {
-        setTeachers(response.data.data || []);
-        setEvaluatedTeachers(response.data.evaluated || []);
-        setNotEvaluatedTeachers(response.data.not_evaluated || []);
-      }
-    } catch (error) {
-      console.error('Error refreshing teacher status:', error);
-    }
-  };
-
   const handlePrint = () => {
-    const currentEvaluations = evaluations;
-    const currentTeacherInfo = teacherInfo;
-    const currentAverageRatings = averageRatings;
-    
-    console.log('=== PRINT DEBUG ===');
-    console.log('Evaluations count:', currentEvaluations.length);
-    console.log('Teacher Info:', currentTeacherInfo);
-    console.log('===================');
-    
-    if (!currentTeacherInfo) {
-      message.warning('Teacher information is not available');
-      return;
-    }
-    
-    if (currentEvaluations.length === 0) {
-      message.warning('No evaluations available to print');
-      return;
-    }
-    
+    if (evaluations.length === 0) return;
     setIsPrinting(true);
-    
-    const printContent = generatePrintContent(currentTeacherInfo, currentEvaluations, currentAverageRatings);
-    
-    setTimeout(() => {
-      const printWindow = window.open('', '_blank', 'width=1200,height=800');
-      if (!printWindow) {
-        message.error('Please allow popups to print');
-        setIsPrinting(false);
-        return;
-      }
-      
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Teacher Evaluation Report - ${currentTeacherInfo.teach_name}</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { font-family: Arial, sans-serif; margin: 20px; color: #333; background: #fff; }
-              .print-container { max-width: 1100px; margin: 0 auto; padding: 20px; }
-              .print-header { text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 3px solid #1890ff; }
-              .print-header h1 { margin: 0 0 5px 0; color: #1890ff; font-size: 28px; }
-              .print-header h2 { margin: 5px 0; color: #333; font-size: 22px; }
-              .print-header .meta { color: #666; font-size: 14px; margin-top: 5px; }
-              .print-section { margin-bottom: 25px; }
-              .print-section h3 { background: #f0f5ff; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; color: #1890ff; font-size: 18px; border-left: 4px solid #1890ff; }
-              .teacher-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; padding: 15px; background: #f9f9f9; border-radius: 8px; margin-bottom: 20px; }
-              .teacher-info-item { display: flex; flex-direction: column; }
-              .teacher-info-item .label { font-weight: bold; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-              .teacher-info-item .value { font-size: 16px; margin-top: 2px; }
-              .ratings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-              .rating-item { background: #f9f9f9; padding: 12px; border-radius: 6px; text-align: center; }
-              .rating-item .rating-label { font-weight: bold; color: #555; font-size: 13px; }
-              .rating-item .rating-value { font-size: 24px; font-weight: bold; color: #1890ff; display: block; margin-top: 5px; }
-              .rating-item .rating-max { font-size: 14px; color: #999; }
-              .evaluation-card { border: 1px solid #e8e8e8; border-radius: 8px; padding: 15px; margin-bottom: 15px; page-break-inside: avoid; }
-              .evaluation-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; gap: 10px; }
-              .evaluation-header .student-name { font-weight: bold; font-size: 16px; }
-              .evaluation-header .section { color: #666; font-size: 14px; }
-              .evaluation-header .date { color: #888; font-size: 13px; }
-              .evaluation-ratings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-              .eval-rating-item { display: flex; justify-content: space-between; padding: 4px 8px; background: #f9f9f9; border-radius: 4px; font-size: 13px; }
-              .eval-rating-item .label { color: #555; }
-              .eval-rating-item .value { font-weight: bold; }
-              .eval-comments { margin-top: 8px; padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 13px; }
-              .eval-comments .label { font-weight: bold; color: #555; }
-              .print-footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid #e8e8e8; text-align: center; font-size: 12px; color: #999; }
-              @media print { body { margin: 0.3in; } .evaluation-card { page-break-inside: avoid; } }
-            </style>
-          </head>
-          <body>
-            <div class="print-container">
-              ${printContent}
-            </div>
-          </body>
-        </html>
-      `);
-      
-      printWindow.document.close();
-      
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-        setIsPrinting(false);
-      }, 500);
-    }, 150);
+    const win = window.open('', '', 'width=800,height=900');
+    win.document.write(`
+      <html>
+        <head>
+          <title>Teacher Evaluation Report - ${teacherInfo?.teach_name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+            h1 { color: #0b1b3d; border-bottom: 2px solid #d4af37; padding-bottom: 10px; }
+            .bar { background: #f1f5f9; border-radius: 4px; height: 16px; margin-top: 4px; }
+            .fill { background: #d4af37; height: 100%; border-radius: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f8fafc; color: #0b1b3d; }
+          </style>
+        </head>
+        <body>
+          <h1>APEX COLLEGE - FACULTY EVALUATION REPORT</h1>
+          <p><strong>Faculty Name:</strong> ${teacherInfo?.teach_name}</p>
+          <p><strong>Total Submissions:</strong> ${evaluations.length}</p>
+          <hr/>
+          <h3>Average Dimension Ratings</h3>
+          <p>Clarity: ${averageRatings?.avg_clarity || 0} / 5</p>
+          <p>Knowledge: ${averageRatings?.avg_knowledge || 0} / 5</p>
+          <p>Communication: ${averageRatings?.avg_communication || 0} / 5</p>
+          <p>Overall: ${averageRatings?.avg_overall || 0} / 5</p>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+    setIsPrinting(false);
   };
 
-  const generatePrintContent = (teacherInfo, evaluations, averageRatings) => {
-    const formatDate = (dateString) => {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    };
-
-    let html = `
-      <div class="print-header">
-        <h1>📊 Teacher Evaluation Report</h1>
-        <h2>${teacherInfo.teach_name || 'N/A'}</h2>
-        <div class="meta">
-          Report Generated on: ${new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })} at ${new Date().toLocaleTimeString()}
-        </div>
+  const RatingBar = ({ value, label }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <Text strong style={{ color: '#0b1b3d' }}>{label}</Text>
+        <Text style={{ fontWeight: 700, color: '#1e3a8a' }}>{Number(value).toFixed(1)} / 5.0</Text>
       </div>
-      
-      <div class="print-section">
-        <h3>Teacher Information</h3>
-        <div class="teacher-info-grid">
-          <div class="teacher-info-item">
-            <span class="label">Teacher ID</span>
-            <span class="value">${teacherInfo.id || 'N/A'}</span>
-          </div>
-          <div class="teacher-info-item">
-            <span class="label">Name</span>
-            <span class="value">${teacherInfo.teach_name || 'N/A'}</span>
-          </div>
-          <div class="teacher-info-item">
-            <span class="label">Total Evaluations</span>
-            <span class="value">${evaluations ? evaluations.length : 0}</span>
-          </div>
-        </div>
-      </div>
-    `;
+      <Progress percent={(Number(value) / 5) * 100} strokeColor="#d4af37" format={() => `${Number(value).toFixed(1)}`} />
+    </div>
+  );
 
-    if (averageRatings && Object.keys(averageRatings).length > 0) {
-      html += `
-        <div class="print-section">
-          <h3>Average Ratings</h3>
-          <div class="ratings-grid">
-      `;
-      
-      const ratingLabels = {
-        avg_clarity: 'Clarity',
-        avg_knowledge: 'Knowledge',
-        avg_communication: 'Communication',
-        avg_availability: 'Availability',
-        avg_fairness: 'Fairness',
-        avg_overall: 'Overall'
-      };
-      
-      Object.keys(ratingLabels).forEach(key => {
-        if (averageRatings[key] !== undefined && averageRatings[key] !== null) {
-          html += `
-            <div class="rating-item">
-              <span class="rating-label">${ratingLabels[key]}</span>
-              <span class="rating-value">${parseFloat(averageRatings[key]).toFixed(2)}<span class="rating-max">/5</span></span>
-            </div>
-          `;
-        }
-      });
-      
-      html += `
-          </div>
-        </div>
-      `;
-    }
-
-    if (evaluations && evaluations.length > 0) {
-      html += `
-        <div class="print-section">
-          <h3>Individual Evaluations (${evaluations.length})</h3>
-      `;
-      
-      evaluations.forEach((evaluation) => {
-        html += `
-          <div class="evaluation-card">
-            <div class="evaluation-header">
-              <span class="student-name">${evaluation.anonymous ? 'Anonymous Student' : (evaluation.student_name || 'N/A')}</span>
-              <span class="section">${evaluation.section_name || 'N/A'}</span>
-              <span class="date">${formatDate(evaluation.submission_date)}</span>
-            </div>
-            <div class="evaluation-ratings">
-              <div class="eval-rating-item">
-                <span class="label">Clarity:</span>
-                <span class="value">${evaluation.clarity || 0}/5</span>
-              </div>
-              <div class="eval-rating-item">
-                <span class="label">Knowledge:</span>
-                <span class="value">${evaluation.knowledge || 0}/5</span>
-              </div>
-              <div class="eval-rating-item">
-                <span class="label">Communication:</span>
-                <span class="value">${evaluation.communication || 0}/5</span>
-              </div>
-              <div class="eval-rating-item">
-                <span class="label">Availability:</span>
-                <span class="value">${evaluation.availability || 0}/5</span>
-              </div>
-              <div class="eval-rating-item">
-                <span class="label">Fairness:</span>
-                <span class="value">${evaluation.fairness || 0}/5</span>
-              </div>
-              <div class="eval-rating-item">
-                <span class="label">Overall:</span>
-                <span class="value">${evaluation.overall || 0}/5</span>
-              </div>
-            </div>
-        `;
-        
-        if (evaluation.comments) {
-          html += `
-            <div class="eval-comments">
-              <span class="label">Comments:</span> ${evaluation.comments}
-            </div>
-          `;
-        }
-        
-        if (evaluation.suggestions) {
-          html += `
-            <div class="eval-comments" style="margin-top: 5px;">
-              <span class="label">Suggestions:</span> ${evaluation.suggestions}
-            </div>
-          `;
-        }
-        
-        html += `</div>`;
-      });
-      
-      html += `</div>`;
-    }
-
-    html += `
-      <div class="print-footer">
-        <p>Generated by Apex School Management System</p>
-        <p>Page 1 of 1</p>
-      </div>
-    `;
-
-    return html;
-  };
-
-  const RatingBar = ({ value, max = 5, label }) => {
-    const percentage = (value / max) * 100;
-    
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-        <Text strong style={{ width: 120, flexShrink: 0 }}>{label}:</Text>
-        <div style={{ 
-          flexGrow: 1, 
-          height: 20, 
-          backgroundColor: '#e0e0e0', 
-          borderRadius: 10, 
-          overflow: 'hidden',
-          margin: '0 10px'
-        }}>
-          <div style={{ 
-            height: '100%', 
-            width: `${percentage}%`,
-            background: 'linear-gradient(90deg, #ff9800, #f57c00)',
-            transition: 'width 0.3s ease'
-          }} />
-        </div>
-        <Text strong style={{ width: 50, textAlign: 'right', flexShrink: 0 }}>
-          {value.toFixed(2)}
-        </Text>
-      </div>
-    );
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  // Evaluation table columns
   const evaluationColumns = [
     {
-      title: 'Student',
-      dataIndex: 'student_name',
-      key: 'student_name',
-      render: (text, record) => record.anonymous ? 'Anonymous' : (text || 'N/A')
+      title: 'Student / Section',
+      key: 'student',
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text strong style={{ color: '#0f172a' }}>{record.anonymous ? 'Anonymous Student' : record.student_name}</Text>
+          <Text style={{ fontSize: 11, color: '#64748b' }}>Section: {record.section_name || 'N/A'}</Text>
+        </Space>
+      )
     },
     {
-      title: 'Section',
-      dataIndex: 'section_name',
-      key: 'section_name',
-      render: (text) => text || 'N/A'
+      title: 'Clarity',
+      dataIndex: 'clarity',
+      key: 'clarity',
+      align: 'center',
+      render: (r) => <Tag color="blue">{r}/5</Tag>
+    },
+    {
+      title: 'Knowledge',
+      dataIndex: 'knowledge',
+      key: 'knowledge',
+      align: 'center',
+      render: (r) => <Tag color="cyan">{r}/5</Tag>
+    },
+    {
+      title: 'Communication',
+      dataIndex: 'communication',
+      key: 'communication',
+      align: 'center',
+      render: (r) => <Tag color="purple">{r}/5</Tag>
     },
     {
       title: 'Overall Rating',
       dataIndex: 'overall',
       key: 'overall',
-      render: (value) => (
-        <Badge 
-          count={value || 0} 
-          style={{ 
-            backgroundColor: value >= 4 ? '#52c41a' : value >= 3 ? '#faad14' : '#f5222d',
-            fontSize: 14,
-            padding: '0 8px'
-          }} 
-        />
-      )
+      align: 'center',
+      render: (r) => <Tag color="gold" style={{ fontWeight: 700 }}>{r}/5.0</Tag>
     },
     {
-      title: 'Date',
-      dataIndex: 'submission_date',
-      key: 'submission_date',
-      render: (date) => formatDate(date)
+      title: 'Feedback Comments',
+      dataIndex: 'comments',
+      key: 'comments',
+      render: (text) => text || '-'
     },
     {
-      title: 'Action',
-      key: 'action',
-      width: 120,
-      fixed: 'right',
+      title: 'Actions',
+      key: 'actions',
+      align: 'center',
+      width: 100,
       render: (_, record) => (
         <Popconfirm
-          title="Delete this evaluation?"
-          description={`Are you sure you want to delete evaluation from ${record.anonymous ? 'Anonymous' : (record.student_name || 'Unknown')}?`}
-          onConfirm={() => handleDelete(record.evaluation_id)}
+          title="Delete Evaluation"
+          description="Are you sure to delete this evaluation?"
+          onConfirm={() => handleDeleteEvaluation(record.evaluation_id)}
           okText="Yes"
           cancelText="No"
-          placement="left"
           okButtonProps={{ danger: true }}
         >
-          <Button 
-            danger 
-            icon={<DeleteOutlined />} 
-            size="small"
-            type="primary"
-          >
-            Delete
-          </Button>
+          <Button type="primary" danger icon={<DeleteOutlined />} size="small" style={{ borderRadius: 6 }} />
         </Popconfirm>
       )
     }
   ];
 
-  // Row selection configuration
   const rowSelection = {
     selectedRowKeys,
-    onChange: (selectedKeys) => {
-      setSelectedRowKeys(selectedKeys);
-    },
-    selections: [
-      Table.SELECTION_ALL,
-      Table.SELECTION_INVERT,
-      Table.SELECTION_NONE,
-    ],
+    onChange: (keys) => setSelectedRowKeys(keys)
   };
 
-  // Teacher card component
-  const TeacherCard = ({ teacher }) => (
-    <Card
-      hoverable
-      style={{ 
-        borderLeft: `4px solid ${teacher.evaluation_status === 'Evaluated' ? '#52c41a' : '#faad14'}`,
-        backgroundColor: selectedTeacher?.id === teacher.id ? '#e6f7ff' : 'white',
-        cursor: 'pointer',
-        height: '100%'
-      }}
-      onClick={() => handleTeacherSelect(teacher)}
-    >
-      <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 8 }}>
-        {teacher.teach_name}
-      </Text>
-      <Space direction="vertical" size={2} style={{ width: '100%' }}>
-        <Text type="secondary">{teacher.designation || 'N/A'}</Text>
-        <Text type="secondary">Section: {teacher.teach_sec}</Text>
-        <div>
-          {teacher.evaluation_status === 'Evaluated' ? (
-            <Tag color="green" icon={<CheckCircleOutlined />}>Evaluated</Tag>
-          ) : (
-            <Tag color="orange" icon={<ClockCircleOutlined />}>Not Evaluated</Tag>
-          )}
-        </div>
-        {teacher.total_evaluations > 0 && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {teacher.total_evaluations} eval(s) - Avg: {teacher.avg_overall_rating ? teacher.avg_overall_rating.toFixed(2) : 'N/A'}/5
-          </Text>
-        )}
-      </Space>
-    </Card>
-  );
-
   return (
-    <div style={{ padding: screens.xs ? 12 : 20, maxWidth: 1400, margin: '0 auto' }}>
-      <Title level={1}>Teacher Evaluation Dashboard</Title>
-      
-      {/* Teacher Selection Section */}
-      <Card style={{ marginBottom: 30 }}>
-        <Row justify="space-between" align="middle" style={{ marginBottom: 15 }}>
-          <Col>
-            <Title level={2} style={{ margin: 0 }}>Select a Teacher</Title>
-          </Col>
-          <Col>
-            <Space>
-              <Badge count={evaluatedTeachers.length} style={{ backgroundColor: '#52c41a' }}>
-                <Text>✅ Evaluated</Text>
-              </Badge>
-              <Badge count={notEvaluatedTeachers.length} style={{ backgroundColor: '#faad14' }}>
-                <Text>⏳ Not Evaluated</Text>
-              </Badge>
-            </Space>
-          </Col>
-        </Row>
-        
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <Card
+        className="apex-card"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <StarOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                Faculty Performance & Student Evaluations
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 12 }}>Review student evaluation reports and rating feedback for teachers</Text>
+            </div>
+          </div>
+        }
+        extra={
+          <Space>
+            <Badge count={evaluatedTeachers.length} overflowCount={999} style={{ backgroundColor: '#10b981' }}>
+              <Tag color="success" style={{ borderRadius: 12, padding: '4px 10px' }}>Evaluated ({evaluatedTeachers.length})</Tag>
+            </Badge>
+            <Badge count={notEvaluatedTeachers.length} overflowCount={999} style={{ backgroundColor: '#f59e0b' }}>
+              <Tag color="warning" style={{ borderRadius: 12, padding: '4px 10px' }}>Pending ({notEvaluatedTeachers.length})</Tag>
+            </Badge>
+          </Space>
+        }
+      >
+        <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 12, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Select Faculty Member:
+        </Text>
+
         {loadingTeachers ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <Spin size="large" />
-            <Text style={{ display: 'block', marginTop: 16 }}>Loading teachers...</Text>
+            <Text style={{ display: 'block', marginTop: 12, color: '#64748b' }}>Loading teachers...</Text>
           </div>
         ) : (
-          <Row gutter={[16, 16]}>
-            {teachers.map((teacher) => (
-              <Col key={teacher.id} xs={24} sm={12} md={8} lg={6}>
-                <TeacherCard teacher={teacher} />
-              </Col>
-            ))}
-          </Row>
-        )}
-      </Card>
-      
-      {error && (
-        <Alert 
-          message="Error" 
-          description={error} 
-          type="error" 
-          showIcon 
-          style={{ marginBottom: 20 }}
-          closable
-          onClose={() => setError('')}
-        />
-      )}
-      
-      {/* Teacher Evaluations Section */}
-      {teacherInfo && (
-        <Card style={{ marginBottom: 20 }}>
-          <Row justify="space-between" align="middle" gutter={[16, 16]}>
-            <Col>
-              <Title level={2} style={{ margin: 0 }}>Evaluations for {teacherInfo.teach_name}</Title>
-              <Text type="secondary">Teacher ID: {teacherInfo.id} | Total Evaluations: {evaluations.length}</Text>
-            </Col>
-            <Col>
-              <Space wrap>
-                {selectedRowKeys.length > 0 && (
-                  <Button 
-                    danger
-                    icon={<DeleteFilled />}
-                    onClick={handleBulkDelete}
-                    loading={bulkDeleteLoading}
-                  >
-                    Delete Selected ({selectedRowKeys.length})
-                  </Button>
-                )}
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => fetchEvaluations(selectedTeacher?.id)}
-                  loading={loading}
-                >
-                  Refresh
-                </Button>
-                <Tooltip title={evaluations.length === 0 ? "No evaluations available to print" : "Print evaluation report"}>
-                  <Button
-                    type="primary"
-                    icon={<BsPrinter />}
-                    onClick={handlePrint}
-                    disabled={isPrinting || evaluations.length === 0}
-                    style={{ 
-                      backgroundColor: evaluations.length === 0 ? '#d9d9d9' : '#2c3e50',
-                      borderColor: evaluations.length === 0 ? '#d9d9d9' : '#2c3e50',
-                      color: evaluations.length === 0 ? 'rgba(0,0,0,0.25)' : 'white'
+          <Row gutter={[14, 14]} style={{ marginBottom: 24 }}>
+            {teachers.map((teacher) => {
+              const isSelected = selectedTeacher?.id === teacher.id;
+              const isEvaluated = teacher.evaluation_status === 'Evaluated';
+
+              return (
+                <Col key={teacher.id} xs={24} sm={12} md={8} lg={6}>
+                  <Card
+                    hoverable
+                    onClick={() => handleSelectTeacher(teacher)}
+                    className="apex-card"
+                    bodyStyle={{ padding: 14 }}
+                    style={{
+                      border: isSelected ? '2px solid #d4af37' : '1px solid #e2e8f0',
+                      background: isSelected ? 'rgba(212, 175, 55, 0.06)' : '#ffffff',
+                      cursor: 'pointer'
                     }}
                   >
-                    {isPrinting ? 'Preparing Report...' : 'Print Report'}
-                  </Button>
-                </Tooltip>
-              </Space>
-            </Col>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }} icon={<UserOutlined />}>
+                        {teacher.teach_name?.charAt(0)?.toUpperCase()}
+                      </Avatar>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <Text strong style={{ color: '#0b1b3d', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {teacher.teach_name}
+                        </Text>
+                        <Tag color={isEvaluated ? 'success' : 'warning'} style={{ borderRadius: 10, fontSize: 10, padding: '0 6px', marginTop: 2 }}>
+                          {isEvaluated ? 'Evaluated' : 'Pending'}
+                        </Tag>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+              );
+            })}
           </Row>
-        </Card>
-      )}
-      
-      {/* Average Ratings */}
-      {averageRatings && Object.keys(averageRatings).length > 0 && (
-        <Card title="Average Ratings" style={{ marginBottom: 20 }}>
-          <RatingBar value={averageRatings.avg_clarity || 0} label="Clarity" />
-          <RatingBar value={averageRatings.avg_knowledge || 0} label="Knowledge" />
-          <RatingBar value={averageRatings.avg_communication || 0} label="Communication" />
-          <RatingBar value={averageRatings.avg_availability || 0} label="Availability" />
-          <RatingBar value={averageRatings.avg_fairness || 0} label="Fairness" />
-          <RatingBar value={averageRatings.avg_overall || 0} label="Overall" />
-        </Card>
-      )}
-      
-      {/* Evaluations Table */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40 }}>
-          <Spin size="large" />
-          <Text style={{ display: 'block', marginTop: 16 }}>Loading evaluations...</Text>
-        </div>
-      ) : evaluations.length > 0 ? (
-        <Card 
-          title={`Individual Evaluations (${evaluations.length} total)`}
-          extra={
-            selectedRowKeys.length > 0 && (
-              <Text style={{ color: '#1890ff' }}>
-                Selected {selectedRowKeys.length} evaluation(s)
-              </Text>
-            )
-          }
-        >
+        )}
+
+        {/* Selected Teacher Evaluation Details */}
+        {teacherInfo && (
+          <Card size="small" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 24, padding: 12 }}>
+            <Row justify="space-between" align="middle" gutter={[16, 16]}>
+              <Col>
+                <Title level={4} style={{ margin: 0, color: '#0b1b3d' }}>
+                  Evaluations for {teacherInfo.teach_name}
+                </Title>
+                <Text style={{ color: '#64748b', fontSize: 12 }}>
+                  Total Submissions: {evaluations.length}
+                </Text>
+              </Col>
+              <Col>
+                <Space wrap>
+                  {selectedRowKeys.length > 0 && (
+                    <Button danger icon={<DeleteFilled />} onClick={handleBulkDelete} loading={bulkDeleteLoading} style={{ borderRadius: 8 }}>
+                      Delete Selected ({selectedRowKeys.length})
+                    </Button>
+                  )}
+                  <Button icon={<ReloadOutlined />} onClick={() => fetchEvaluations(selectedTeacher?.id)} loading={loading} style={{ borderRadius: 8 }}>
+                    Refresh
+                  </Button>
+                  <Button type="primary" icon={<BsPrinter />} onClick={handlePrint} disabled={evaluations.length === 0} className="apex-btn-gold">
+                    Print Evaluation Report
+                  </Button>
+                </Space>
+              </Col>
+            </Row>
+
+            {/* Average Ratings */}
+            {averageRatings && Object.keys(averageRatings).length > 0 && (
+              <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
+                <Col xs={24} md={12}>
+                  <Card size="small" style={{ borderRadius: 8 }}>
+                    <RatingBar value={averageRatings.avg_clarity || 0} label="Clarity & Teaching Method" />
+                    <RatingBar value={averageRatings.avg_knowledge || 0} label="Subject Knowledge" />
+                    <RatingBar value={averageRatings.avg_communication || 0} label="Communication Skills" />
+                  </Card>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Card size="small" style={{ borderRadius: 8 }}>
+                    <RatingBar value={averageRatings.avg_availability || 0} label="Student Availability" />
+                    <RatingBar value={averageRatings.avg_fairness || 0} label="Fairness & Grading" />
+                    <RatingBar value={averageRatings.avg_overall || 0} label="Overall Score" />
+                  </Card>
+                </Col>
+              </Row>
+            )}
+          </Card>
+        )}
+
+        {/* Evaluations Table */}
+        {teacherInfo && (
           <Table
             columns={evaluationColumns}
             dataSource={evaluations.map(e => ({ ...e, key: e.evaluation_id }))}
             rowKey="evaluation_id"
             rowSelection={rowSelection}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              pageSizeOptions: ['5', '10', '20', '50'],
-              showTotal: (total) => `Total ${total} entries`,
-            }}
-            size="middle"
-            bordered
-            scroll={{ x: 800 }}
+            loading={loading}
+            scroll={{ x: 'max-content' }}
+            pagination={{ pageSize: 10 }}
           />
-        </Card>
-      ) : teacherInfo && !loading ? (
-        <Card>
-          <Empty 
-            description="No evaluations found for this teacher" 
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-          />
-        </Card>
-      ) : null}
+        )}
+      </Card>
 
-      {/* Bulk Delete Confirmation Modal */}
+      {/* Bulk Delete Modal */}
       <Modal
-        title="Confirm Bulk Delete"
+        title="Confirm Bulk Deletion"
         open={isBulkDeleteModalVisible}
         onOk={confirmBulkDelete}
         onCancel={() => setIsBulkDeleteModalVisible(false)}
         okText="Yes, Delete All"
         cancelText="Cancel"
         okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
-        width={600}
+        centered
       >
-        <Paragraph>
-          Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected evaluation(s)?
-        </Paragraph>
-        <Paragraph style={{ color: '#ff4d4f' }}>
-          This action cannot be undone.
-        </Paragraph>
-        <div style={{ marginTop: 16, maxHeight: 250, overflowY: 'auto' }}>
-          {evaluations
-            .filter(e => selectedRowKeys.includes(e.evaluation_id))
-            .map(e => (
-              <div key={e.evaluation_id} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-                <Text>
-                  <strong>{e.anonymous ? 'Anonymous' : e.student_name}</strong> - {e.section_name} 
-                  <Tag color="blue" style={{ marginLeft: 8 }}>Overall: {e.overall}/5</Tag>
-                </Text>
-              </div>
-            ))
-          }
-        </div>
+        <p>Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected evaluation(s)?</p>
       </Modal>
     </div>
   );

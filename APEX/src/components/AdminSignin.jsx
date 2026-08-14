@@ -159,7 +159,7 @@ const StyledInput = styled(Input)`
   background: rgba(255, 255, 255, 0.06) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 8px !important;
-  color: #fff !important;
+  color: #ffffff !important;
   margin-bottom: 18px;
 
   input {
@@ -517,7 +517,7 @@ const AdminLogin = () => {
                 <StyledFooter>
                     <div>© {new Date().getFullYear()} Apex College Harichand. All rights reserved.</div>
                     <span className="credit">
-                        Powered by MUHAMMAD KAZIM AHMAD AND YOUSAF SHAH
+                        Powered by MUHAMMAD KAZIM AHMAD AND MUHAMMAD RAYYAN
                     </span>
                 </StyledFooter>
             </StyledLayout>

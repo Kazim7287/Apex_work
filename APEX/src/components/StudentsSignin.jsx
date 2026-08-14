@@ -44,18 +44,25 @@ const StyledLayout = styled(Layout)`
 const StyledHeader = styled(Header)`
   background: rgba(11, 27, 61, 0.85) !important;
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   height: 76px;
-  line-height: 76px;
-  padding: 0 24px;
+  line-height: normal;
+  padding: 0 clamp(12px, 2.5vw, 24px);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const HeaderContainer = styled.div`
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 `;
 
 const BrandWrapper = styled(Link)`
@@ -448,7 +455,7 @@ const StudentSignin = () => {
         <StyledFooter>
           <div>© {new Date().getFullYear()} Apex College Harichand. All rights reserved.</div>
           <span className="credit">
-            Powered by MUHAMMAD KAZIM AHMAD AND YOUSAF SHAH
+            Powered by MUHAMMAD KAZIM AHMAD AND MUHAMMAD RAYYAN
           </span>
         </StyledFooter>
       </StyledLayout>

@@ -1,305 +1,169 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Table, 
-  Card, 
-  Tag, 
-  Spin, 
-  message, 
-  Modal, 
-  Form, 
-  Input, 
-  Button, 
-  Select, 
-  Descriptions,
-  Space,
-  Typography,
-  Row,
-  Col,
-  Badge,
-  Divider,
-  Tooltip,
-  Tabs,
-  Popconfirm,
-  Empty
-} from 'antd';
-import {
-  EyeOutlined,
-  MessageOutlined,
-  UserOutlined,
-  CalendarOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  SyncOutlined,
-  ClockCircleOutlined,
-  TeamOutlined,
-  SolutionOutlined,
-  DeleteOutlined,
-  DeleteFilled
-} from '@ant-design/icons';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-const { Option } = Select;
+import {
+    Avatar,
+    Button,
+    Card,
+    Descriptions,
+    Form,
+    Input,
+    Modal,
+    Popconfirm,
+    Select,
+    Space,
+    Table,
+    Tabs,
+    Tag,
+    Tooltip,
+    Typography,
+    message,
+} from "antd";
+
+import {
+    CalendarOutlined,
+    CheckCircleOutlined,
+    ClockCircleOutlined,
+    DeleteFilled,
+    DeleteOutlined,
+    EyeOutlined,
+    MessageOutlined,
+    ReloadOutlined,
+    SolutionOutlined,
+    UserOutlined,
+} from "@ant-design/icons";
+
 const { TextArea } = Input;
 const { Text, Title } = Typography;
-const { TabPane } = Tabs;
+
+const API_BASE =
+    "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/";
 
 const StudentApplications = () => {
+    const navigate = useNavigate();
+    const [form] = Form.useForm();
+
+    // =========================================================
+    // STATE
+    // =========================================================
+
     const [applications, setApplications] = useState([]);
-    const [filteredApplications, setFilteredApplications] = useState([]);
+    const [filteredApplications, setFilteredApplications] =
+        useState([]);
+
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
     const [selectedApp, setSelectedApp] = useState(null);
+
     const [detailVisible, setDetailVisible] = useState(false);
     const [responseVisible, setResponseVisible] = useState(false);
-    const [activeTab, setActiveTab] = useState('all');
-    const [userRole, setUserRole] = useState('admin');
-    const [form] = Form.useForm();
-    const navigate = useNavigate();
 
-    // State for bulk selection and deletion
+    const [activeTab, setActiveTab] = useState("all");
+
+    const [userRole, setUserRole] = useState("admin");
+
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-    const [isBulkDeleteModalVisible, setIsBulkDeleteModalVisible] = useState(false);
-    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
-    // API Base URL
-    const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
+    const [bulkDeleteVisible, setBulkDeleteVisible] =
+        useState(false);
 
-    // Create axios-like fetch wrapper
+    const [bulkDeleteLoading, setBulkDeleteLoading] =
+        useState(false);
+
+    // =========================================================
+    // API HELPER
+    // =========================================================
+
     const apiFetch = async (endpoint, options = {}) => {
-        const response = await fetch(`${API_BASE}${endpoint}`, {
+        return fetch(`${API_BASE}${endpoint}`, {
             ...options,
-            credentials: 'include',
+            credentials: "include",
             headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
+                "Content-Type": "application/json",
+                ...options.headers,
+            },
         });
-        return response;
     };
 
-    // Determine user role (admin or teacher)
+    // =========================================================
+    // CHECK USER ROLE
+    // =========================================================
+
     useEffect(() => {
         const checkUserRole = async () => {
             try {
-                const response = await apiFetch('read_leave_applications.php');
-                
-                if (response.status === 200) {
-                    setUserRole('teacher');
-                } else {
-                    setUserRole('admin');
-                }
-            } catch (error) {
-                console.error("Error checking user role:", error);
-                setUserRole('admin');
+                const response = await apiFetch(
+                    "read_leave_applications.php"
+                );
+
+                setUserRole(
+                    response.status === 200
+                        ? "teacher"
+                        : "admin"
+                );
+            } catch {
+                setUserRole("admin");
             }
         };
-        
+
         checkUserRole();
     }, []);
 
+    // =========================================================
+    // FETCH APPLICATIONS
+    // =========================================================
+
     const fetchApplications = async () => {
         setLoading(true);
+
         try {
-            const endpoint = userRole === 'admin' 
-                ? 'AdminApplications.php'
-                : 'read_leave_applications.php';
-            
+            const endpoint =
+                userRole === "teacher"
+                    ? "read_leave_applications.php"
+                    : "adRead_leave_applications.php";
+
             const response = await apiFetch(endpoint);
 
             if (response.status === 401) {
-                navigate(userRole === 'admin' ? '/admin/login' : '/teacher/login');
+                message.error(
+                    "Session expired. Please sign in again."
+                );
+
+                navigate("/admin-signIn");
                 return;
             }
 
-            const data = await response.json();
-            
-            let applicationsData = [];
-            
-            if (userRole === 'admin') {
-                if (data.success && Array.isArray(data.data)) {
-                    applicationsData = data.data;
-                }
-            } else {
-                if (Array.isArray(data)) {
-                    applicationsData = data;
-                } else if (data.data && Array.isArray(data.data)) {
-                    applicationsData = data.data;
-                }
-            }
-
-            const validApplications = applicationsData.filter(app => 
-                app && (app.student_name !== null && app.student_name !== undefined)
-            );
-
-            setApplications(validApplications);
-            setFilteredApplications(validApplications);
-            setSelectedRowKeys([]);
-            
-            if (validApplications.length === 0) {
-                message.info(userRole === 'admin' 
-                    ? "No applications found" 
-                    : "No applications found for your students"
+            if (!response.ok) {
+                throw new Error(
+                    "Failed to fetch applications"
                 );
             }
-            
+
+            const data = await response.json();
+
+            if (data.status === "success" || data.success) {
+                const list = Array.isArray(data.data)
+                    ? data.data
+                    : [];
+
+                setApplications(list);
+                applyFilter(list, activeTab);
+            } else {
+                setApplications([]);
+                setFilteredApplications([]);
+            }
         } catch (error) {
-            console.error("Fetch error:", error);
-            message.error("Network error while fetching applications");
-            setApplications([]);
-            setFilteredApplications([]);
+            console.error(
+                "Error fetching applications:",
+                error
+            );
+
+            message.error(
+                "Failed to load student applications"
+            );
         } finally {
             setLoading(false);
-        }
-    };
-
-    // Handle single delete
-    const handleDelete = async (id) => {
-        try {
-            const response = await apiFetch(`delete_applications.php?id=${id}`, {
-                method: 'DELETE'
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-                message.success(data.message || 'Application deleted successfully');
-                
-                // Remove from local state
-                setApplications(prev => prev.filter(app => app.id !== id));
-                setFilteredApplications(prev => prev.filter(app => app.id !== id));
-                setSelectedRowKeys(prev => prev.filter(key => key !== id));
-            } else {
-                message.error(data.message || 'Delete failed');
-            }
-        } catch (error) {
-            message.error('Error deleting application');
-            console.error('Delete error:', error);
-        }
-    };
-
-    // Handle bulk delete
-    const handleBulkDelete = () => {
-        if (selectedRowKeys.length === 0) {
-            message.warning('Please select at least one application to delete');
-            return;
-        }
-        setIsBulkDeleteModalVisible(true);
-    };
-
-    const confirmBulkDelete = async () => {
-        try {
-            setBulkDeleteLoading(true);
-            setIsBulkDeleteModalVisible(false);
-            
-            const idsParam = selectedRowKeys.join(',');
-            const response = await apiFetch(`delete_applications.php?ids=${idsParam}`, {
-                method: 'DELETE'
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-                message.success(data.message);
-                
-                // Remove selected applications from local state
-                setApplications(prev => prev.filter(app => !selectedRowKeys.includes(app.id)));
-                setFilteredApplications(prev => prev.filter(app => !selectedRowKeys.includes(app.id)));
-                setSelectedRowKeys([]);
-            } else {
-                message.error(data.message || 'Bulk delete failed');
-            }
-        } catch (error) {
-            message.error('Error performing bulk delete');
-            console.error('Bulk delete error:', error);
-        } finally {
-            setBulkDeleteLoading(false);
-        }
-    };
-
-    const handleResponseSubmit = async (values) => {
-        setSubmitting(true);
-        try {
-            let payload = {};
-            const endpoint = 'read_leave_applications.php';
-            
-            if (userRole === 'admin') {
-                payload = {
-                    id: selectedApp.id,
-                    status: values.status,
-                    response: values.response || '',
-                    response_description: values.response_description || '',
-                    teacher_id: values.teacher_id || null
-                };
-            } else {
-                payload = {
-                    id: selectedApp.id,
-                    status: values.status,
-                    response_description: values.response_description || ''
-                };
-            }
-
-            const response = await apiFetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-
-            if (response.status === 401) {
-                navigate(userRole === 'admin' ? '/admin/login' : '/teacher/login');
-                return;
-            }
-
-            const data = await response.json();
-            
-            if (data.success) {
-                message.success("Application updated successfully");
-                
-                setApplications(prev => prev.map(app => 
-                    app.id === selectedApp.id ? { ...app, ...data.data } : app
-                ));
-                setFilteredApplications(prev => prev.map(app => 
-                    app.id === selectedApp.id ? { ...app, ...data.data } : app
-                ));
-                
-                setResponseVisible(false);
-                form.resetFields();
-            } else {
-                message.error(data.message || data.error || "Failed to update application");
-            }
-        } catch (error) {
-            message.error("Error submitting response");
-            console.error("Submit error:", error);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleTabChange = (key) => {
-        setActiveTab(key);
-        if (key === 'all') {
-            setFilteredApplications(applications);
-        } else {
-            setFilteredApplications(applications.filter(app => app.status === key));
-        }
-        setSelectedRowKeys([]);
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Approved': return 'green';
-            case 'Rejected': return 'red';
-            case 'Processing': return 'blue';
-            case 'Pending': return 'orange';
-            default: return 'default';
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'Approved': return <CheckCircleOutlined />;
-            case 'Rejected': return <CloseCircleOutlined />;
-            case 'Processing': return <SyncOutlined spin />;
-            case 'Pending': return <ClockCircleOutlined />;
-            default: return null;
         }
     };
 
@@ -307,497 +171,843 @@ const StudentApplications = () => {
         fetchApplications();
     }, [userRole]);
 
-    // Row selection configuration
-    const rowSelection = {
-        selectedRowKeys,
-        onChange: (selectedKeys) => {
-            setSelectedRowKeys(selectedKeys);
-        },
-        selections: [
-            Table.SELECTION_ALL,
-            Table.SELECTION_INVERT,
-            Table.SELECTION_NONE,
-        ],
+    // =========================================================
+    // FILTER APPLICATIONS
+    // =========================================================
+
+    const applyFilter = (data, tab) => {
+        if (tab === "all") {
+            setFilteredApplications(data);
+            return;
+        }
+
+        const filtered = data.filter(
+            (application) =>
+                application.status?.toLowerCase() ===
+                tab.toLowerCase()
+        );
+
+        setFilteredApplications(filtered);
     };
+
+    const handleTabChange = (key) => {
+        setActiveTab(key);
+        applyFilter(applications, key);
+    };
+
+    // =========================================================
+    // DELETE SINGLE APPLICATION
+    // =========================================================
+
+    const handleSingleDelete = async (id) => {
+        try {
+            const response = await apiFetch(
+                `delete_leave_application.php?id=${id}`,
+                {
+                    method: "DELETE",
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.status === "success") {
+                message.success(
+                    "Application deleted successfully"
+                );
+
+                await fetchApplications();
+            } else {
+                message.error(
+                    data.message ||
+                        "Failed to delete application"
+                );
+            }
+        } catch (error) {
+            console.error(error);
+
+            message.error(
+                "Error deleting application"
+            );
+        }
+    };
+
+    // =========================================================
+    // BULK DELETE
+    // =========================================================
+
+    const handleBulkDelete = () => {
+        if (selectedRowKeys.length === 0) {
+            message.warning(
+                "Select at least one application to delete"
+            );
+
+            return;
+        }
+
+        setBulkDeleteVisible(true);
+    };
+
+    const confirmBulkDelete = async () => {
+        setBulkDeleteLoading(true);
+
+        try {
+            const response = await apiFetch(
+                "bulk_delete_leave_applications.php",
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        ids: selectedRowKeys,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.status === "success") {
+                message.success(
+                    `Successfully deleted ${selectedRowKeys.length} application(s)`
+                );
+
+                setSelectedRowKeys([]);
+                setBulkDeleteVisible(false);
+
+                await fetchApplications();
+            } else {
+                message.error(
+                    data.message ||
+                        "Failed to delete applications"
+                );
+            }
+        } catch (error) {
+            console.error(error);
+
+            message.error(
+                "Error deleting applications"
+            );
+        } finally {
+            setBulkDeleteLoading(false);
+        }
+    };
+
+    // =========================================================
+    // UPDATE APPLICATION
+    // =========================================================
+
+    const handleResponseSubmit = async (values) => {
+        if (!selectedApp?.id) {
+            return;
+        }
+
+        setSubmitting(true);
+
+        try {
+            let endpoint;
+            let payload;
+
+            if (userRole === "teacher") {
+                endpoint =
+                    "teacher_update_leave_application.php";
+
+                payload = {
+                    id: selectedApp.id,
+                    status: values.status,
+                    review_comments:
+                        values.response_description,
+                };
+            } else {
+                endpoint =
+                    "update_leave_application.php";
+
+                payload = {
+                    id: selectedApp.id,
+                    status: values.status,
+                    response: values.response || "",
+                    response_description:
+                        values.response_description,
+                    teacher_id:
+                        values.teacher_id ||
+                        selectedApp.teacher_id ||
+                        "",
+                };
+            }
+
+            const response = await apiFetch(endpoint, {
+                method: "POST",
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+
+            if (data.status === "success" || data.success) {
+                message.success(
+                    "Application updated successfully"
+                );
+
+                closeResponseModal();
+
+                await fetchApplications();
+            } else {
+                message.error(
+                    data.message ||
+                        "Failed to update application"
+                );
+            }
+        } catch (error) {
+            console.error(error);
+
+            message.error(
+                "Error submitting response"
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // =========================================================
+    // OPEN RESPONSE MODAL
+    // =========================================================
+
+    const openResponseModal = (record) => {
+        setSelectedApp(record);
+
+        form.setFieldsValue({
+            status: record.status || "Pending",
+            response: record.response || "",
+            response_description:
+                record.response_description ||
+                record.review_comments ||
+                "",
+            teacher_id: record.teacher_id || "",
+        });
+
+        setResponseVisible(true);
+    };
+
+    const closeResponseModal = () => {
+        setResponseVisible(false);
+        setSelectedApp(null);
+        form.resetFields();
+    };
+
+    // =========================================================
+    // DETAILS MODAL
+    // =========================================================
+
+    const openDetailModal = (record) => {
+        setSelectedApp(record);
+        setDetailVisible(true);
+    };
+
+    const closeDetailModal = () => {
+        setDetailVisible(false);
+        setSelectedApp(null);
+    };
+
+    // =========================================================
+    // STATUS TAG
+    // =========================================================
+
+    const getStatusTag = (status) => {
+        switch (status?.toLowerCase()) {
+            case "approved":
+                return (
+                    <Tag
+                        icon={<CheckCircleOutlined />}
+                        color="success"
+                        style={{
+                            borderRadius: 12,
+                            padding: "3px 10px",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Approved
+                    </Tag>
+                );
+
+            case "rejected":
+                return (
+                    <Tag
+                        color="error"
+                        style={{
+                            borderRadius: 12,
+                            padding: "3px 10px",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Rejected
+                    </Tag>
+                );
+
+            case "processing":
+                return (
+                    <Tag
+                        color="processing"
+                        style={{
+                            borderRadius: 12,
+                            padding: "3px 10px",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Processing
+                    </Tag>
+                );
+
+            default:
+                return (
+                    <Tag
+                        icon={<ClockCircleOutlined />}
+                        color="warning"
+                        style={{
+                            borderRadius: 12,
+                            padding: "3px 10px",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Pending
+                    </Tag>
+                );
+        }
+    };
+
+    // =========================================================
+    // TABLE COLUMNS
+    // =========================================================
 
     const columns = [
         {
-            title: 'Student',
-            dataIndex: 'student_name',
-            key: 'student_name',
-            fixed: 'left',
-            width: 150,
-            render: (text, record) => (
-                <Button 
-                    type="link" 
-                    onClick={() => {
-                        setSelectedApp(record);
-                        setDetailVisible(true);
-                    }}
-                    style={{ padding: 0, fontWeight: 500 }}
-                >
-                    <UserOutlined style={{ marginRight: 8 }} />
-                    {text}
-                </Button>
-            )
-        },
-        {
-            title: 'Section',
-            dataIndex: 'section_name',
-            key: 'section_name',
-            width: 120,
-            responsive: ['md'],
-        },
-        {
-            title: 'Type',
-            dataIndex: 'type',
-            key: 'type',
-            width: 120,
-            responsive: ['md'],
-        },
-        {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-            width: 120,
-            render: (status) => (
-                <Badge 
-                    color={getStatusColor(status)} 
-                    text={status || 'Pending'} 
-                    style={{ fontWeight: 500 }}
-                />
-            )
-        },
-        {
-            title: 'Submission Date',
-            dataIndex: 'submission_date',
-            key: 'submission_date',
-            width: 140,
-            responsive: ['lg'],
-            render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
-        },
-        {
-            title: 'Actions',
-            key: 'actions',
-            width: 140,
-            fixed: 'right',
-            render: (_, record) => (
+            title: "Student",
+            dataIndex: "student_name",
+            key: "student_name",
+
+            render: (name, record) => (
                 <Space>
-                    <Tooltip title="View Details">
-                        <Button 
-                            icon={<EyeOutlined />} 
-                            onClick={() => {
-                                setSelectedApp(record);
-                                setDetailVisible(true);
+                    <Avatar
+                        icon={<UserOutlined />}
+                        style={{
+                            background: "#0b1b3d",
+                            color: "#d4af37",
+                            fontWeight: 700,
+                        }}
+                    />
+
+                    <div>
+                        <Text
+                            strong
+                            style={{
+                                display: "block",
+                                color: "#0f172a",
+                            }}
+                        >
+                            {name || "Unknown Student"}
+                        </Text>
+
+                        <Text
+                            style={{
+                                fontSize: 11,
+                                color: "#64748b",
+                            }}
+                        >
+                            Section:{" "}
+                            {record.section_name || "N/A"}
+                        </Text>
+                    </div>
+                </Space>
+            ),
+        },
+
+        {
+            title: "Application",
+            dataIndex: "leave_title",
+            key: "leave_title",
+
+            render: (title) => (
+                <Text
+                    strong
+                    style={{
+                        color: "#1e3a8a",
+                    }}
+                >
+                    {title || "Untitled Application"}
+                </Text>
+            ),
+        },
+
+        {
+            title: "Date",
+            key: "dates",
+
+            render: (_, record) => (
+                <Text
+                    style={{
+                        fontSize: 13,
+                        color: "#334155",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    <CalendarOutlined
+                        style={{
+                            marginRight: 6,
+                            color: "#d4af37",
+                        }}
+                    />
+
+                    {record.start_date || "N/A"}{" "}
+                    → {record.end_date || "N/A"}
+                </Text>
+            ),
+        },
+
+        {
+            title: "Status",
+            dataIndex: "status",
+            key: "status",
+            align: "center",
+
+            render: (status) =>
+                getStatusTag(status),
+        },
+
+        {
+            title: "Actions",
+            key: "actions",
+            align: "center",
+            width: 140,
+
+            render: (_, record) => (
+                <Space size="small">
+                    <Tooltip title="View Application">
+                        <Button
+                            type="primary"
+                            size="small"
+                            icon={<EyeOutlined />}
+                            onClick={() =>
+                                openDetailModal(record)
+                            }
+                            style={{
+                                background: "#0b1b3d",
+                                borderRadius: 6,
                             }}
                         />
                     </Tooltip>
-                    <Tooltip title="Respond">
-                        <Button 
-                            type="primary" 
+
+                    <Tooltip title="Update Status">
+                        <Button
+                            type="primary"
+                            size="small"
                             icon={<MessageOutlined />}
-                            onClick={() => {
-                                setSelectedApp(record);
-                                form.setFieldsValue({
-                                    status: record.status || 'Pending',
-                                    response: record.response || '',
-                                    response_description: record.response_discription || '',
-                                    teacher_id: record.teacher_id || ''
-                                });
-                                setResponseVisible(true);
-                            }}
-                            disabled={userRole === 'teacher' && record.status !== 'Pending'}
-                        >
-                            {userRole === 'teacher' ? 'Review' : 'Respond'}
-                        </Button>
+                            onClick={() =>
+                                openResponseModal(record)
+                            }
+                            className="apex-btn-gold"
+                        />
                     </Tooltip>
+
                     <Popconfirm
-                        title="Are you sure to delete this application?"
-                        onConfirm={() => handleDelete(record.id)}
+                        title="Delete Application"
+                        description="Are you sure you want to delete this application?"
+                        onConfirm={() =>
+                            handleSingleDelete(record.id)
+                        }
                         okText="Yes"
                         cancelText="No"
-                        placement="left"
+                        okButtonProps={{
+                            danger: true,
+                        }}
                     >
-                        <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            size="middle"
-                        />
+                        <Tooltip title="Delete">
+                            <Button
+                                type="primary"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                style={{
+                                    borderRadius: 6,
+                                }}
+                            />
+                        </Tooltip>
                     </Popconfirm>
                 </Space>
-            )
-        }
+            ),
+        },
     ];
 
+    // =========================================================
+    // ROW SELECTION
+    // =========================================================
+
+    const rowSelection = {
+        selectedRowKeys,
+
+        onChange: (keys) => {
+            setSelectedRowKeys(keys);
+        },
+    };
+
+    // =========================================================
+    // TAB ITEMS
+    // =========================================================
+
+    const tabItems = [
+        {
+            key: "all",
+            label: "All Applications",
+        },
+        {
+            key: "pending",
+            label: "Pending Review",
+        },
+        {
+            key: "approved",
+            label: "Approved",
+        },
+        {
+            key: "rejected",
+            label: "Rejected",
+        },
+    ];
+
+    // =========================================================
+    // RENDER
+    // =========================================================
+
     return (
-        <div style={{ padding: '16px', background: '#f0f2f5', minHeight: '100vh' }}>
-            <Card 
+        <div
+            style={{
+                width: "100%",
+                maxWidth: 1400,
+                margin: "0 auto",
+            }}
+        >
+            <Card
+                className="apex-card"
                 title={
-                    <Space>
-                        {userRole === 'admin' ? (
-                            <SolutionOutlined style={{ fontSize: '24px' }} />
-                        ) : (
-                            <TeamOutlined style={{ fontSize: '24px' }} />
-                        )}
-                        <Title level={4} style={{ margin: 0 }}>
-                            {userRole === 'admin' ? 'Student Applications Management' : 'My Students Applications'}
-                        </Title>
-                        <Badge count={filteredApplications.length} showZero />
-                    </Space>
-                } 
-                bordered={false}
-                style={{ 
-                    margin: '16px', 
-                    borderRadius: '8px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                }}
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: 40,
+                                height: 40,
+                                minWidth: 40,
+                                borderRadius: 10,
+                                background:
+                                    "linear-gradient(135deg, #0b1b3d, #1e3a8a)",
+                                color: "#d4af37",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 18,
+                            }}
+                        >
+                            <SolutionOutlined />
+                        </div>
+
+                        <div>
+                            <Title
+                                level={4}
+                                style={{
+                                    margin: 0,
+                                    color: "#0b1b3d",
+                                    fontWeight: 700,
+                                }}
+                            >
+                                Student Leave Applications
+                            </Title>
+
+                            <Text
+                                style={{
+                                    color: "#64748b",
+                                    fontSize: 12,
+                                }}
+                            >
+                                Review, approve, or reject
+                                student leave requests
+                            </Text>
+                        </div>
+                    </div>
+                }
                 extra={
-                    <Space>
+                    <Space wrap>
                         {selectedRowKeys.length > 0 && (
-                            <Button 
+                            <Button
                                 danger
                                 icon={<DeleteFilled />}
-                                onClick={handleBulkDelete}
-                                loading={bulkDeleteLoading}
+                                onClick={
+                                    handleBulkDelete
+                                }
+                                style={{
+                                    borderRadius: 8,
+                                }}
                             >
-                                Delete Selected ({selectedRowKeys.length})
+                                Delete Selected (
+                                {selectedRowKeys.length})
                             </Button>
                         )}
-                        <Button 
-                            icon={<SyncOutlined />} 
-                            onClick={fetchApplications}
-                            loading={loading}
-                        >
-                            Refresh
-                        </Button>
+
+                        <Tooltip title="Refresh">
+                            <Button
+                                type="text"
+                                icon={<ReloadOutlined />}
+                                onClick={
+                                    fetchApplications
+                                }
+                                loading={loading}
+                                style={{
+                                    borderRadius: 8,
+                                }}
+                            />
+                        </Tooltip>
                     </Space>
                 }
             >
-                {selectedRowKeys.length > 0 && (
-                    <div style={{ marginBottom: 16, padding: '8px 12px', background: '#e6f7ff', borderRadius: 4 }}>
-                        <Text>
-                            Selected <strong>{selectedRowKeys.length}</strong> application(s)
-                        </Text>
-                    </div>
-                )}
-
-                <Tabs 
-                    activeKey={activeTab} 
+                <Tabs
+                    activeKey={activeTab}
+                    items={tabItems}
                     onChange={handleTabChange}
-                    style={{ marginBottom: '16px' }}
-                >
-                    <TabPane tab="All Applications" key="all" />
-                    <TabPane 
-                        tab={
-                            <span>
-                                <ClockCircleOutlined />
-                                Pending
-                            </span>
-                        } 
-                        key="Pending" 
-                    />
-                    <TabPane 
-                        tab={
-                            <span>
-                                <SyncOutlined />
-                                Processing
-                            </span>
-                        } 
-                        key="Processing" 
-                    />
-                    <TabPane 
-                        tab={
-                            <span>
-                                <CheckCircleOutlined />
-                                Approved
-                            </span>
-                        } 
-                        key="Approved" 
-                    />
-                    <TabPane 
-                        tab={
-                            <span>
-                                <CloseCircleOutlined />
-                                Rejected
-                            </span>
-                        } 
-                        key="Rejected" 
-                    />
-                </Tabs>
+                    style={{
+                        marginBottom: 16,
+                    }}
+                />
 
-                <Spin spinning={loading} tip="Loading applications...">
-                    <Table 
-                        columns={columns} 
-                        dataSource={filteredApplications} 
-                        rowKey="id"
-                        rowSelection={rowSelection}
-                        bordered
-                        pagination={{ 
-                            pageSize: 10, 
-                            showSizeChanger: true,
-                            showQuickJumper: true,
-                            showTotal: (total, range) => 
-                                `${range[0]}-${range[1]} of ${total} applications`
+                <Table
+                    columns={columns}
+                    dataSource={filteredApplications}
+                    rowKey="id"
+                    rowSelection={rowSelection}
+                    loading={loading}
+                    scroll={{
+                        x: "max-content",
+                    }}
+                    pagination={{
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        responsive: true,
+                    }}
+                />
+            </Card>
+
+            {/* =====================================================
+                VIEW DETAILS MODAL
+            ====================================================== */}
+
+            <Modal
+                title="Student Application Details"
+                open={detailVisible}
+                onCancel={closeDetailModal}
+                footer={[
+                    <Button
+                        key="close"
+                        onClick={closeDetailModal}
+                        style={{
+                            borderRadius: 8,
                         }}
-                        scroll={{ x: 900 }}
-                        size="middle"
-                        locale={{
-                            emptyText: (
-                                <Empty
-                                    description="No student applications found"
-                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                />
-                            )
-                        }}
-                    />
-                </Spin>
+                    >
+                        Close
+                    </Button>,
+                ]}
+                width={650}
+                centered
+            >
+                {selectedApp && (
+                    <div style={{ paddingTop: 12 }}>
+                        <Descriptions
+                            bordered
+                            column={2}
+                            size="small"
+                            responsive
+                        >
+                            <Descriptions.Item label="Student">
+                                {selectedApp.student_name ||
+                                    "N/A"}
+                            </Descriptions.Item>
 
-                {/* Bulk Delete Confirmation Modal */}
-                <Modal
-                    title="Confirm Bulk Delete"
-                    open={isBulkDeleteModalVisible}
-                    onOk={confirmBulkDelete}
-                    onCancel={() => setIsBulkDeleteModalVisible(false)}
-                    okText="Yes, Delete All"
-                    cancelText="Cancel"
-                    okButtonProps={{ danger: true, loading: bulkDeleteLoading }}
-                >
-                    <p>
-                        Are you sure you want to delete <strong>{selectedRowKeys.length}</strong> selected application(s)?
-                    </p>
-                    <p style={{ color: '#ff4d4f' }}>
-                        This action cannot be undone.
-                    </p>
-                    <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto' }}>
-                        {applications
-                            .filter(app => selectedRowKeys.includes(app.id))
-                            .map(app => (
-                                <div key={app.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <Text>
-                                        {app.student_name} - {app.type} ({app.status || 'Pending'})
-                                    </Text>
-                                </div>
-                            ))
-                        }
-                    </div>
-                </Modal>
+                            <Descriptions.Item label="Section">
+                                {selectedApp.section_name ||
+                                    "N/A"}
+                            </Descriptions.Item>
 
-                {/* Application Detail Modal */}
-                <Modal
-                    title={
-                        <Space>
-                            <UserOutlined />
-                            Application Details
-                        </Space>
-                    }
-                    open={detailVisible}
-                    onCancel={() => setDetailVisible(false)}
-                    footer={[
-                        <Button key="close" onClick={() => setDetailVisible(false)}>
-                            Close
-                        </Button>,
-                        userRole === 'admin' || (userRole === 'teacher' && selectedApp?.status === 'Pending') ? (
-                            <Button 
-                                key="respond" 
-                                type="primary" 
-                                onClick={() => {
-                                    setDetailVisible(false);
-                                    form.setFieldsValue({
-                                        status: selectedApp?.status || 'Pending',
-                                        response: selectedApp?.response || '',
-                                        response_description: selectedApp?.response_discription || '',
-                                        teacher_id: selectedApp?.teacher_id || ''
-                                    });
-                                    setResponseVisible(true);
+                            <Descriptions.Item label="Duration">
+                                {selectedApp.start_date ||
+                                    "N/A"}{" "}
+                                →{" "}
+                                {selectedApp.end_date ||
+                                    "N/A"}
+                            </Descriptions.Item>
+
+                            <Descriptions.Item label="Status">
+                                {getStatusTag(
+                                    selectedApp.status
+                                )}
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <div
+                            style={{
+                                marginTop: 16,
+                                background: "#f8fafc",
+                                padding: 16,
+                                borderRadius: 8,
+                                border: "1px solid #e2e8f0",
+                            }}
+                        >
+                            <Text
+                                strong
+                                style={{
+                                    display: "block",
+                                    color: "#0b1b3d",
+                                    marginBottom: 8,
                                 }}
                             >
-                                {userRole === 'teacher' ? 'Review Application' : 'Respond to Application'}
-                            </Button>
-                        ) : null
-                    ]}
-                    width={700}
-                    centered
-                >
-                    {selectedApp && (
-                        <div>
-                            <Divider orientation="left" orientationMargin="0">
-                                Student Information
-                            </Divider>
-                            <Descriptions bordered column={1} size="small">
-                                <Descriptions.Item label="Student Name">
-                                    <Text strong>{selectedApp.student_name}</Text>
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Section">
-                                    {selectedApp.section_name || 'N/A'}
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Application Type">
-                                    {selectedApp.type}
-                                </Descriptions.Item>
-                                {userRole === 'teacher' && selectedApp.teacher_name && (
-                                    <Descriptions.Item label="Assigned Teacher">
-                                        {selectedApp.teacher_name}
-                                    </Descriptions.Item>
-                                )}
-                            </Descriptions>
+                                Reason for Leave
+                            </Text>
 
-                            <Divider orientation="left" orientationMargin="0">
-                                Application Details
-                            </Divider>
-                            <Descriptions bordered column={1} size="small">
-                                <Descriptions.Item label="Title">
-                                    {selectedApp.title || 'N/A'}
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Description">
-                                    <Text>{selectedApp.description || 'No description provided'}</Text>
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Submission Date">
-                                    <Space>
-                                        <CalendarOutlined />
-                                        {selectedApp.submission_date ? 
-                                            new Date(selectedApp.submission_date).toLocaleDateString() : 'N/A'}
-                                    </Space>
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Status">
-                                    <Tag 
-                                        color={getStatusColor(selectedApp.status)} 
-                                        icon={getStatusIcon(selectedApp.status)}
-                                        style={{ fontWeight: 500 }}
-                                    >
-                                        {selectedApp.status || 'Pending'}
-                                    </Tag>
-                                </Descriptions.Item>
-                            </Descriptions>
-
-                            {(selectedApp.response || selectedApp.response_discription) && (
-                                <>
-                                    <Divider orientation="left" orientationMargin="0">
-                                        Response Details
-                                    </Divider>
-                                    <Descriptions bordered column={1} size="small">
-                                        {selectedApp.response && (
-                                            <Descriptions.Item label="Response">
-                                                {selectedApp.response}
-                                            </Descriptions.Item>
-                                        )}
-                                        {selectedApp.response_discription && (
-                                            <Descriptions.Item label="Response Details">
-                                                {selectedApp.response_discription}
-                                            </Descriptions.Item>
-                                        )}
-                                        {selectedApp.processed_by && (
-                                            <Descriptions.Item label="Processed By">
-                                                Admin ID: {selectedApp.processed_by}
-                                            </Descriptions.Item>
-                                        )}
-                                    </Descriptions>
-                                </>
-                            )}
+                            <Text>
+                                {selectedApp.leave_description ||
+                                    "No description provided."}
+                            </Text>
                         </div>
-                    )}
-                </Modal>
+                    </div>
+                )}
+            </Modal>
 
-                {/* Response Modal */}
-                <Modal
-                    title={
-                        <Space>
-                            <MessageOutlined />
-                            {userRole === 'teacher' ? 'Review Application' : 'Update Application'}
-                            {selectedApp && ` - ${selectedApp.student_name}`}
-                        </Space>
-                    }
-                    open={responseVisible}
-                    onCancel={() => {
-                        setResponseVisible(false);
-                        form.resetFields();
+            {/* =====================================================
+                UPDATE STATUS MODAL
+            ====================================================== */}
+
+            <Modal
+                title="Update Application Status"
+                open={responseVisible}
+                onCancel={closeResponseModal}
+                footer={null}
+                width={550}
+                centered
+                destroyOnClose
+            >
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={handleResponseSubmit}
+                    style={{
+                        paddingTop: 12,
                     }}
-                    footer={null}
-                    width={600}
-                    centered
-                    destroyOnClose
                 >
-                    <Form
-                        form={form}
-                        layout="vertical"
-                        onFinish={handleResponseSubmit}
+                    <Form.Item
+                        name="status"
+                        label={
+                            <Text strong>
+                                Decision Status
+                            </Text>
+                        }
+                        rules={[
+                            {
+                                required: true,
+                                message:
+                                    "Please select a status",
+                            },
+                        ]}
                     >
-                        <Row gutter={16}>
-                            <Col xs={24} sm={12}>
-                                <Form.Item
-                                    name="status"
-                                    label="Status"
-                                    rules={[{ required: true, message: 'Please select status' }]}
-                                >
-                                    <Select 
-                                        placeholder="Select status"
-                                        optionFilterProp="children"
-                                    >
-                                        <Option value="Approved">
-                                            <Tag color="green">Approved</Tag>
-                                        </Option>
-                                        <Option value="Rejected">
-                                            <Tag color="red">Rejected</Tag>
-                                        </Option>
-                                        <Option value="Processing">
-                                            <Tag color="blue">Processing</Tag>
-                                        </Option>
-                                        <Option value="Pending">
-                                            <Tag color="orange">Pending</Tag>
-                                        </Option>
-                                    </Select>
-                                </Form.Item>
-                            </Col>
-                            {userRole === 'admin' && (
-                                <Col xs={24} sm={12}>
-                                    <Form.Item
-                                        name="teacher_id"
-                                        label="Assign Teacher (Optional)"
-                                    >
-                                        <Input 
-                                            placeholder="Teacher ID" 
-                                            prefix={<UserOutlined />}
-                                        />
-                                    </Form.Item>
-                                </Col>
-                            )}
-                        </Row>
+                        <Select
+                            style={{
+                                width: "100%",
+                                borderRadius: 8,
+                            }}
+                            placeholder="Select status"
+                            options={[
+                                {
+                                    value: "Approved",
+                                    label: "Approved",
+                                },
+                                {
+                                    value: "Rejected",
+                                    label: "Rejected",
+                                },
+                                {
+                                    value: "Processing",
+                                    label: "Processing",
+                                },
+                                {
+                                    value: "Pending",
+                                    label: "Pending",
+                                },
+                            ]}
+                        />
+                    </Form.Item>
 
-                        {userRole === 'admin' && (
-                            <Form.Item
-                                name="response"
-                                label="Response Title"
-                            >
-                                <Input placeholder="Brief response title" />
-                            </Form.Item>
-                        )}
+                    <Form.Item
+                        name="response_description"
+                        label={
+                            <Text strong>
+                                Review Comments / Notes
+                            </Text>
+                        }
+                        rules={[
+                            {
+                                required: true,
+                                message:
+                                    "Please enter review comments",
+                            },
+                        ]}
+                    >
+                        <TextArea
+                            rows={4}
+                            placeholder="Enter decision explanation or instructions"
+                            style={{
+                                borderRadius: 8,
+                            }}
+                        />
+                    </Form.Item>
 
-                        <Form.Item
-                            name="response_description"
-                            label={userRole === 'teacher' ? 'Review Comments' : 'Response Details'}
-                            rules={[{ required: true, message: 'Please enter response details' }]}
-                        >
-                            <TextArea 
-                                rows={4} 
-                                placeholder={userRole === 'teacher' ? 'Please provide your review comments...' : 'Please provide detailed response...'} 
-                                showCount 
-                                maxLength={500}
-                            />
-                        </Form.Item>
+                    <Button
+                        type="primary"
+                        htmlType="submit"
+                        loading={submitting}
+                        block
+                        className="apex-btn-gold"
+                        style={{
+                            height: 40,
+                            marginTop: 8,
+                        }}
+                    >
+                        Submit Decision
+                    </Button>
+                </Form>
+            </Modal>
 
-                        <Form.Item>
-                            <Button 
-                                type="primary" 
-                                htmlType="submit" 
-                                block 
-                                size="large"
-                                loading={submitting}
-                                icon={<CheckCircleOutlined />}
-                            >
-                                {userRole === 'teacher' ? 'Submit Review' : 'Submit Response'}
-                            </Button>
-                        </Form.Item>
-                    </Form>
-                </Modal>
-            </Card>
+            {/* =====================================================
+                BULK DELETE MODAL
+            ====================================================== */}
+
+            <Modal
+                title="Confirm Bulk Deletion"
+                open={bulkDeleteVisible}
+                onOk={confirmBulkDelete}
+                onCancel={() =>
+                    setBulkDeleteVisible(false)
+                }
+                okText="Yes, Delete All"
+                cancelText="Cancel"
+                okButtonProps={{
+                    danger: true,
+                    loading: bulkDeleteLoading,
+                }}
+                centered
+            >
+                <p>
+                    Are you sure you want to delete{" "}
+                    <strong>
+                        {selectedRowKeys.length}
+                    </strong>{" "}
+                    selected application
+                    {selectedRowKeys.length !== 1
+                        ? "s"
+                        : ""}
+                    ?
+                </p>
+            </Modal>
         </div>
     );
 };

@@ -8,7 +8,6 @@ import {
   Card, 
   Row, 
   Col, 
-  Divider,
   Typography,
   Space,
   Tag,
@@ -16,11 +15,8 @@ import {
   Select,
   Tabs,
   Spin,
-  Grid,
-  Drawer,
   Avatar,
   Badge,
-  Layout,
   Alert,
   Tooltip
 } from 'antd';
@@ -30,12 +26,10 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
-  MenuOutlined,
   TeamOutlined,
-  BookOutlined,
   UserOutlined,
-  InfoCircleOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -43,8 +37,6 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 const { Option } = Select;
-const { useBreakpoint } = Grid;
-const { Content } = Layout;
 
 const AdminAttendanceView = () => {
   const navigate = useNavigate();
@@ -58,782 +50,522 @@ const AdminAttendanceView = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('daily');
   const [currentSectionName, setCurrentSectionName] = useState('');
-  const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);
-  
-  const screens = useBreakpoint();
-  const isMobile = !screens.md;
-  const isSmallMobile = !screens.sm;
-  const isTablet = screens.md && !screens.lg;
 
-  // Fetch all sections
   useEffect(() => {
     fetchAllSections();
   }, []);
 
   const fetchWithSession = async (url, options = {}) => {
-    try {
-      const response = await fetch(url, {
-        ...options,
-        credentials: 'include',
-        headers: {
-          ...options.headers,
-          'Content-Type': 'application/json',
-        }
-      });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        ...options.headers,
+      },
+    });
 
-      if (response.status === 401) {
-        navigate('/admin-signin');
-        return null;
-      }
-
-      const data = await response.json();
-      
-      if (data && data.error) {
-        message.error(data.error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Fetch error:', error);
-      message.error('Error fetching data');
+    if (response.status === 401) {
+      message.error('Session expired. Please sign in again.');
+      navigate('/admin-signin');
       return null;
     }
-  };
 
-  const fetchAllSections = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchWithSession('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php');
-      if (data && Array.isArray(data)) {
-        setSections(data);
-      } else if (!data) {
-        // Error already handled
-      } else {
-        message.error('No sections found');
-      }
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}`);
     }
-  };
 
-  const fetchAttendanceByDate = async () => {
-    if (!selectedDate || !selectedSection) {
-      message.error('Please select date and section');
+    const data = await response.json();
+
+    if (data && data.error) {
+      message.error(data.error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Fetch error:', error);
+
+    message.error(
+      error.message === 'Failed to fetch'
+        ? 'Unable to connect to the attendance server.'
+        : error.message || 'Error fetching data'
+    );
+
+    return null;
+  }
+};
+
+const fetchAllSections = async () => {
+  setLoading(true);
+
+  try {
+    const data = await fetchWithSession(
+      'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php'
+    );
+
+    if (data && Array.isArray(data)) {
+      setSections(data);
+    } else {
+      setSections([]);
+      message.warning('No sections found');
+    }
+  } catch (error) {
+    console.error('Error fetching sections:', error);
+    setSections([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchAttendanceByDate = async () => {
+  if (!selectedSection || !selectedDate) {
+    message.warning('Please select a section and date');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const formattedDate = selectedDate.format('YYYY-MM-DD');
+
+    // IMPORTANT:
+    // This is the endpoint from your OLD working file.
+    const url =
+      `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetadAttendance.php` +
+      `?section_id=${encodeURIComponent(selectedSection)}` +
+      `&date=${encodeURIComponent(formattedDate)}`;
+
+    console.log('Fetching attendance:', url);
+
+    const data = await fetchWithSession(url);
+
+    console.log('Attendance API response:', data);
+
+    if (!data) {
+      setAttendanceData([]);
       return;
     }
-  
-    setLoading(true);
-    try {
-      // Format date to YYYY-MM-DD
-      const formattedDate = selectedDate.format('YYYY-MM-DD');
-    
-      // Build URL with only required parameters
-      const url = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetadAttendance.php?section_id=${selectedSection}&date=${formattedDate}`;
-      
-      const data = await fetchWithSession(url);
-      
-      if (data && (data.status === 'success' || data.status === 'empty')) {
-        setAttendanceData(data.data || []);
-        setCurrentSectionName(sections.find(s => s.id === selectedSection)?.name || '');
-        setIsModalVisible(true);
-        
-        if (data.status === 'empty') {
-          message.warning('No attendance records found');
-        }
-      } else {
-        message.warning(data?.message || 'No attendance records found');
-        setAttendanceData([]);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-      message.error('Failed to fetch attendance data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const fetchAttendanceSummary = async () => {
-    if (!selectedSection) {
-      message.error('Please select a section');
-      return;
-    }
-  
-    setLoading(true);
-    try {
-      const url = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetadAttendancesummery.php?section_id=${selectedSection}`;
-      
-      const data = await fetchWithSession(url);
-      
-      if (data && data.status === 'success') {
-        // Process the data from the new API format with updated attendance types
-        const students = data.students || [];
-        
-        const transformedData = students.map(student => {
-          // Calculate totals from all records with new attendance types
-          const present = student.records?.filter(
-            r => r.attendance === 'Present'
-          ).length || 0;
-          
-          const absent = student.records?.filter(
-            r => r.attendance === 'Absent'
-          ).length || 0;
-          
-          const leave = student.records?.filter(
-            r => r.attendance === 'Leave'
-          ).length || 0;
-          
-          const lateComer = student.records?.filter(
-            r => r.attendance === 'Late Comer'
-          ).length || 0;
-          
-          const halfLeave = student.records?.filter(
-            r => r.attendance === 'Half Leave'
-          ).length || 0;
-          
-          const total = student.records?.length || 0;
-          
-          // Calculate weighted attendance percentage
-          const weightedPresent = present + (lateComer * 0.75) + (halfLeave * 0.5);
-          const percentage = total > 0 ? Math.round((weightedPresent / total) * 100) : 0;
-          
-          return {
-            student_id: student.student_id,
-            student_name: student.student_name,
-            present,
-            absent,
-            leave,
-            late_comer: lateComer,
-            half_leave: halfLeave,
-            total,
-            percentage
-          };
-        });
-        
-        setSummaryData(transformedData);
-        setCurrentSectionName(sections.find(s => s.id === selectedSection)?.name || '');
-        setIsSummaryModalVisible(true);
-      } else if (data && data.message) {
-        message.info(data.message);
-        setSummaryData([]);
-      } else {
-        message.error('Error fetching attendance summary');
-        setSummaryData([]);
+    if (data.status === 'success' || data.status === 'empty') {
+      setAttendanceData(Array.isArray(data.data) ? data.data : []);
+
+      const currentSection = sections.find(
+        section => String(section.id) === String(selectedSection)
+      );
+
+      setCurrentSectionName(
+        currentSection ? currentSection.name : ''
+      );
+
+      setIsModalVisible(true);
+
+      if (data.status === 'empty') {
+        message.info('No attendance records found for this date.');
       }
-    } catch (error) {
-      console.error('Error:', error);
-      message.error('Failed to fetch attendance summary');
+    } else {
+      setAttendanceData([]);
+
+      message.warning(
+        data.message || 'No attendance records found.'
+      );
+    }
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+    setAttendanceData([]);
+    message.error('Failed to fetch attendance data.');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchAttendanceSummary = async () => {
+  if (!selectedSection) {
+    message.warning('Please select a section');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // IMPORTANT:
+    // This is the endpoint from your OLD working file.
+    const url =
+      `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetadAttendancesummery.php` +
+      `?section_id=${encodeURIComponent(selectedSection)}`;
+
+    console.log('Fetching attendance summary:', url);
+
+    const data = await fetchWithSession(url);
+
+    console.log('Attendance summary API response:', data);
+
+    if (!data) {
       setSummaryData([]);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
 
-  const getAttendanceTag = (status) => {
-    switch(status) {
-      case 'Present':
-        return <Tag icon={<CheckCircleOutlined />} color="success" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>Present</Tag>;
-      case 'Leave':
-        return <Tag icon={<ExclamationCircleOutlined />} color="blue" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>Leave</Tag>;
-      case 'Late Comer':
-        return <Tag icon={<ClockCircleOutlined />} color="orange" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>Late</Tag>;
-      case 'Half Leave':
-        return <Tag icon={<ExclamationCircleOutlined />} color="cyan" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>Half Leave</Tag>;
-      case 'Absent':
+    if (data.status === 'success') {
+      const students = Array.isArray(data.students)
+        ? data.students
+        : [];
+
+      const transformedData = students.map(student => {
+        const records = Array.isArray(student.records)
+          ? student.records
+          : [];
+
+        const present = records.filter(
+          record => record.attendance === 'Present'
+        ).length;
+
+        const absent = records.filter(
+          record => record.attendance === 'Absent'
+        ).length;
+
+        const leave = records.filter(
+          record => record.attendance === 'Leave'
+        ).length;
+
+        const lateComer = records.filter(
+          record => record.attendance === 'Late Comer'
+        ).length;
+
+        const halfLeave = records.filter(
+          record => record.attendance === 'Half Leave'
+        ).length;
+
+        const total = records.length;
+
+        const weightedPresent =
+          present +
+          lateComer * 0.75 +
+          halfLeave * 0.5;
+
+        const percentage =
+          total > 0
+            ? Math.round((weightedPresent / total) * 100)
+            : 0;
+
+        return {
+          student_id: student.student_id,
+          student_name: student.student_name,
+          present,
+          absent,
+          leave,
+          late_comer: lateComer,
+          half_leave: halfLeave,
+          total,
+          percentage,
+        };
+      });
+
+      setSummaryData(transformedData);
+
+      const currentSection = sections.find(
+        section => String(section.id) === String(selectedSection)
+      );
+
+      setCurrentSectionName(
+        currentSection ? currentSection.name : ''
+      );
+
+      setIsSummaryModalVisible(true);
+
+      if (transformedData.length === 0) {
+        message.info('No attendance summary available.');
+      }
+    } else {
+      setSummaryData([]);
+
+      message.info(
+        data.message || 'No attendance summary available.'
+      );
+    }
+  } catch (error) {
+    console.error('Error fetching attendance summary:', error);
+    setSummaryData([]);
+    message.error('Failed to fetch attendance summary.');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const getStatusBadge = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'present':
+      case 'p':
+        return <Tag icon={<CheckCircleOutlined />} color="success" style={{ borderRadius: 12, padding: '2px 10px' }}>Present</Tag>;
+      case 'absent':
+      case 'a':
+        return <Tag icon={<CloseCircleOutlined />} color="error" style={{ borderRadius: 12, padding: '2px 10px' }}>Absent</Tag>;
+      case 'leave':
+      case 'l':
+        return <Tag icon={<ExclamationCircleOutlined />} color="warning" style={{ borderRadius: 12, padding: '2px 10px' }}>Leave</Tag>;
+      case 'late':
+        return <Tag icon={<ClockCircleOutlined />} color="processing" style={{ borderRadius: 12, padding: '2px 10px' }}>Late</Tag>;
       default:
-        return <Tag icon={<CloseCircleOutlined />} color="error" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>Absent</Tag>;
+        return <Tag color="default">{status || 'N/A'}</Tag>;
     }
   };
 
   const attendanceColumns = [
-    { 
-      title: 'Student', 
-      dataIndex: 'student_name', 
+    {
+      title: 'Student Name',
+      dataIndex: 'student_name',
       key: 'student_name',
-      fixed: isMobile ? 'left' : false,
-      width: isMobile ? 120 : undefined,
-      render: (text) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar 
-            size={isSmallMobile ? "small" : "default"}
-            icon={<UserOutlined />}
-            style={{ 
-              backgroundColor: '#1890ff',
-              marginRight: 8,
-              flexShrink: 0
-            }}
-          />
-          <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-            {text}
-          </Text>
-        </div>
+      render: (name) => (
+        <Space>
+          <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }} icon={<UserOutlined />} />
+          <Text strong style={{ color: '#0f172a' }}>{name}</Text>
+        </Space>
       )
     },
-    { 
-      title: 'Status', 
-      dataIndex: 'attendance', 
-      key: 'attendance',
-      render: (status) => getAttendanceTag(status)
+    {
+      title: 'Roll / Reg No.',
+      dataIndex: 'roll_no',
+      key: 'roll_no',
+      render: (roll) => roll ? <Tag color="blue">#{roll}</Tag> : 'N/A'
     },
-    { 
-      title: 'Subject', 
-      dataIndex: 'subject_name', 
-      key: 'subject_name',
-      responsive: ['md'],
-      render: (text) => (
-        <Tag color="blue" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-          {text}
-        </Tag>
-      )
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      align: 'center',
+      render: (status) => getStatusBadge(status)
     },
-    { 
-      title: 'Date', 
-      dataIndex: 'date', 
-      key: 'date',
-      responsive: ['md'],
-      render: (date) => (
-        <Text style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-          {date}
-        </Text>
-      )
-    },
+    {
+      title: 'Remarks / Notes',
+      dataIndex: 'remarks',
+      key: 'remarks',
+      render: (text) => text || '-'
+    }
   ];
 
-  // Enhanced summary columns for better mobile display
   const summaryColumns = [
-    { 
-      title: 'Student', 
-      dataIndex: 'student_name', 
+    {
+      title: 'Student Name',
+      dataIndex: 'student_name',
       key: 'student_name',
-      fixed: isMobile ? 'left' : false,
-      width: isMobile ? 120 : undefined,
-      render: (text) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar 
-            size={isSmallMobile ? "small" : "default"}
-            icon={<UserOutlined />}
-            style={{ 
-              backgroundColor: '#1890ff',
-              marginRight: 8,
-              flexShrink: 0
-            }}
+      render: (name) => (
+        <Space>
+          <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }} icon={<UserOutlined />} />
+          <Text strong style={{ color: '#0f172a' }}>{name}</Text>
+        </Space>
+      )
+    },
+    {
+      title: 'Present Days',
+      dataIndex: 'present_days',
+      key: 'present_days',
+      align: 'center',
+      render: (val) => <Tag color="success" style={{ fontWeight: 700 }}>{val || 0}</Tag>
+    },
+    {
+      title: 'Total Classes',
+      dataIndex: 'total_days',
+      key: 'total_days',
+      align: 'center',
+      render: (val) => <Tag color="blue">{val || 0}</Tag>
+    },
+    {
+      title: 'Attendance Percentage',
+      dataIndex: 'attendance_percentage',
+      key: 'attendance_percentage',
+      render: (pct) => {
+        const value = parseFloat(pct || 0);
+        let color = '#10b981';
+        if (value < 75) color = '#f59e0b';
+        if (value < 50) color = '#ef4444';
+        return (
+          <Progress 
+            percent={value} 
+            strokeColor={color} 
+            size="small" 
+            format={(p) => `${p}%`}
+            style={{ minWidth: 140 }}
           />
-          <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-            {text}
-          </Text>
-        </div>
-      )
-    },
-    { 
-      title: 'Present', 
-      dataIndex: 'present', 
-      key: 'present',
-      render: (count) => (
-        <Tooltip title="Present days">
-          <Tag color="green" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-            {count}
-          </Tag>
-        </Tooltip>
-      )
-    },
-    { 
-      title: 'Absent', 
-      dataIndex: 'absent', 
-      key: 'absent',
-      render: (count) => (
-        <Tooltip title="Absent days">
-          <Tag color="red" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-            {count}
-          </Tag>
-        </Tooltip>
-      )
-    },
-    { 
-      title: 'Leave', 
-      dataIndex: 'leave', 
-      key: 'leave',
-      render: (count) => (
-        <Tooltip title="Leave days">
-          <Tag color="blue" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-            {count}
-          </Tag>
-        </Tooltip>
-      ),
-      responsive: ['sm']
-    },
-    { 
-      title: 'Late', 
-      dataIndex: 'late_comer', 
-      key: 'late_comer',
-      render: (count) => (
-        <Tooltip title="Late comer days">
-          <Tag color="orange" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-            {count}
-          </Tag>
-        </Tooltip>
-      ),
-      responsive: ['sm']
-    },
-    { 
-      title: 'Half Leave', 
-      dataIndex: 'half_leave', 
-      key: 'half_leave',
-      render: (count) => (
-        <Tooltip title="Half leave days">
-          <Tag color="cyan" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-            {count}
-          </Tag>
-        </Tooltip>
-      ),
-      responsive: ['sm']
-    },
-    { 
-      title: 'Total', 
-      dataIndex: 'total', 
-      key: 'total',
-      render: (count) => (
-        <Tooltip title="Total days">
-          <Tag style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-            {count}
-          </Tag>
-        </Tooltip>
-      ),
-      responsive: ['sm']
-    },
-    { 
-      title: 'Percentage', 
-      dataIndex: 'percentage', 
-      key: 'percentage',
-      render: (percentage) => (
-        <Tooltip title={`Attendance percentage: ${percentage}%`}>
-          <div style={{ minWidth: 80 }}>
-            <Progress 
-              percent={percentage}
-              status={percentage >= 75 ? 'success' : percentage >= 50 ? 'normal' : 'exception'}
-              format={() => (
-                <Text style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-                  {percentage}%
-                </Text>
-              )}
-              size={isSmallMobile ? 'small' : 'default'}
-              showInfo={true}
-            />
-          </div>
-        </Tooltip>
-      )
-    },
+        );
+      }
+    }
   ];
-
-  // Mobile-optimized summary columns
-  const mobileSummaryColumns = [
-    { 
-      title: 'Student', 
-      dataIndex: 'student_name', 
-      key: 'student_name',
-      fixed: 'left',
-      width: 100,
-      render: (text) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar 
-            size="small"
-            icon={<UserOutlined />}
-            style={{ 
-              backgroundColor: '#1890ff',
-              marginRight: 4,
-              flexShrink: 0
-            }}
-          />
-          <Text strong style={{ fontSize: '11px' }}>
-            {text}
-          </Text>
-        </div>
-      )
-    },
-    { 
-      title: 'P', 
-      dataIndex: 'present', 
-      key: 'present',
-      width: 50,
-      render: (count) => (
-        <Tooltip title="Present days">
-          <Badge count={count} style={{ backgroundColor: '#52c41a' }} />
-        </Tooltip>
-      )
-    },
-    { 
-      title: 'A', 
-      dataIndex: 'absent', 
-      key: 'absent',
-      width: 50,
-      render: (count) => (
-        <Tooltip title="Absent days">
-          <Badge count={count} style={{ backgroundColor: '#f5222d' }} />
-        </Tooltip>
-      )
-    },
-    { 
-      title: 'L', 
-      dataIndex: 'leave', 
-      key: 'leave',
-      width: 50,
-      render: (count) => (
-        <Tooltip title="Leave days">
-          <Badge count={count} style={{ backgroundColor: '#1890ff' }} />
-        </Tooltip>
-      )
-    },
-    { 
-      title: 'LC', 
-      dataIndex: 'late_comer', 
-      key: 'late_comer',
-      width: 50,
-      render: (count) => (
-        <Tooltip title="Late comer days">
-          <Badge count={count} style={{ backgroundColor: '#fa8c16' }} />
-        </Tooltip>
-      )
-    },
-    { 
-      title: 'HL', 
-      dataIndex: 'half_leave', 
-      key: 'half_leave',
-      width: 50,
-      render: (count) => (
-        <Tooltip title="Half leave days">
-          <Badge count={count} style={{ backgroundColor: '#13c2c2' }} />
-        </Tooltip>
-      )
-    },
-    { 
-      title: '%', 
-      dataIndex: 'percentage', 
-      key: 'percentage',
-      width: 80,
-      render: (percentage) => (
-        <Tooltip title={`Attendance: ${percentage}%`}>
-          <div style={{ width: 60 }}>
-            <Progress 
-              percent={percentage}
-              status={percentage >= 75 ? 'success' : percentage >= 50 ? 'normal' : 'exception'}
-              size="small"
-              showInfo={false}
-            />
-            <Text style={{ fontSize: '10px', display: 'block', textAlign: 'center' }}>
-              {percentage}%
-            </Text>
-          </div>
-        </Tooltip>
-      )
-    },
-  ];
-
-  const renderAttendanceTable = () => (
-    <>
-      <div style={{ marginBottom: 16 }}>
-        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>Section: </Text>
-        <Text style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>{currentSectionName}</Text>
-        <Divider type="vertical" />
-        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>Date: </Text>
-        <Text style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-          {selectedDate ? selectedDate.format('YYYY-MM-DD') : 'No date selected'}
-        </Text>
-      </div>
-      <Table
-        dataSource={attendanceData}
-        columns={attendanceColumns}
-        rowKey="id"
-        loading={loading}
-        pagination={{ 
-          pageSize: 10,
-          size: isSmallMobile ? 'small' : 'default',
-          simple: isMobile
-        }}
-        scroll={{ x: isMobile ? 300 : true }}
-        size={isSmallMobile ? 'small' : (isMobile ? 'middle' : 'default')}
-        locale={{ emptyText: 'No attendance records found' }}
-      />
-    </>
-  );
-
-  const renderSummaryTable = () => (
-    <>
-      <div style={{ marginBottom: 16 }}>
-        <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>Section: </Text>
-        <Text style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>{currentSectionName}</Text>
-      </div>
-      
-      {isMobile ? (
-        <Alert
-          message="Mobile View"
-          description="Swipe left/right to see all attendance details"
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-        />
-      ) : null}
-      
-      <Table
-        dataSource={summaryData}
-        columns={isMobile ? mobileSummaryColumns : summaryColumns}
-        rowKey="student_id"
-        loading={loading}
-        scroll={{ x: isMobile ? 500 : true }}
-        pagination={{ 
-          pageSize: 10,
-          size: isSmallMobile ? 'small' : 'default',
-          simple: isMobile
-        }}
-        size={isSmallMobile ? 'small' : (isMobile ? 'middle' : 'default')}
-        locale={{ emptyText: 'No attendance summary available' }}
-      />
-    </>
-  );
-
-  const FilterSection = ({ type }) => {
-    const [dropdownOpen, setDropdownOpen] = useState({
-      section: false,
-      date: false
-    });
-
-    const handleDropdownChange = (key, value) => {
-      setDropdownOpen(prev => ({ ...prev, [key]: value }));
-    };
-
-    return (
-      <Card 
-        title={
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {type === 'daily' ? (
-              <CalendarOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-            ) : (
-              <FileTextOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-            )}
-            <Text strong style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-              {type === 'daily' ? 'Daily Attendance' : 'Attendance Summary'}
-            </Text>
-          </div>
-        }
-        style={{ marginBottom: 20 }}
-        bodyStyle={{ padding: isSmallMobile ? '12px' : '16px' }}
-      >
-        <Row gutter={[16, 16]}>
-          <Col xs={24}>
-            <Space 
-              direction={isMobile ? "vertical" : "horizontal"} 
-              size="middle" 
-              style={{ width: '100%' }}
-              align={isMobile ? "start" : "end"}
-            >
-              {/* Section Dropdown */}
-              <div style={{ width: isMobile ? '100%' : 250 }}>
-                <Text strong style={{ display: 'block', marginBottom: 4, fontSize: isSmallMobile ? '12px' : '14px' }}>
-                  Select Section:
-                </Text>
-                <Select
-                  style={{ width: '100%' }}
-                  placeholder="Select section"
-                  value={selectedSection}
-                  onChange={(value) => {
-                    setSelectedSection(value);
-                    handleDropdownChange('section', false);
-                  }}
-                  loading={loading}
-                  size={isSmallMobile ? 'small' : 'middle'}
-                  suffixIcon={<TeamOutlined />}
-                  open={dropdownOpen.section}
-                  onDropdownVisibleChange={(open) => handleDropdownChange('section', open)}
-                  dropdownStyle={{ 
-                    minWidth: isMobile ? '100%' : 250,
-                    zIndex: 9999 
-                  }}
-                  getPopupContainer={trigger => trigger.parentNode}
-                >
-                  {sections.map(section => (
-                    <Option key={section.id} value={section.id}>
-                      {section.name}
-                    </Option>
-                  ))}
-                </Select>
-              </div>
-
-              {/* Date Picker - Only for daily view */}
-              {type === 'daily' && selectedSection && (
-                <div style={{ width: isMobile ? '100%' : 250 }}>
-                  <Text strong style={{ display: 'block', marginBottom: 4, fontSize: isSmallMobile ? '12px' : '14px' }}>
-                    Select Date:
-                  </Text>
-                  <DatePicker 
-                    style={{ width: '100%' }}
-                    value={selectedDate}
-                    onChange={(date) => {
-                      setSelectedDate(date || dayjs());
-                      handleDropdownChange('date', false);
-                    }}
-                    size={isSmallMobile ? 'small' : 'middle'}
-                    open={dropdownOpen.date}
-                    onOpenChange={(open) => handleDropdownChange('date', open)}
-                    getPopupContainer={trigger => trigger.parentNode}
-                    format="YYYY-MM-DD"
-                  />
-                </div>
-              )}
-
-              {/* Action Button */}
-              <div style={{ width: isMobile ? '100%' : 'auto', marginTop: isMobile ? 8 : 0 }}>
-                <Button 
-                  type="primary" 
-                  icon={type === 'daily' ? <CalendarOutlined /> : <FileTextOutlined />}
-                  onClick={type === 'daily' ? fetchAttendanceByDate : fetchAttendanceSummary}
-                  disabled={!selectedSection || (type === 'daily' && !selectedDate)}
-                  loading={loading}
-                  size={isSmallMobile ? 'small' : 'middle'}
-                  block={isMobile}
-                  style={{ minWidth: isMobile ? '100%' : 150 }}
-                >
-                  {type === 'daily' ? 'View Attendance' : 'View Summary'}
-                </Button>
-              </div>
-            </Space>
-          </Col>
-        </Row>
-      </Card>
-    );
-  };
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f5f7fa' }}>
-      <Content style={{ 
-        padding: isSmallMobile ? '8px' : (isMobile ? '12px' : '16px'),
-      }}>
-        <Card
-          title={
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '8px'
-            }}>
-              {isMobile && (
-                <Button 
-                  icon={<MenuOutlined />}
-                  type="text"
-                  onClick={() => setMobileDrawerVisible(true)}
-                  style={{ marginRight: 8 }}
-                  size="small"
-                />
-              )}
-              <Title level={isSmallMobile ? 4 : 2} style={{ margin: 0 }}>
-                <TeamOutlined style={{ marginRight: 12, color: '#1890ff' }} />
-                Attendance Management
-              </Title>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <Card
+        className="apex-card"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <TeamOutlined />
             </div>
-          }
-          bordered={false}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.09)',
-            borderRadius: '8px'
-          }}
-          bodyStyle={{ 
-            padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '20px')
-          }}
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                Attendance Control & Register
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 12 }}>Check daily student attendance records and overall summary percentages</Text>
+            </div>
+          </div>
+        }
+      >
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={setActiveTab}
+          style={{ marginBottom: 20 }}
         >
-          {/* Mobile Drawer */}
-          {isMobile && (
-            <Drawer
-              title="Navigation"
-              placement="left"
-              onClose={() => setMobileDrawerVisible(false)}
-              open={mobileDrawerVisible}
-              width={280}
-              bodyStyle={{ padding: 0 }}
-            >
-              {/* Add your sidebar component here if needed */}
-            </Drawer>
-          )}
-
-          <Tabs 
-            activeKey={activeTab} 
-            onChange={setActiveTab}
-            type={isMobile ? "card" : "line"}
-            size={isSmallMobile ? "small" : "middle"}
+          <TabPane 
+            tab={
+              <span>
+                <CalendarOutlined /> Daily Attendance Records
+              </span>
+            } 
+            key="daily"
           >
-            <TabPane 
-              tab={
-                <span>
-                  <CalendarOutlined />
-                  {isMobile ? 'Daily' : 'Daily Attendance'}
-                </span>
-              } 
-              key="daily"
-            >
-              <FilterSection type="daily" />
-            </TabPane>
+            <Card size="small" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+              <Row gutter={[16, 16]} align="middle">
+                <Col xs={24} sm={10}>
+                  <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 6 }}>Select Class Section:</Text>
+                  <Select
+                    placeholder="Choose Section"
+                    value={selectedSection}
+                    onChange={setSelectedSection}
+                    style={{ width: '100%', borderRadius: 8 }}
+                  >
+                    {sections.map(sec => (
+                      <Option key={sec.id} value={sec.id}>Section {sec.name}</Option>
+                    ))}
+                  </Select>
+                </Col>
 
-            <TabPane 
-              tab={
-                <span>
-                  <FileTextOutlined />
-                  {isMobile ? 'Summary' : 'Attendance Summary'}
-                </span>
-              } 
-              key="summary"
-            >
-              <FilterSection type="summary" />
-            </TabPane>
-          </Tabs>
+                <Col xs={24} sm={8}>
+                  <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 6 }}>Select Date:</Text>
+                  <DatePicker 
+                    style={{ width: '100%', borderRadius: 8 }}
+                    value={selectedDate}
+                    onChange={(date) => setSelectedDate(date || dayjs())}
+                    format="YYYY-MM-DD"
+                  />
+                </Col>
 
-          {/* Modal for Daily Attendance */}
-          <Modal 
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                <CalendarOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                <span style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                  Daily Attendance - {currentSectionName}
-                </span>
-              </div>
-            }
-            open={isModalVisible} 
-            onCancel={() => setIsModalVisible(false)} 
-            footer={null}
-            width={isMobile ? '95' : isTablet ? '90%' : 800}
-            bodyStyle={{ 
-              padding: isSmallMobile ? '8px' : '12px',
-              maxHeight: '60vh',
-              overflowY: 'auto'
-            }}
-            centered
-            destroyOnClose
+                <Col xs={24} sm={6}>
+                  <div style={{ marginTop: 22 }}>
+                    <Button 
+                      type="primary"
+                      icon={<CalendarOutlined />}
+                      onClick={fetchAttendanceByDate}
+                      loading={loading}
+                      block
+                      className="apex-btn-gold"
+                    >
+                      Fetch Attendance
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </TabPane>
+
+          <TabPane 
+            tab={
+              <span>
+                <FileTextOutlined /> Attendance Summary & Percentage
+              </span>
+            } 
+            key="summary"
           >
-            {loading ? <Spin size="large" /> : renderAttendanceTable()}
-          </Modal>
+            <Card size="small" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+              <Row gutter={[16, 16]} align="middle">
+                <Col xs={24} sm={16}>
+                  <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 6 }}>Select Class Section:</Text>
+                  <Select
+                    placeholder="Choose Section"
+                    value={selectedSection}
+                    onChange={setSelectedSection}
+                    style={{ width: '100%', borderRadius: 8 }}
+                  >
+                    {sections.map(sec => (
+                      <Option key={sec.id} value={sec.id}>Section {sec.name}</Option>
+                    ))}
+                  </Select>
+                </Col>
 
-          {/* Modal for Attendance Summary */}
-          <Modal 
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                <FileTextOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                <span style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                  Attendance Summary - {currentSectionName}
-                </span>
-              </div>
-            }
-            open={isSummaryModalVisible} 
-            onCancel={() => setIsSummaryModalVisible(false)} 
-            footer={null}
-            width={isMobile ? '95%' : isTablet ? '95%' : 1000}
-            bodyStyle={{ 
-              padding: isSmallMobile ? '8px' : '12px',
-              maxHeight: '60vh',
-              overflowY: 'auto'
-            }}
-            centered
-            destroyOnClose
-          >
-            {loading ? <Spin size="large" /> : renderSummaryTable()}
-          </Modal>
-        </Card>
-      </Content>
-    </Layout>
+                <Col xs={24} sm={8}>
+                  <div style={{ marginTop: 22 }}>
+                    <Button 
+                      type="primary"
+                      icon={<FileTextOutlined />}
+                      onClick={fetchAttendanceSummary}
+                      loading={loading}
+                      block
+                      className="apex-btn-gold"
+                    >
+                      View Section Summary
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </TabPane>
+        </Tabs>
+      </Card>
+
+      {/* Daily Attendance Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CalendarOutlined style={{ color: '#d4af37' }} />
+            <span>Daily Attendance: Section {currentSectionName} ({selectedDate?.format('YYYY-MM-DD')})</span>
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsModalVisible(false)} style={{ borderRadius: 8 }}>
+            Close
+          </Button>
+        ]}
+        width={800}
+        centered
+      >
+        <Table 
+          columns={attendanceColumns}
+          dataSource={attendanceData}
+          rowKey="id"
+          loading={loading}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
+      </Modal>
+
+      {/* Attendance Summary Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <FileTextOutlined style={{ color: '#d4af37' }} />
+            <span>Attendance Summary: Section {currentSectionName}</span>
+          </div>
+        }
+        open={isSummaryModalVisible}
+        onCancel={() => setIsSummaryModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsSummaryModalVisible(false)} style={{ borderRadius: 8 }}>
+            Close
+          </Button>
+        ]}
+        width={850}
+        centered
+      >
+        <Table 
+          columns={summaryColumns}
+          dataSource={summaryData}
+          rowKey="id"
+          loading={loading}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
+      </Modal>
+    </div>
   );
 };
 

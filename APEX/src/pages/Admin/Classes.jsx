@@ -10,41 +10,35 @@ import {
   Col, 
   Card,
   Typography,
-  Layout,
   Empty,
-  Grid,
-  Drawer,
   Space,
-  Divider
+  Tag,
+  Popconfirm,
+  Tooltip
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   LoadingOutlined,
-  MenuOutlined,
-  CloseOutlined
+  BookOutlined,
+  TeamOutlined,
+  ReloadOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
-import Sidebar from './Sidebar';
 
-const { Content: AntContent } = Layout;
 const { Title, Text } = Typography;
-const { useBreakpoint } = Grid;
 
 const Classes = () => {
   const [sections, setSections] = useState([]);
+  const [filteredSections, setFilteredSections] = useState([]);
+  const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [currentSection, setCurrentSection] = useState(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [addForm] = Form.useForm();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileSidebarVisible, setMobileSidebarVisible] = useState(false);
-  
-  const screens = useBreakpoint();
-  const isMobile = !screens.md;
-  const isSmallMobile = !screens.sm;
 
   // Fetch sections with credentials
   const fetchSections = async () => {
@@ -65,8 +59,11 @@ const Classes = () => {
       } else if (data.message) {
         message.info(data.message);
         setSections([]);
+        setFilteredSections([]);
       } else {
-        setSections(data);
+        const secs = Array.isArray(data) ? data : [];
+        setSections(secs);
+        setFilteredSections(secs);
       }
     } catch (error) {
       message.error('Failed to fetch sections');
@@ -79,6 +76,19 @@ const Classes = () => {
   useEffect(() => {
     fetchSections();
   }, []);
+
+  const handleSearch = (value) => {
+    setSearchText(value);
+    if (!value.trim()) {
+      setFilteredSections(sections);
+    } else {
+      const query = value.toLowerCase();
+      setFilteredSections(sections.filter(s => 
+        s.name.toLowerCase().includes(query) || 
+        String(s.id).includes(query)
+      ));
+    }
+  };
 
   // Add a section with credentials
   const handleSubmit = async (values) => {
@@ -98,12 +108,11 @@ const Classes = () => {
       if (result.error) {
         message.error(result.error);
       } else {
-        message.success(result.message);
+        message.success(result.message || 'Section added successfully');
         addForm.resetFields();
-        setSections(prev => [...prev, { id: result.id, name: values.sectionName }]);
+        fetchSections();
       }
     } catch (error) {
-      console.error('Submission error:', error);
       message.error('Failed to add section');
     } finally {
       setSubmitLoading(false);
@@ -112,45 +121,39 @@ const Classes = () => {
 
   // Delete a section with credentials
   const handleDelete = async (id) => {
-    Modal.confirm({
-      title: 'Are you sure you want to delete this section?',
-      content: 'This action cannot be undone.',
-      okText: 'Yes, Delete',
-      okType: 'danger',
-      cancelText: 'Cancel',
-      onOk: async () => {
-        try {
-          const response = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sect_Delet.php?id=${id}`, {
-            method: 'DELETE',
-            credentials: 'include'
-          });
-          
-          const result = await response.json();
+    try {
+      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/sec_del.php', {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ id }),
+      });
+      
+      const result = await response.json();
 
-          if (result.error) {
-            message.error(result.error);
-          } else {
-            message.success(result.message);
-            setSections(prev => prev.filter(section => section.id !== id));
-          }
-        } catch (error) {
-          console.error('Deletion error:', error);
-          message.error('Failed to delete section');
-        }
-      },
-    });
+      if (result.error) {
+        message.error(result.error);
+      } else {
+        message.success(result.message || 'Section deleted successfully');
+        fetchSections();
+      }
+    } catch (error) {
+      message.error('Failed to delete section');
+    }
   };
 
-  // Update a section with credentials
+  // Update section name
   const handleUpdate = async () => {
-    try {
-      if (!currentSection?.name || !currentSection?.id) {
-        message.error('Section name and ID are required');
-        return;
-      }
+    if (!currentSection || !currentSection.name.trim()) {
+      message.error('Section name cannot be empty');
+      return;
+    }
 
+    try {
       setUpdateLoading(true);
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Update.php', {
+      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/sec_update.php', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -167,248 +170,196 @@ const Classes = () => {
       if (result.error) {
         message.error(result.error);
       } else {
-        message.success(result.message);
+        message.success(result.message || 'Section updated successfully');
         setUpdateModalVisible(false);
-        setSections(prev => 
-          prev.map(section => 
-            section.id === currentSection.id ? { ...section, name: currentSection.name } : section
-          )
-        );
+        fetchSections();
       }
     } catch (error) {
-      console.error('Update error:', error);
       message.error('Failed to update section');
     } finally {
       setUpdateLoading(false);
     }
   };
 
-  // Mobile sidebar toggle
-  const toggleMobileSidebar = () => {
-    setMobileSidebarVisible(!mobileSidebarVisible);
-  };
-
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {/* Desktop Sidebar */}
-      {!isMobile && (
-        <Sidebar 
-          collapsed={sidebarCollapsed} 
-          onCollapse={setSidebarCollapsed}
-        />
-      )}
-      
-      {/* Mobile Sidebar Drawer */}
-      {isMobile && (
-        <Drawer
-          title="Menu"
-          placement="left"
-          onClose={() => setMobileSidebarVisible(false)}
-          open={mobileSidebarVisible}
-          width={250}
-          bodyStyle={{ padding: 0 }}
-          closeIcon={<CloseOutlined />}
-        >
-          <Sidebar 
-            collapsed={false} 
-            onCollapse={() => {}}
-            mobileMode={true}
-          />
-        </Drawer>
-      )}
-      
-      <AntContent 
-        style={{ 
-          padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '24px'),
-          marginLeft: isMobile ? 0 : (sidebarCollapsed ? 80 : 200),
-          transition: 'all 0.2s',
-          background: '#f5f7fa',
-          minHeight: '100vh'
-        }}
-      >
-        {/* Mobile Header */}
-        {isMobile && (
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            marginBottom: 16,
-            padding: '12px 16px',
-            background: '#fff',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.09)'
-          }}>
-            <Button 
-              icon={<MenuOutlined />} 
-              onClick={toggleMobileSidebar}
-              style={{ marginRight: 12 }}
-              type="text"
-            />
-            <Title level={4} style={{ margin: 0, fontSize: isSmallMobile ? '16px' : '18px' }}>
-              Class Sections
-            </Title>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <Card
+        className="apex-card"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <BookOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                Class Sections & Academic Wings
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 12 }}>Create and manage student section groups</Text>
+            </div>
           </div>
-        )}
-        
-        <Card
-          title={!isMobile && <Title level={2} style={{ margin: 0, fontSize: isSmallMobile ? '18px' : '24px' }}>Class Sections</Title>}
-          bordered={false}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            borderRadius: '8px'
-          }}
-          bodyStyle={{ padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '24px') }}
-        >
+        }
+        extra={
+          <Space wrap>
+            <Input
+              placeholder="Search section..."
+              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+              value={searchText}
+              onChange={(e) => handleSearch(e.target.value)}
+              allowClear
+              style={{ width: 200, borderRadius: 8 }}
+            />
+            <Button 
+              type="text" 
+              icon={<ReloadOutlined />} 
+              onClick={fetchSections}
+              loading={loading}
+              style={{ borderRadius: 8 }}
+            />
+          </Space>
+        }
+      >
+        {/* Add Section Form Bar */}
+        <Card size="small" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 24 }}>
           <Form
             form={addForm}
-            layout={isMobile ? "vertical" : "inline"}
+            layout="inline"
             onFinish={handleSubmit}
-            style={{ marginBottom: '24px' }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12 }}
           >
             <Form.Item
               name="sectionName"
               rules={[{ required: true, message: 'Please input section name!' }]}
-              style={isMobile ? { marginBottom: 12 } : { flex: 1, marginRight: 8 }}
+              style={{ flex: 1, margin: 0 }}
             >
               <Input
-                placeholder="Enter Section Name"
-                style={{ width: '100%' }}
-                size={isSmallMobile ? 'small' : 'middle'}
+                placeholder="Enter new Section Name (e.g. Pre-Engineering A, Computer Science B)"
+                prefix={<TeamOutlined style={{ color: '#1e3a8a' }} />}
+                style={{ borderRadius: 8 }}
               />
             </Form.Item>
-            <Form.Item style={isMobile ? { marginBottom: 0 } : {}}>
+            <Form.Item style={{ margin: 0 }}>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={submitLoading}
                 icon={<PlusOutlined />}
-                size={isSmallMobile ? 'small' : 'middle'}
-                block={isMobile}
+                className="apex-btn-gold"
+                style={{ display: 'flex', alignItems: 'center' }}
               >
-                {isMobile ? 'Add' : 'Add Section'}
+                Add Section
               </Button>
             </Form.Item>
           </Form>
-
-          <Divider style={{ margin: isMobile ? '16px 0' : '24px 0' }} />
-
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: isMobile ? '32px 16px' : '48px 24px' }}>
-              <Spin 
-                indicator={<LoadingOutlined style={{ fontSize: isMobile ? 24 : 32 }} spin />} 
-                size={isMobile ? "default" : "large"}
-              />
-              <div style={{ marginTop: 16 }}>
-                <Text type="secondary">Loading sections...</Text>
-              </div>
-            </div>
-          ) : sections.length === 0 ? (
-            <Empty 
-              description="No sections found" 
-              imageStyle={{ 
-                height: isMobile ? 80 : 120,
-                marginBottom: isMobile ? 8 : 16
-              }}
-            >
-              <Button 
-                type="primary" 
-                onClick={() => addForm.submit()}
-                icon={<PlusOutlined />}
-                size={isSmallMobile ? 'small' : 'middle'}
-              >
-                Add First Section
-              </Button>
-            </Empty>
-          ) : (
-            <Row gutter={[isSmallMobile ? 8 : 16, isSmallMobile ? 8 : 16]}>
-              {sections.map((section) => (
-                <Col 
-                  xs={24} 
-                  sm={12} 
-                  md={8} 
-                  lg={6} 
-                  key={section.id}
-                >
-                  <Card
-                    hoverable
-                    size="small"
-                    style={{ 
-                      height: '100%',
-                      borderRadius: '8px'
-                    }}
-                    bodyStyle={{ 
-                      padding: isSmallMobile ? '12px' : '16px'
-                    }}
-                    actions={[
-                      <EditOutlined 
-                        key="edit" 
-                        onClick={() => {
-                          setCurrentSection(section);
-                          setUpdateModalVisible(true);
-                        }} 
-                        style={{ fontSize: isSmallMobile ? '14px' : '16px' }}
-                      />,
-                      <DeleteOutlined 
-                        key="delete" 
-                        onClick={() => handleDelete(section.id)} 
-                        style={{ fontSize: isSmallMobile ? '14px' : '16px', color: '#ff4d4f' }}
-                      />,
-                    ]}
-                  >
-                    <Card.Meta
-                      title={
-                        <Text 
-                          strong 
-                          style={{ 
-                            fontSize: isSmallMobile ? '14px' : '16px',
-                            display: 'block',
-                            marginBottom: '4px'
-                          }}
-                        >
-                          {section.name}
-                        </Text>
-                      }
-                      description={
-                        <Text 
-                          type="secondary" 
-                          style={{ fontSize: isSmallMobile ? '11px' : '12px' }}
-                        >
-                          ID: {section.id}
-                        </Text>
-                      }
-                    />
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          )}
         </Card>
 
-        <Modal
-          title="Update Section"
-          open={updateModalVisible}
-          onOk={handleUpdate}
-          onCancel={() => setUpdateModalVisible(false)}
-          confirmLoading={updateLoading}
-          okText="Update"
-          cancelText="Cancel"
-          width={isMobile ? '90%' : 520}
-          bodyStyle={{ padding: isMobile ? '16px' : '24px' }}
-        >
-          <Form layout="vertical">
-            <Form.Item label="Section Name">
-              <Input
-                value={currentSection?.name || ''}
-                onChange={(e) =>
-                  setCurrentSection(prev => ({ ...prev, name: e.target.value }))
-                }
-                size={isSmallMobile ? 'small' : 'middle'}
-                placeholder="Enter section name"
-              />
-            </Form.Item>
-          </Form>
-        </Modal>
-      </AntContent>
-    </Layout>
+        {/* Section Cards Grid */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <Spin indicator={<LoadingOutlined style={{ fontSize: 36, color: '#0b1b3d' }} spin />} />
+            <div style={{ marginTop: 16 }}>
+              <Text style={{ color: '#64748b' }}>Loading class sections...</Text>
+            </div>
+          </div>
+        ) : filteredSections.length === 0 ? (
+          <Empty 
+            description="No class sections found" 
+            style={{ margin: '40px 0' }}
+          >
+            <Button type="primary" onClick={() => addForm.submit()} icon={<PlusOutlined />} className="apex-btn-gold">
+              Add First Section
+            </Button>
+          </Empty>
+        ) : (
+          <Row gutter={[16, 16]}>
+            {filteredSections.map((section) => (
+              <Col xs={24} sm={12} md={8} lg={6} key={section.id}>
+                <Card
+                  hoverable
+                  className="apex-card"
+                  bodyStyle={{ padding: 18 }}
+                  style={{ borderTop: '3px solid #d4af37', height: '100%' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <Tag color="navy" style={{ background: '#0b1b3d', color: '#d4af37', border: '1px solid rgba(212, 175, 55, 0.3)', borderRadius: 6, fontWeight: 700 }}>
+                      ID #{section.id}
+                    </Tag>
+                    <Space size="small">
+                      <Tooltip title="Edit Section">
+                        <Button 
+                          type="text" 
+                          icon={<EditOutlined style={{ color: '#1e3a8a' }} />} 
+                          onClick={() => {
+                            setCurrentSection(section);
+                            setUpdateModalVisible(true);
+                          }}
+                          style={{ borderRadius: 6, background: '#f1f5f9' }}
+                        />
+                      </Tooltip>
+                      <Popconfirm
+                        title="Delete Section"
+                        description="Are you sure to delete this section?"
+                        onConfirm={() => handleDelete(section.id)}
+                        okText="Yes, Delete"
+                        cancelText="Cancel"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <Tooltip title="Delete Section">
+                          <Button 
+                            type="text" 
+                            danger 
+                            icon={<DeleteOutlined />} 
+                            style={{ borderRadius: 6, background: '#fef2f2' }}
+                          />
+                        </Tooltip>
+                      </Popconfirm>
+                    </Space>
+                  </div>
+
+                  <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                    Section {section.name}
+                  </Title>
+                  <Text style={{ color: '#64748b', fontSize: 12, display: 'block', marginTop: 4 }}>
+                    Academic Wing / Group
+                  </Text>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
+      </Card>
+
+      {/* Edit Section Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BookOutlined style={{ color: '#d4af37' }} />
+            <span>Update Section Name</span>
+          </div>
+        }
+        open={updateModalVisible}
+        onOk={handleUpdate}
+        onCancel={() => setUpdateModalVisible(false)}
+        confirmLoading={updateLoading}
+        okText="Update Section"
+        cancelText="Cancel"
+        okButtonProps={{ className: 'apex-btn-gold' }}
+        centered
+      >
+        <Form layout="vertical" style={{ paddingTop: 12 }}>
+          <Form.Item label={<Text strong style={{ color: '#0b1b3d' }}>Section Name</Text>}>
+            <Input
+              value={currentSection?.name || ''}
+              onChange={(e) =>
+                setCurrentSection(prev => ({ ...prev, name: e.target.value }))
+              }
+              placeholder="Enter section name"
+              size="large"
+              style={{ borderRadius: 8 }}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
   );
 };
 

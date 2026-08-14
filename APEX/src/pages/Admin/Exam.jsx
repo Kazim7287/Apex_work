@@ -1,14 +1,11 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useState, useEffect, useRef } from "react";
-import Sidebar from "./Sidebar";
 import {
-  Layout,
   Card,
   Button,
   Table,
   Typography,
-  Form,
   Input,
   Select,
   DatePicker,
@@ -18,20 +15,11 @@ import {
   message,
   Space,
   Modal,
-  Grid,
-  Drawer,
-  Divider,
   Tag,
-  Avatar,
-  Spin,
-  Badge,
-  Popconfirm,
   Alert,
-  Tabs,
   Dropdown,
-  Menu
+  Tooltip
 } from "antd";
-import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   CalendarOutlined,
@@ -40,28 +28,19 @@ import {
   TeamOutlined,
   EyeOutlined,
   PlusOutlined,
-  MenuOutlined,
-  EditOutlined,
-  DeleteOutlined,
   ScheduleOutlined,
-  HomeOutlined, 
-  AppstoreOutlined,
-  UnorderedListOutlined,
   PrinterOutlined,
   DownloadOutlined,
   FilePdfOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  CheckCircleOutlined
 } from "@ant-design/icons";
 
-const { Content } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = TimePicker;
-const { useBreakpoint } = Grid;
-const { TabPane } = Tabs;
 
 const ExamTimetable = () => {
-  const navigate = useNavigate();
   const [sections, setSections] = useState([]);
   const [examNames, setExamNames] = useState([]);
   const [loadingSections, setLoadingSections] = useState(false);
@@ -73,14 +52,10 @@ const ExamTimetable = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [sectionTimetable, setSectionTimetable] = useState([]);
-  const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);
-  const [activeView, setActiveView] = useState('grid');
   const printRef = useRef();
-  
-  const screens = useBreakpoint();
-  const isMobile = !screens.md;
-  const isSmallMobile = !screens.sm;
-  const isTablet = screens.md && !screens.lg;
+
+  // Form state for scheduling
+  const [subjectForms, setSubjectForms] = useState({});
 
   // API endpoints
   const SECTIONS_API = "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php";
@@ -89,7 +64,6 @@ const ExamTimetable = () => {
   const EXAM_TIMETABLE_READ_API = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/ExamTimetableFetch.php`;
   const EXAM_TIMETABLE_INSERT_API = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/examtimetableinsert.php`;
 
-  // Secure fetch function with session handling
   const fetchWithAuth = async (url, options = {}) => {
     try {
       const response = await fetch(url, {
@@ -98,845 +72,495 @@ const ExamTimetable = () => {
         headers: {
           ...options.headers,
           'Content-Type': 'application/json',
-        },
+        }
       });
-
       if (response.status === 401) {
-        message.error('Session expired. Please login again.');
-        navigate('/admin-signin');
+        message.error("Session expired. Please log in again.");
         return null;
       }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
+      return response;
     } catch (error) {
-      console.error('Fetch error:', error);
-      message.error(error.message || 'Failed to fetch data');
+      console.error("API error:", error);
+      message.error("Network error. Please try again.");
       return null;
     }
   };
 
-  // Fetch initial data
   useEffect(() => {
-    const fetchData = async () => {
-      await fetchSections();
-      await fetchExamNames();
-    };
-    fetchData();
+    fetchSections();
+    fetchExamNames();
   }, []);
 
-  // API Functions
   const fetchSections = async () => {
+    setLoadingSections(true);
     try {
-      setLoadingSections(true);
-      const data = await fetchWithAuth(SECTIONS_API);
-      if (data) {
-        setSections(data?.length > 0 ? data : []);
+      const response = await fetchWithAuth(SECTIONS_API);
+      if (response && response.ok) {
+        const data = await response.json();
+        setSections(data);
       }
     } catch (error) {
-      console.error("Error fetching sections:", error);
+      message.error("Failed to load sections");
     } finally {
       setLoadingSections(false);
     }
   };
 
   const fetchExamNames = async () => {
+  try {
+    const response = await fetchWithAuth(EXAM_READ_API);
+
+    if (response && response.ok) {
+      const result = await response.json();
+
+      console.log("EXAM API RESPONSE:", result);
+
+      const exams = Array.isArray(result.data)
+        ? result.data
+        : result.data
+          ? [result.data]
+          : [];
+
+      setExamNames(exams);
+    }
+  } catch (error) {
+    console.error("Failed to load exam names:", error);
+    setExamNames([]);
+  }
+};
+
+  const fetchSubjectsForSection = async (sectionId) => {
+    setLoadingSubjects(true);
     try {
-      const data = await fetchWithAuth(EXAM_READ_API);
-      if (data?.status === "success" && data?.data?.length > 0) {
-        setExamNames(data.data);
+      const response = await fetchWithAuth(`${SUBJECTS_API}?section_id=${sectionId}`);
+      if (response && response.ok) {
+        const data = await response.json();
+        setSectionSubjects(data);
+        const initialForms = {};
+        data.forEach(subject => {
+          initialForms[subject.id] = {
+            subject_id: subject.id,
+            subject_name: subject.name,
+            exam_date: null,
+            time_range: null,
+            total_marks: '',
+            passing_marks: ''
+          };
+        });
+        setSubjectForms(initialForms);
       }
     } catch (error) {
-      console.error("Error fetching exam names:", error);
-    }
-  };
-
-  const fetchSubjectsBySection = async (sectionId) => {
-    try {
-      setLoadingSubjects(true);
-      const data = await fetchWithAuth(`${SUBJECTS_API}?section_id=${sectionId}`);
-      return data?.length > 0 
-        ? data.map(subject => ({
-            id: subject.subject_id,
-            sec_tech_subject_id: subject.id,
-            name: subject.subject_name,
-            subject_code: subject.subject_code,
-            examName: "",
-            day: "",
-            date: null,
-            timeRange: null,
-            classRoom: ""
-          }))
-        : [];
-    } catch (error) {
-      console.error("Error fetching subjects:", error);
-      return [];
+      message.error("Failed to load subjects for this section");
     } finally {
       setLoadingSubjects(false);
     }
   };
 
-  const fetchTimetableBySectionAndExam = async (sectionId, examName) => {
-    try {
-      setLoadingExams(true);
-      let url = `${EXAM_TIMETABLE_READ_API}?section_id=${sectionId}`;
-      
-      // Add exam_name parameter if provided
-      if (examName) {
-        url += `&exam_name=${encodeURIComponent(examName)}`;
-      }
-      
-      const data = await fetchWithAuth(url);
-      return data?.status === "success" ? data.data : [];
-    } catch (error) {
-      console.error("Error fetching timetable:", error);
-      return [];
-    } finally {
-      setLoadingExams(false);
-    }
-  };
-
-  // Event Handlers
-  const handleSectionClick = async (section) => {
+  const handleSectionSelect = (section) => {
     setSelectedSection(section);
     setSelectedExam(null);
-    
-    try {
-      const subjects = await fetchSubjectsBySection(section.id);
-      setSectionSubjects(subjects);
-    } catch (error) {
-      console.error("Error loading section subjects:", error);
-    }
-  };
-
-  const handleViewTimetable = async () => {
-    if (!selectedSection) {
-      message.warning("Please select a section first");
-      return;
-    }
-    
-    try {
-      const timetable = await fetchTimetableBySectionAndExam(selectedSection.id, selectedExam);
-      setSectionTimetable(timetable);
-      setIsModalVisible(true);
-    } catch (error) {
-      console.error("Error loading timetable:", error);
-    }
+    setSectionSubjects([]);
+    fetchSubjectsForSection(section.id);
   };
 
   const handleExamSelect = (examName) => {
     setSelectedExam(examName);
-    setSectionSubjects(prev => prev.map(subject => ({
-      ...subject,
-      examName
-    })));
   };
 
-  const handleInputChange = (subjectId, fieldName, value) => {
-    setSectionSubjects(prev => prev.map(subject => 
-      subject.id === subjectId ? { ...subject, [fieldName]: value } : subject
-    ));
+  const handleFormChange = (subjectId, field, value) => {
+    setSubjectForms(prev => ({
+      ...prev,
+      [subjectId]: {
+        ...prev[subjectId],
+        [field]: value
+      }
+    }));
   };
 
   const handleSubmit = async () => {
+    if (!selectedSection || !selectedExam) {
+      message.warning("Please select both a Section and an Exam Type.");
+      return;
+    }
+
+    const unconfigured = Object.values(subjectForms).filter(
+      form => !form.exam_date || !form.time_range || !form.total_marks || !form.passing_marks
+    );
+
+    if (unconfigured.length > 0) {
+      message.warning(`Please complete exam schedule details for all ${unconfigured.length} remaining subjects.`);
+      return;
+    }
+
     setIsSubmitting(true);
-    
     try {
-      // Validation
-      if (!selectedSection) throw new Error("Please select a section first");
-      if (!selectedExam) throw new Error("Please select an exam type");
+      const timetableData = Object.values(subjectForms).map(item => ({
+        section_id: selectedSection.id,
+        exam_name: selectedExam,
+        subject_id: item.subject_id,
+        exam_date: item.exam_date.format("YYYY-MM-DD"),
+        start_time: item.time_range[0].format("HH:mm:ss"),
+        end_time: item.time_range[1].format("HH:mm:ss"),
+        total_marks: parseInt(item.total_marks),
+        passing_marks: parseInt(item.passing_marks)
+      }));
 
-      const examsToSubmit = sectionSubjects
-        .filter(subject => {
-          const isValid = (
-            subject.examName && 
-            subject.day && 
-            subject.date && 
-            subject.timeRange && 
-            subject.classRoom
-          );
-          
-          if (!isValid && Object.values(subject).some(Boolean)) {
-            message.warning(`Please fill all fields for subject: ${subject.name}`);
-          }
-          return isValid;
-        })
-        .map(subject => {
-          const [startTime, endTime] = subject.timeRange;
-          return {
-            subject_id: subject.id,
-            section_id: selectedSection.id,
-            room_no: subject.classRoom,
-            time_one: startTime.format("HH:mm:ss"),
-            time_two: endTime.format("HH:mm:ss"),
-            exam_date: subject.date.format("YYYY-MM-DD"),
-            exam_day: subject.day,
-            exam_name: subject.examName
-          };
-        });
-
-      if (examsToSubmit.length === 0) {
-        throw new Error("Please fill in all required fields for at least one subject");
-      }
-
-      // API call
       const response = await fetchWithAuth(EXAM_TIMETABLE_INSERT_API, {
         method: "POST",
-        body: JSON.stringify({ exam_timetable: examsToSubmit }),
+        body: JSON.stringify({ timetable: timetableData })
       });
 
-      if (!response) throw new Error("Failed to save exam timetable");
-
-      message.success("Exams scheduled successfully!");
-      resetForm();
+      if (response && response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          message.success("Exam timetable scheduled successfully!");
+          handleViewTimetable();
+        } else {
+          message.error(result.message || "Failed to schedule exam timetable");
+        }
+      }
     } catch (error) {
-      console.error("Error saving exams:", error);
-      handleApiError(error);
+      message.error("Error submitting exam timetable");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setSelectedSection(null);
-    setSectionSubjects([]);
-    setSelectedExam(null);
-    setIsModalVisible(false);
-  };
+  const handleViewTimetable = async () => {
+    if (!selectedSection || !selectedExam) {
+      message.warning("Select both Section and Exam Type to view timetable.");
+      return;
+    }
 
-  const handleApiError = (error) => {
-    if (error.message.includes("Duplicate entry")) {
-      message.error("This exam schedule already exists for some subjects");
-    } else if (error.message.includes("foreign key constraint fails")) {
-      message.error("Invalid subject or exam reference. Please refresh and try again.");
-    } else {
-      message.error(error.message || "Failed to save exams. Please check all fields.");
+    setLoadingExams(true);
+    try {
+      const response = await fetchWithAuth(
+        `${EXAM_TIMETABLE_READ_API}?section_id=${selectedSection.id}&exam_name=${encodeURIComponent(selectedExam)}`
+      );
+      if (response && response.ok) {
+        const data = await response.json();
+        setSectionTimetable(Array.isArray(data) ? data : []);
+        setIsModalVisible(true);
+      }
+    } catch (error) {
+      message.error("Failed to load timetable");
+    } finally {
+      setLoadingExams(false);
     }
   };
 
-  // Printing functionality
   const handlePrint = () => {
     const printContent = printRef.current;
-    const originalContents = document.body.innerHTML;
-    
-    // Create a print-friendly version
-    const printWindow = window.open('', '_blank');
+    const windowUrl = 'about:blank';
+    const uniqueName = new Date().getTime();
+    const windowName = 'Print' + uniqueName;
+    const printWindow = window.open(windowUrl, windowName, 'left=50,top=50,width=800,height=900');
+
     printWindow.document.write(`
       <html>
         <head>
-          <title>Exam Timetable - ${selectedSection?.name || ''} ${selectedExam ? `- ${selectedExam}` : ''}</title>
+          <title>Exam Timetable - ${selectedSection?.name} (${selectedExam})</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 20px;
-              color: #000;
-            }
-            .print-header {
-              text-align: center;
-              margin-bottom: 20px;
-              border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-            }
-            .print-header h1 {
-              margin: 0;
-              font-size: 24px;
-            }
-            .print-header h2 {
-              margin: 5px 0 0 0;
-              font-size: 18px;
-              color: #444;
-            }
-            .print-meta {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 15px;
-              font-size: 14px;
-            }
-            .print-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 15px;
-            }
-            .print-table th, .print-table td {
-              border: 1px solid #ddd;
-              padding: 8px;
-              text-align: left;
-            }
-            .print-table th {
-              background-color: #f2f2f2;
-              font-weight: bold;
-            }
-            .print-footer {
-              margin-top: 30px;
-              text-align: right;
-              font-size: 12px;
-              color: #666;
-            }
-            @media print {
-              body {
-                margin: 0;
-                padding: 15px;
-              }
-              .no-print {
-                display: none !important;
-              }
-            }
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h2 { color: #0b1b3d; border-bottom: 2px solid #d4af37; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background-color: #f8fafc; color: #0b1b3d; }
           </style>
         </head>
         <body>
-          <div class="print-header">
-            <h1>Exam Timetable</h1>
-            <h2>${selectedSection?.name || ''} ${selectedExam ? `- ${selectedExam}` : ''}</h2>
-          </div>
-          <div class="print-meta">
-            <div>Generated on: ${new Date().toLocaleDateString()}</div>
-            <div>Total Exams: ${sectionTimetable.length}</div>
-          </div>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Room</th>
-                <th>Day</th>
-                <th>Time</th>
-                <th>Date</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${sectionTimetable.map(exam => `
-                <tr>
-                  <td>${exam.subject_name}</td>
-                  <td>${exam.room_no}</td>
-                  <td>${exam.exam_day}</td>
-                  <td>${exam.time_one} - ${exam.time_two}</td>
-                  <td>${dayjs(exam.exam_date).format("DD/MM/YYYY")}</td>
-                  <td>${calculateDuration(exam.time_one, exam.time_two)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="print-footer">
-            Generated by Apex Education System
-          </div>
+          <h2>APEX COLLEGE - EXAM TIMETABLE</h2>
+          <p><strong>Section:</strong> ${selectedSection?.name}</p>
+          <p><strong>Exam:</strong> ${selectedExam}</p>
+          ${printContent.innerHTML}
         </body>
       </html>
     `);
-    
     printWindow.document.close();
-    
-    // Wait for content to load then print
-    printWindow.onload = function() {
-      printWindow.print();
-      printWindow.onafterprint = function() {
-        printWindow.close();
-      };
-    };
-  };
-
-  const calculateDuration = (startTime, endTime) => {
-    if (!startTime || !endTime) return "N/A";
-    const [h1, m1] = startTime.split(':').map(Number);
-    const [h2, m2] = endTime.split(':').map(Number);
-    const minutes = (h2 * 60 + m2) - (h1 * 60 + m1);
-    return minutes <= 0 ? "0 min" : `${Math.floor(minutes/60)}h ${minutes%60}m`;
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
   };
 
   const exportAsPDF = () => {
-    message.info("PDF export functionality would typically connect to a backend service");
-    // In a real application, this would generate a PDF version
-    // For now, we'll just use the print functionality
     handlePrint();
   };
 
   const exportAsText = () => {
-    let textContent = `Exam Timetable\n`;
-    textContent += `Section: ${selectedSection?.name || ''}\n`;
-    textContent += `Exam: ${selectedExam || ''}\n`;
-    textContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
-    
-    textContent += "Subject\tRoom\tDay\tTime\tDate\tDuration\n";
-    textContent += sectionTimetable.map(exam => 
-      `${exam.subject_name}\t${exam.room_no}\t${exam.exam_day}\t${exam.time_one}-${exam.time_two}\t${dayjs(exam.exam_date).format("DD/MM/YYYY")}\t${calculateDuration(exam.time_one, exam.time_two)}`
-    ).join('\n');
-    
-    const blob = new Blob([textContent], { type: 'text/plain' });
+    let textContent = `EXAM TIMETABLE\nSection: ${selectedSection?.name}\nExam: ${selectedExam}\n\n`;
+    sectionTimetable.forEach(item => {
+      textContent += `Subject: ${item.subject_name}\nDate: ${item.exam_date}\nTime: ${item.start_time} - ${item.end_time}\nTotal Marks: ${item.total_marks} | Passing: ${item.passing_marks}\n-------------------------------\n`;
+    });
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `timetable-${selectedSection?.name || 'section'}-${selectedExam || 'exam'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    message.success("Timetable exported as text");
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Timetable_${selectedSection?.name}_${selectedExam}.txt`;
+    link.click();
   };
 
-  // Responsive table columns
   const examColumns = [
-    { 
-      title: "Subject", 
-      dataIndex: "subject_name", 
-      key: "subject_name",
-      fixed: isMobile ? 'left' : false,
-      width: isMobile ? 120 : undefined,
-      render: (text) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <BookOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-          <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-            {text}
-          </Text>
-        </div>
+    {
+      title: 'Subject Name',
+      dataIndex: 'subject_name',
+      key: 'subject_name',
+      render: (name) => (
+        <Space>
+          <BookOutlined style={{ color: '#1e3a8a' }} />
+          <Text strong style={{ color: '#0f172a' }}>{name}</Text>
+        </Space>
       )
     },
-    { 
-      title: "Room", 
-      dataIndex: "room_no", 
-      key: "room_no",
-      render: (text) => (
-        <Tag icon={<HomeOutlined />} color="blue" style={{ fontSize: isSmallMobile ? '10px' : '12px' }}>
-          {text}
+    {
+      title: 'Exam Date',
+      dataIndex: 'exam_date',
+      key: 'exam_date',
+      render: (date) => (
+        <Tag icon={<CalendarOutlined />} color="processing" style={{ borderRadius: 12 }}>
+          {date}
         </Tag>
-      ),
-      responsive: ['sm']
+      )
     },
-    { 
-      title: "Day", 
-      dataIndex: "exam_day", 
-      key: "exam_day",
-      render: (text) => (
-        <Text style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>{text}</Text>
-      ),
-      responsive: ['md']
-    },
-    { 
-      title: "Time", 
-      key: "time",
+    {
+      title: 'Timing',
+      key: 'timing',
       render: (_, record) => (
-        <div style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-          <ClockCircleOutlined style={{ marginRight: 4 }} />
-          {record.time_one} - {record.time_two}
-        </div>
-      ),
-      responsive: ['md']
-    },
-    { 
-      title: "Date", 
-      dataIndex: "exam_date", 
-      key: "exam_date",
-      render: date => (
-        <div style={{ fontSize: isSmallMobile ? '11px' : '13px' }}>
-          <CalendarOutlined style={{ marginRight: 4 }} />
-          {dayjs(date).format("DD/MM/YYYY")}
-        </div>
-      ),
-      responsive: ['lg']
+        <Text style={{ fontSize: 13, color: '#334155' }}>
+          <ClockCircleOutlined style={{ marginRight: 6, color: '#d4af37' }} />
+          {record.start_time} - {record.end_time}
+        </Text>
+      )
     },
     {
-      title: "Duration",
-      key: "duration",
-      render: (_, record) => {
-        const duration = calculateDuration(record.time_one, record.time_two);
-        return (
-          <Badge 
-            count={duration} 
-            style={{ 
-              backgroundColor: duration.includes('0 min') ? '#f5222d' : '#52c41a',
-              fontSize: isSmallMobile ? '10px' : '12px'
-            }} 
-          />
-        );
-      },
-      responsive: ['lg']
-    }
-  ];
-
-  // Mobile-friendly components
-  const SectionButtons = () => (
-    <div style={{ 
-      display: 'flex', 
-      flexWrap: 'wrap', 
-      gap: '8px',
-      justifyContent: isMobile ? 'center' : 'flex-start'
-    }}>
-      {sections.map(section => (
-        <Button
-          key={section.id}
-          type={selectedSection?.id === section.id ? "primary" : "default"}
-          onClick={() => handleSectionClick(section)}
-          icon={<TeamOutlined />}
-          size={isSmallMobile ? 'small' : 'middle'}
-          style={{ 
-            minWidth: isSmallMobile ? '80px' : '100px',
-            flex: isMobile ? '1 1 40%' : 'none',
-            maxWidth: isMobile ? '45%' : 'none'
-          }}
-        >
-          {section.name}
-        </Button>
-      ))}
-    </div>
-  );
-
-  const ExamTypeButtons = () => (
-    <div style={{ 
-      display: 'flex', 
-      flexWrap: 'wrap', 
-      gap: '8px',
-      justifyContent: isMobile ? 'center' : 'flex-start'
-    }}>
-      {examNames.map(exam => (
-        <Button
-          key={exam.id}
-          type={selectedExam === exam.exam_name ? "primary" : "default"}
-          onClick={() => handleExamSelect(exam.exam_name)}
-          size={isSmallMobile ? 'small' : 'middle'}
-          style={{ 
-            minWidth: isSmallMobile ? '100px' : '120px',
-            flex: isMobile ? '1 1 45%' : 'none',
-            maxWidth: isMobile ? '48%' : 'none'
-          }}
-        >
-          {exam.exam_name}
-        </Button>
-      ))}
-    </div>
-  );
-
-  const SubjectForm = ({ subject }) => (
-    <Card 
-      size="small" 
-      style={{ marginBottom: 16, borderRadius: 8 }}
-      bodyStyle={{ padding: isSmallMobile ? '12px' : '16px' }}
-    >
-      <Title level={5} style={{ marginBottom: 16, fontSize: isSmallMobile ? '14px' : '16px' }}>
-        <BookOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-        {subject.name}
-        {subject.subject_code && (
-          <Text type="secondary" style={{ fontSize: isSmallMobile ? '11px' : '12px', marginLeft: 8 }}>
-            ({subject.subject_code})
-          </Text>
-        )}
-      </Title>
-      
-      <Row gutter={[8, 8]}>
-        <Col xs={24} sm={12} md={8}>
-          <Form.Item label="Exam Name" required>
-            <Input
-              value={subject.examName}
-              onChange={e => handleInputChange(subject.id, "examName", e.target.value)}
-              disabled={!!selectedExam}
-              size={isSmallMobile ? 'small' : 'middle'}
-              prefix={<ScheduleOutlined />}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Form.Item label="Day" required>
-            <Select
-              value={subject.day}
-              onChange={value => handleInputChange(subject.id, "day", value)}
-              placeholder="Select day"
-              size={isSmallMobile ? 'small' : 'middle'}
-            >
-              {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map(day => (
-                <Option key={day} value={day}>{day}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Form.Item label="Date" required>
-            <DatePicker
-              style={{ width: "100%" }}
-              value={subject.date}
-              onChange={value => handleInputChange(subject.id, "date", value)}
-              placeholder="Select date"
-              size={isSmallMobile ? 'small' : 'middle'}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Form.Item label="Room" required>
-            <Input
-              value={subject.classRoom}
-              onChange={e => handleInputChange(subject.id, "classRoom", e.target.value)}
-              placeholder="Enter room number"
-              size={isSmallMobile ? 'small' : 'middle'}
-              prefix={<HomeOutlined />}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={16}>
-          <Form.Item label="Time" required>
-            <RangePicker
-              format="HH:mm"
-              minuteStep={1}
-              value={subject.timeRange}
-              onChange={value => handleInputChange(subject.id, "timeRange", value)}
-              style={{ width: '100%' }}
-              size={isSmallMobile ? 'small' : 'middle'}
-            />
-          </Form.Item>
-        </Col>
-      </Row>
-    </Card>
-  );
-
-  // Export menu items
-  const exportMenuItems = [
-    {
-      key: 'print',
-      label: 'Print',
-      icon: <PrinterOutlined />,
-      onClick: handlePrint
+      title: 'Total Marks',
+      dataIndex: 'total_marks',
+      key: 'total_marks',
+      align: 'center',
+      render: (marks) => <Tag color="blue">{marks}</Tag>
     },
     {
-      key: 'pdf',
-      label: 'Export as PDF',
-      icon: <FilePdfOutlined />,
-      onClick: exportAsPDF
-    },
-    {
-      key: 'text',
-      label: 'Export as Text',
-      icon: <FileTextOutlined />,
-      onClick: exportAsText
+      title: 'Passing Marks',
+      dataIndex: 'passing_marks',
+      key: 'passing_marks',
+      align: 'center',
+      render: (marks) => <Tag color="green">{marks}</Tag>
     }
   ];
 
   return (
-    <Layout style={{ minHeight: "100vh", background: '#f5f7fa' }}>
-      {/* Mobile Drawer */}
-      {isMobile && (
-        <Drawer
-          title="Navigation"
-          placement="left"
-          onClose={() => setMobileDrawerVisible(false)}
-          open={mobileDrawerVisible}
-          width={280}
-          bodyStyle={{ padding: 0 }}
-        >
-          <Sidebar />
-        </Drawer>
-      )}
-
-      <Content style={{ 
-        padding: isSmallMobile ? '8px' : (isMobile ? '12px' : '16px'),
-      }}>
-        <Card
-          title={
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '8px'
-            }}>
-              {isMobile && (
-                <Button 
-                  icon={<MenuOutlined />}
-                  type="text"
-                  onClick={() => setMobileDrawerVisible(true)}
-                  style={{ marginRight: 8 }}
-                  size="small"
-                />
-              )}
-              <Title level={isSmallMobile ? 4 : 2} style={{ margin: 0, fontSize: isMobile ? '18px' : '24px' }}>
-                <ScheduleOutlined style={{ marginRight: 12, color: '#1890ff' }} />
-                Exam Timetable
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <Card
+        className="apex-card"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <ScheduleOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                Exam Schedule & Timetable Planner
               </Title>
+              <Text style={{ color: '#64748b', fontSize: 12 }}>Configure examination dates, timing, and marks distribution by section</Text>
             </div>
-          }
-          bordered={false}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.09)',
-            borderRadius: '8px'
-          }}
-          bodyStyle={{ 
-            padding: isSmallMobile ? '12px' : (isMobile ? '16px' : '20px')
-          }}
-          extra={
-            selectedSection && (
-              <Space>
-                <Button 
-                  type="primary" 
-                  onClick={handleViewTimetable}
-                  loading={loadingExams}
-                  icon={<EyeOutlined />}
-                  size={isSmallMobile ? 'small' : 'middle'}
-                  disabled={!selectedExam}
-                >
-                  {isMobile ? 'View' : 'View Timetable'}
-                </Button>
-              </Space>
-            )
-          }
-        >
-          {/* Sections Selection */}
+          </div>
+        }
+        extra={
+          selectedSection && selectedExam && (
+            <Button 
+              type="primary" 
+              onClick={handleViewTimetable}
+              loading={loadingExams}
+              icon={<EyeOutlined />}
+              className="apex-btn-gold"
+            >
+              View Saved Timetable
+            </Button>
+          )
+        }
+      >
+        {/* Step 1: Select Section */}
+        <div style={{ marginBottom: 24 }}>
+          <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 12, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            1. Select Class Section:
+          </Text>
+          <Row gutter={[10, 10]}>
+            {sections.map(section => {
+              const isSelected = selectedSection?.id === section.id;
+              return (
+                <Col key={section.id}>
+                  <Button
+                    type={isSelected ? 'primary' : 'default'}
+                    onClick={() => handleSectionSelect(section)}
+                    icon={<TeamOutlined />}
+                    className={isSelected ? 'apex-btn-gold' : ''}
+                    style={{ borderRadius: 8, fontWeight: 600, borderColor: isSelected ? '#d4af37' : '#cbd5e1' }}
+                  >
+                    Section {section.name}
+                  </Button>
+                </Col>
+              );
+            })}
+          </Row>
+        </div>
+
+        {/* Step 2: Select Exam Type */}
+        {selectedSection && (
+          <div style={{ marginBottom: 24 }}>
+            <Text strong style={{ color: '#0b1b3d', display: 'block', marginBottom: 12, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              2. Select Exam Category:
+            </Text>
+            <Row gutter={[10, 10]}>
+              {examNames.map(exam => {
+                const examTitle = exam.exam_name || exam.name || exam;
+                const isSelected = selectedExam === examTitle;
+                return (
+                  <Col key={exam.id || examTitle}>
+                    <Button
+                      type={isSelected ? 'primary' : 'default'}
+                      onClick={() => handleExamSelect(examTitle)}
+                      icon={<ScheduleOutlined />}
+                      style={{ 
+                        borderRadius: 8, 
+                        fontWeight: 600,
+                        background: isSelected ? 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)' : '#ffffff',
+                        color: isSelected ? '#ffffff' : '#0b1b3d',
+                        borderColor: isSelected ? '#0b1b3d' : '#cbd5e1'
+                      }}
+                    >
+                      {examTitle}
+                    </Button>
+                  </Col>
+                );
+              })}
+            </Row>
+          </div>
+        )}
+
+        {/* Step 3: Subject Scheduling Forms */}
+        {selectedSection && selectedExam && (
           <Card 
+            size="small" 
+            style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}
             title={
-              <Text strong style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                <TeamOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                Select Section
-              </Text>
+              <Space style={{ color: '#0b1b3d', fontWeight: 700 }}>
+                <BookOutlined style={{ color: '#d4af37' }} />
+                <span>Configure Schedule for Section {selectedSection.name} — {selectedExam}</span>
+              </Space>
             }
-            loading={loadingSections}
-            style={{ marginBottom: 16 }}
-            bodyStyle={{ padding: isSmallMobile ? '12px' : '16px' }}
           >
-            <SectionButtons />
-          </Card>
+            <Alert
+              message="Set Exam Date, Timing, and Marks for all subjects below"
+              type="info"
+              showIcon
+              style={{ marginBottom: 20, borderRadius: 8 }}
+            />
 
-          {selectedSection && (
-            <>
-              {/* Exam Type Selection */}
-              <Card 
-                title={
-                  <Text strong style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                    <ScheduleOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                    Select Exam Type
-                  </Text>
-                }
-                style={{ marginBottom: 16 }}
-                bodyStyle={{ padding: isSmallMobile ? '12px' : '16px' }}
-              >
-                <ExamTypeButtons />
-              </Card>
-
-              {/* Subject Scheduling Form */}
-              {selectedExam && (
+            {sectionSubjects.map((subject, idx) => {
+              const form = subjectForms[subject.id] || {};
+              return (
                 <Card 
-                  title={
-                    <Text strong style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                      <TeamOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                      Schedule for {selectedSection.name} - {selectedExam}
-                    </Text>
-                  }
-                  loading={loadingSubjects}
-                  style={{ marginBottom: 16 }}
-                  bodyStyle={{ padding: isSmallMobile ? '12px' : '16px' }}
+                  key={subject.id} 
+                  size="small" 
+                  style={{ marginBottom: 14, borderRadius: 10, border: '1px solid #e2e8f0' }}
                 >
-                  {sectionSubjects.length > 0 ? (
-                    <>
-                      <Alert
-                        message="Fill exam details for each subject"
-                        description="All fields are required for scheduling."
-                        type="info"
-                        showIcon
-                        style={{ marginBottom: 16, fontSize: isSmallMobile ? '12px' : '14px' }}
-                      />
-                      
-                      <div style={{ maxHeight: isMobile ? '400px' : 'none', overflowY: isMobile ? 'auto' : 'visible' }}>
-                        {sectionSubjects.map(subject => (
-                          <SubjectForm key={subject.id} subject={subject} />
-                        ))}
-                      </div>
-                      
-                      <Button 
-                        type="primary" 
-                        size={isMobile ? "middle" : "large"}
-                        onClick={handleSubmit}
-                        loading={isSubmitting}
-                        icon={<PlusOutlined />}
-                        block
-                        style={{ marginTop: 16 }}
-                      >
-                        Submit Schedule
-                      </Button>
-                    </>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: 20 }}>
-                      <BookOutlined style={{ fontSize: 36, color: '#ddd', marginBottom: 12 }} />
-                      <Text type="secondary" style={{ display: 'block', fontSize: isSmallMobile ? '12px' : '14px' }}>
-                        No subjects found for this section
+                  <Row gutter={[16, 12]} align="middle">
+                    <Col xs={24} sm={6}>
+                      <Text strong style={{ color: '#0b1b3d', fontSize: 14, display: 'block' }}>
+                        {idx + 1}. {subject.name}
                       </Text>
-                    </div>
-                  )}
+                      <Text style={{ fontSize: 11, color: '#64748b' }}>Code: #{subject.id}</Text>
+                    </Col>
+                    <Col xs={24} sm={5}>
+                      <DatePicker 
+                        placeholder="Exam Date" 
+                        style={{ width: '100%', borderRadius: 8 }}
+                        value={form.exam_date}
+                        onChange={(date) => handleFormChange(subject.id, 'exam_date', date)}
+                      />
+                    </Col>
+                    <Col xs={24} sm={5}>
+                      <RangePicker 
+                        format="HH:mm"
+                        style={{ width: '100%', borderRadius: 8 }}
+                        value={form.time_range}
+                        onChange={(times) => handleFormChange(subject.id, 'time_range', times)}
+                      />
+                    </Col>
+                    <Col xs={12} sm={4}>
+                      <Input 
+                        placeholder="Total Marks" 
+                        type="number"
+                        value={form.total_marks}
+                        onChange={(e) => handleFormChange(subject.id, 'total_marks', e.target.value)}
+                        style={{ borderRadius: 8 }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={4}>
+                      <Input 
+                        placeholder="Pass Marks" 
+                        type="number"
+                        value={form.passing_marks}
+                        onChange={(e) => handleFormChange(subject.id, 'passing_marks', e.target.value)}
+                        style={{ borderRadius: 8 }}
+                      />
+                    </Col>
+                  </Row>
                 </Card>
-              )}
-            </>
-          )}
+              );
+            })}
 
-          {/* Timetable Modal */}
-          <Modal
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                <CalendarOutlined style={{ marginRight: 8, color: '#1890ff', fontSize: 18 }} />
-                <span style={{ fontSize: isSmallMobile ? '14px' : '16px' }}>
-                  Exam Timetable: {selectedSection?.name || ''} 
-                  {selectedExam && ` - ${selectedExam}`}
-                </span>
-              </div>
-            }
-            open={isModalVisible}
-            onCancel={() => setIsModalVisible(false)}
-            footer={[
-              <Button key="close" onClick={() => setIsModalVisible(false)}>
-                Close
-              </Button>,
-              <Dropdown 
-                key="export" 
-                menu={{ items: exportMenuItems }} 
-                placement="topRight"
-              >
-                <Button type="primary" icon={<DownloadOutlined />}>
-                  Export
-                </Button>
-              </Dropdown>,
-              <Button 
-                key="print" 
-                type="primary" 
-                icon={<PrinterOutlined />}
-                onClick={handlePrint}
-              >
-                Print
-              </Button>
-            ]}
-            width={isMobile ? '95%' : isTablet ? '90%' : 1000}
-            bodyStyle={{ 
-              padding: isSmallMobile ? '8px' : '12px',
-              maxHeight: '60vh',
-              overflowY: 'auto'
-            }}
-            centered
-          >
-            <div ref={printRef}>
-              {sectionTimetable.length > 0 ? (
-                <>
-                  <div style={{ marginBottom: 12 }}>
-                    <Text strong style={{ fontSize: isSmallMobile ? '12px' : '14px' }}>
-                      Total Exams: {sectionTimetable.length}
-                    </Text>
-                  </div>
-                  <Table
-                    columns={examColumns}
-                    dataSource={sectionTimetable}
-                    rowKey="id"
-                    loading={loadingExams}
-                    pagination={false}
-                    scroll={{ x: isMobile ? 500 : true }}
-                    locale={{ emptyText: "No exams scheduled yet" }}
-                    size={isSmallMobile ? 'small' : (isMobile ? 'middle' : 'default')}
-                  />
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', padding: 20 }}>
-                  <CalendarOutlined style={{ fontSize: 36, color: '#ddd', marginBottom: 12 }} />
-                  <Text type="secondary" style={{ display: 'block', fontSize: isSmallMobile ? '12px' : '14px' }}>
-                    No exam timetable found for {selectedSection?.name || 'this section'}
-                    {selectedExam && ` and ${selectedExam}`}
-                  </Text>
-                </div>
-              )}
-            </div>
-          </Modal>
-        </Card>
-      </Content>
-    </Layout>
+            <Button 
+              type="primary" 
+              size="large"
+              onClick={handleSubmit}
+              loading={isSubmitting}
+              icon={<CheckCircleOutlined />}
+              block
+              className="apex-btn-gold"
+              style={{ marginTop: 12, height: 44 }}
+            >
+              Save & Publish Exam Timetable
+            </Button>
+          </Card>
+        )}
+      </Card>
+
+      {/* Timetable Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CalendarOutlined style={{ color: '#d4af37', fontSize: 18 }} />
+            <span>Timetable: Section {selectedSection?.name} ({selectedExam})</span>
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsModalVisible(false)} style={{ borderRadius: 8 }}>
+            Close
+          </Button>,
+          <Button key="export" icon={<DownloadOutlined />} onClick={exportAsText} style={{ borderRadius: 8 }}>
+            Export Text
+          </Button>,
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrint} className="apex-btn-gold">
+            Print Timetable
+          </Button>
+        ]}
+        width={850}
+        centered
+      >
+        <div ref={printRef} style={{ paddingTop: 12 }}>
+          <Table
+            columns={examColumns}
+            dataSource={sectionTimetable}
+            rowKey="id"
+            loading={loadingExams}
+            pagination={false}
+            scroll={{ x: 'max-content' }}
+          />
+        </div>
+      </Modal>
+    </div>
   );
 };
 

@@ -8,10 +8,10 @@ import {
   message,
   Typography,
   Space,
-  Divider,
   Input,
   Select,
-  Avatar
+  Avatar,
+  Tooltip
 } from 'antd';
 import {
   EyeOutlined,
@@ -19,10 +19,12 @@ import {
   SyncOutlined,
   MailOutlined,
   UserOutlined,
-  EditOutlined
+  EditOutlined,
+  MessageOutlined
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
+const { Option } = Select;
 
 const FeedbackManagement = () => {
   const [feedbackList, setFeedbackList] = useState([]);
@@ -99,42 +101,34 @@ const FeedbackManagement = () => {
     fetchFeedback();
   }, [fetchFeedback]);
 
-  const handleViewFeedback = (feedback) => {
-    setSelectedFeedback(feedback);
-    setIsViewModalVisible(true);
-  };
-
-  const handleStatusUpdateClick = (feedback) => {
-    setSelectedFeedback(feedback);
-    setCurrentStatus(feedback.status);
-    setIsStatusModalVisible(true);
-  };
-
-  const updateFeedbackStatus = async () => {
+  const handleUpdateStatus = async () => {
     if (!selectedFeedback || !currentStatus) return;
-    
+
     setUpdatingStatus(true);
     try {
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/adminresponse.php', {
-        method: 'PUT',
+      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/UpdateFeed.php', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
-          id: selectedFeedback.id,
-          status: currentStatus
+          feedback_id: selectedFeedback.id,
+          status: currentStatus,
         }),
       });
 
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
+      if (data.status !== 'success') {
         throw new Error(data.message || 'Failed to update status');
       }
 
-      message.success('Status updated successfully');
-      fetchFeedback();
+      message.success(data.message || 'Status updated successfully');
       setIsStatusModalVisible(false);
+      fetchFeedback();
+
     } catch (error) {
       console.error('Error updating status:', error);
       message.error(error.message || 'Failed to update status');
@@ -143,321 +137,204 @@ const FeedbackManagement = () => {
     }
   };
 
-  const handleTableChange = (newPagination, newFilters) => {
-    setPagination(prev => ({
-      ...prev,
-      current: newPagination.current,
-      pageSize: newPagination.pageSize,
-    }));
-
-    setFilters(prev => ({
-      ...prev,
-      status: newFilters.status?.[0] || null,
-    }));
+  const openViewModal = (record) => {
+    setSelectedFeedback(record);
+    setIsViewModalVisible(true);
   };
 
-  const handleSearch = (value) => {
-    setFilters(prev => ({ ...prev, search: value }));
-    setPagination(prev => ({ ...prev, current: 1 }));
+  const openStatusModal = (record) => {
+    setSelectedFeedback(record);
+    setCurrentStatus(record.status);
+    setIsStatusModalVisible(true);
   };
-
-  const handleStatusFilterChange = (value) => {
-    setFilters(prev => ({ ...prev, status: value }));
-    setPagination(prev => ({ ...prev, current: 1 }));
-  };
-
-  const handleRefresh = () => {
-    fetchFeedback();
-  };
-
-  const getStatusTag = (status) => {
-    const statusMap = {
-      'pending': { color: 'orange', text: 'Pending' },
-      'resolved': { color: 'green', text: 'Resolved' },
-      'reviewed': { color: 'blue', text: 'Reviewed' },
-      'archived': { color: 'gray', text: 'Archived' },
-      'rejected': { color: 'red', text: 'Rejected' },
-    };
-
-    const normalizedStatus = status?.toLowerCase();
-    const statusInfo = statusMap[normalizedStatus] || { color: 'default', text: status };
-
-    return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
-  };
-
-  const statusOptions = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'reviewed', label: 'Reviewed' },
-    { value: 'resolved', label: 'Resolved' },
-    { value: 'archived', label: 'Archived' },
-    { value: 'rejected', label: 'Rejected' },
-  ];
 
   const columns = [
     {
-      title: 'Name',
+      title: 'Sender',
       dataIndex: 'name',
       key: 'name',
-      sorter: true,
       render: (name, record) => (
         <Space>
-          <Avatar style={{ backgroundColor: '#1890ff' }}>{getInitial(name)}</Avatar>
-          <span>{name}</span>
+          <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }}>
+            {getInitial(name)}
+          </Avatar>
+          <div>
+            <Text strong style={{ color: '#0f172a', display: 'block', lineHeight: 1.2 }}>{name}</Text>
+            <Text style={{ fontSize: 11, color: '#64748b' }}>{record.email}</Text>
+          </div>
         </Space>
       ),
     },
     {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-      sorter: true,
-      render: (email) => (
-        <a href={`mailto:${email}`} style={{ display: 'flex', alignItems: 'center' }}>
-          <MailOutlined style={{ marginRight: 8 }} />
-          {email}
-        </a>
-      ),
+      title: 'Subject',
+      dataIndex: 'subject',
+      key: 'subject',
+      render: (subject) => <Text strong style={{ color: '#1e3a8a' }}>{subject}</Text>
     },
     {
-      title: 'Feedback',
-      dataIndex: 'feedback',
-      key: 'feedback',
-      ellipsis: true,
-      render: (text) => (
-        <div style={{
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: '300px'
-        }}>
-          {text}
-        </div>
-      ),
+      title: 'Date Received',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date) => date ? new Date(date).toLocaleString() : 'N/A'
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      filters: statusOptions.map(opt => ({
-        text: opt.label,
-        value: opt.value
-      })),
-      render: getStatusTag,
-      sorter: true,
-    },
-    {
-      title: 'Date',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (date) => new Date(date).toLocaleDateString(),
-      sorter: true,
+      align: 'center',
+      render: (status) => {
+        let color = 'gold';
+        if (status === 'resolved') color = 'green';
+        if (status === 'in_progress') color = 'blue';
+        return <Tag color={color} style={{ borderRadius: 12, textTransform: 'capitalize', padding: '2px 10px' }}>{status}</Tag>;
+      },
     },
     {
       title: 'Actions',
       key: 'actions',
-      width: 180,
+      align: 'center',
+      width: 140,
       render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewFeedback(record)}
-          >
-            View
-          </Button>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleStatusUpdateClick(record)}
-          >
-            Update Status
-          </Button>
+        <Space size="small">
+          <Tooltip title="View Message">
+            <Button
+              type="primary"
+              icon={<EyeOutlined />}
+              onClick={() => openViewModal(record)}
+              size="small"
+              style={{ background: '#0b1b3d', borderRadius: 6 }}
+            />
+          </Tooltip>
+          <Tooltip title="Update Status">
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => openStatusModal(record)}
+              size="small"
+              className="apex-btn-gold"
+            />
+          </Tooltip>
         </Space>
       ),
     },
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       <Card
+        className="apex-card"
         title={
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Title level={4} style={{ margin: 0 }}>Feedback Management</Title>
-            <Space>
-              <Select
-                placeholder="Filter by status"
-                style={{ width: 180 }}
-                allowClear
-                options={statusOptions}
-                onChange={handleStatusFilterChange}
-                value={filters.status}
-              />
-              <Input.Search
-                placeholder="Search feedback..."
-                allowClear
-                enterButton={<SearchOutlined />}
-                style={{ width: 300 }}
-                onSearch={handleSearch}
-              />
-              <Button
-                icon={<SyncOutlined />}
-                onClick={handleRefresh}
-                loading={loading}
-              >
-                Refresh
-              </Button>
-            </Space>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              <MessageOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                Public Website Enquiries & Feedback
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 12 }}>Review messages submitted through the public website contact form</Text>
+            </div>
+          </div>
+        }
+        extra={
+          <Space wrap>
+            <Input
+              placeholder="Search sender or subject..."
+              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+              value={filters.search}
+              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+              allowClear
+              style={{ width: 220, borderRadius: 8 }}
+            />
+            <Select
+              placeholder="Filter Status"
+              value={filters.status}
+              onChange={(val) => setFilters(prev => ({ ...prev, status: val }))}
+              allowClear
+              style={{ width: 140, borderRadius: 8 }}
+            >
+              <Option value="new">New</Option>
+              <Option value="in_progress">In Progress</Option>
+              <Option value="resolved">Resolved</Option>
+            </Select>
+            <Button type="text" icon={<SyncOutlined />} onClick={fetchFeedback} loading={loading} style={{ borderRadius: 8 }} />
           </Space>
         }
-        bordered={false}
       >
         <Table
           columns={columns}
           dataSource={feedbackList}
           rowKey="id"
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          }}
-          onChange={handleTableChange}
           loading={loading}
           scroll={{ x: 'max-content' }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: (page, pageSize) => setPagination(prev => ({ ...prev, current: page, pageSize })),
+            showTotal: (total) => `Total ${total} feedback messages`
+          }}
         />
       </Card>
 
+      {/* View Message Modal */}
       <Modal
-        title="Feedback Details"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }}>
+              {getInitial(selectedFeedback?.name)}
+            </Avatar>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#0b1b3d' }}>{selectedFeedback?.name}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{selectedFeedback?.email}</div>
+            </div>
+          </div>
+        }
         open={isViewModalVisible}
         onCancel={() => setIsViewModalVisible(false)}
         footer={[
-          <Button key="close" onClick={() => setIsViewModalVisible(false)}>
+          <Button key="close" onClick={() => setIsViewModalVisible(false)} style={{ borderRadius: 8 }}>
             Close
-          </Button>,
+          </Button>
         ]}
-        width={800}
+        width={600}
         centered
       >
         {selectedFeedback && (
-          <div style={{ padding: '16px 0' }}>
-            <Space style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: 16
-            }}>
-              <div>
-                <Text strong>From: </Text>
-                <Space>
-                  <Avatar size="large" style={{ backgroundColor: '#1890ff' }}>
-                    {getInitial(selectedFeedback.name)}
-                  </Avatar>
-                  <div>
-                    <div>{selectedFeedback.name}</div>
-                    <a href={`mailto:${selectedFeedback.email}`} style={{ display: 'flex', alignItems: 'center' }}>
-                      <MailOutlined style={{ marginRight: 8 }} />
-                      {selectedFeedback.email}
-                    </a>
-                  </div>
-                </Space>
-              </div>
-              <div>
-                <Text strong>Status: </Text>
-                {getStatusTag(selectedFeedback.status)}
-              </div>
-            </Space>
-
-            <Space style={{ display: 'flex', gap: 32, marginBottom: 16 }}>
-              <div>
-                <Text strong>Submitted: </Text>
-                <Text>{new Date(selectedFeedback.created_at).toLocaleString()}</Text>
-              </div>
-              {selectedFeedback.updated_at && (
-                <div>
-                  <Text strong>Last Updated: </Text>
-                  <Text>{new Date(selectedFeedback.updated_at).toLocaleString()}</Text>
-                </div>
-              )}
-            </Space>
-
-            <Divider />
-
-            <div style={{ marginBottom: 24 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>Feedback:</Text>
-              <div style={{
-                padding: 16,
-                background: '#f9f9f9',
-                borderRadius: 4,
-                borderLeft: '4px solid #1890ff'
-              }}>
-                {selectedFeedback.feedback}
-              </div>
-            </div>
-
-            {selectedFeedback.response && (
-              <>
-                <Divider />
-                <div style={{ marginBottom: 16 }}>
-                  <Text strong style={{ display: 'block', marginBottom: 8 }}>Admin Response:</Text>
-                  <div style={{
-                    padding: 16,
-                    background: '#f0f9ff',
-                    borderRadius: 4,
-                    borderLeft: '4px solid #52c41a'
-                  }}>
-                    {selectedFeedback.response}
-                  </div>
-                </div>
-                {selectedFeedback.response_at && (
-                  <div style={{ textAlign: 'right' }}>
-                    <Text type="secondary">
-                      Responded on: {new Date(selectedFeedback.response_at).toLocaleString()}
-                    </Text>
-                  </div>
-                )}
-              </>
-            )}
+          <div style={{ paddingTop: 12 }}>
+            <Text strong style={{ color: '#0b1b3d', fontSize: 15, display: 'block', marginBottom: 8 }}>
+              Subject: {selectedFeedback.subject}
+            </Text>
+            <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <Text style={{ fontSize: 14, lineHeight: 1.6 }}>{selectedFeedback.message}</Text>
+            </Card>
           </div>
         )}
       </Modal>
 
+      {/* Update Status Modal */}
       <Modal
         title="Update Feedback Status"
         open={isStatusModalVisible}
+        onOk={handleUpdateStatus}
         onCancel={() => setIsStatusModalVisible(false)}
-        footer={[
-          <Button key="cancel" onClick={() => setIsStatusModalVisible(false)}>
-            Cancel
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={updatingStatus}
-            onClick={updateFeedbackStatus}
-          >
-            Update Status
-          </Button>,
-        ]}
+        confirmLoading={updatingStatus}
+        okText="Update Status"
+        okButtonProps={{ className: 'apex-btn-gold' }}
         centered
       >
-        {selectedFeedback && (
-          <div style={{ padding: '16px 0' }}>
-            <div style={{ marginBottom: 24 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>Current Status:</Text>
-              {getStatusTag(selectedFeedback.status)}
-            </div>
-
-            <div>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>New Status:</Text>
-              <Select
-                style={{ width: '100%' }}
-                value={currentStatus}
-                onChange={setCurrentStatus}
-                options={statusOptions}
-              />
-            </div>
-          </div>
-        )}
+        <div style={{ paddingTop: 12 }}>
+          <Text strong style={{ display: 'block', marginBottom: 8 }}>Select New Status:</Text>
+          <Select
+            value={currentStatus}
+            onChange={setCurrentStatus}
+            style={{ width: '100%', borderRadius: 8 }}
+          >
+            <Option value="new">New</Option>
+            <Option value="in_progress">In Progress</Option>
+            <Option value="resolved">Resolved</Option>
+          </Select>
+        </div>
       </Modal>
     </div>
   );
