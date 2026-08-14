@@ -43,6 +43,7 @@ const AdminAttendanceView = () => {
   const [sections, setSections] = useState([]);
   const [attendanceData, setAttendanceData] = useState([]);
   const [summaryData, setSummaryData] = useState([]);
+  const [summaryPage, setSummaryPage] = useState(1);
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [selectedSection, setSelectedSection] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -216,25 +217,30 @@ const fetchAttendanceSummary = async () => {
           ? student.records
           : [];
 
+        const getAttendanceValue = (record) =>
+          String(record?.attendance || '').trim().toLowerCase();
+
         const present = records.filter(
-          record => record.attendance === 'Present'
+          record => getAttendanceValue(record) === 'present'
         ).length;
 
         const absent = records.filter(
-          record => record.attendance === 'Absent'
+          record => getAttendanceValue(record) === 'absent'
         ).length;
 
         const leave = records.filter(
-          record => record.attendance === 'Leave'
+          record => getAttendanceValue(record) === 'leave'
         ).length;
 
-        const lateComer = records.filter(
-          record => record.attendance === 'Late Comer'
-        ).length;
+        const lateComer = records.filter((record) => {
+          const value = getAttendanceValue(record);
+          return value === 'late comer' || value === 'late';
+        }).length;
 
-        const halfLeave = records.filter(
-          record => record.attendance === 'Half Leave'
-        ).length;
+        const halfLeave = records.filter((record) => {
+          const value = getAttendanceValue(record);
+          return value === 'half leave' || value === 'half-leave';
+        }).length;
 
         const total = records.length;
 
@@ -250,7 +256,11 @@ const fetchAttendanceSummary = async () => {
 
         return {
           student_id: student.student_id,
-          student_name: student.student_name,
+          student_name:
+            student.student_name ||
+            student.name ||
+            student.full_name ||
+            'Unnamed Student',
           present,
           absent,
           leave,
@@ -262,6 +272,7 @@ const fetchAttendanceSummary = async () => {
       });
 
       setSummaryData(transformedData);
+      setSummaryPage(1);
 
       const currentSection = sections.find(
         section => String(section.id) === String(selectedSection)
@@ -345,47 +356,137 @@ const fetchAttendanceSummary = async () => {
 
   const summaryColumns = [
     {
-      title: 'Student Name',
+      title: 'Student',
       dataIndex: 'student_name',
       key: 'student_name',
+      width: 245,
       render: (name) => (
         <Space>
-          <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }} icon={<UserOutlined />} />
-          <Text strong style={{ color: '#0f172a' }}>{name}</Text>
+          <Avatar
+            style={{
+              background: '#0b1b3d',
+              color: '#d4af37',
+              fontWeight: 700
+            }}
+            icon={<UserOutlined />}
+          />
+          <Text
+            strong
+            ellipsis={{ tooltip: name || 'Unnamed Student' }}
+            style={{ color: '#0f172a', maxWidth: 170 }}
+          >
+            {name || 'Unnamed Student'}
+          </Text>
         </Space>
       )
     },
     {
-      title: 'Present Days',
-      dataIndex: 'present_days',
-      key: 'present_days',
+      title: 'Present',
+      dataIndex: 'present',
+      key: 'present',
+      width: 90,
       align: 'center',
-      render: (val) => <Tag color="success" style={{ fontWeight: 700 }}>{val || 0}</Tag>
+      render: (value) => (
+        <Tag color="success" style={{ fontWeight: 700 }}>
+          {Number(value) || 0}
+        </Tag>
+      )
     },
     {
-      title: 'Total Classes',
-      dataIndex: 'total_days',
-      key: 'total_days',
+      title: 'Absent',
+      dataIndex: 'absent',
+      key: 'absent',
+      width: 90,
       align: 'center',
-      render: (val) => <Tag color="blue">{val || 0}</Tag>
+      render: (value) => (
+        <Tag color="error" style={{ fontWeight: 700 }}>
+          {Number(value) || 0}
+        </Tag>
+      )
     },
     {
-      title: 'Attendance Percentage',
-      dataIndex: 'attendance_percentage',
-      key: 'attendance_percentage',
-      render: (pct) => {
-        const value = parseFloat(pct || 0);
-        let color = '#10b981';
-        if (value < 75) color = '#f59e0b';
-        if (value < 50) color = '#ef4444';
+      title: 'Leave',
+      dataIndex: 'leave',
+      key: 'leave',
+      width: 90,
+      align: 'center',
+      render: (value) => (
+        <Tag color="warning" style={{ fontWeight: 700 }}>
+          {Number(value) || 0}
+        </Tag>
+      )
+    },
+    {
+      title: 'Late',
+      dataIndex: 'late_comer',
+      key: 'late_comer',
+      width: 90,
+      align: 'center',
+      render: (value) => (
+        <Tag color="processing" style={{ fontWeight: 700 }}>
+          {Number(value) || 0}
+        </Tag>
+      )
+    },
+    {
+      title: 'Half Leave',
+      dataIndex: 'half_leave',
+      key: 'half_leave',
+      width: 110,
+      align: 'center',
+      render: (value) => (
+        <Tag color="cyan" style={{ fontWeight: 700 }}>
+          {Number(value) || 0}
+        </Tag>
+      )
+    },
+    {
+      title: 'Total',
+      dataIndex: 'total',
+      key: 'total',
+      width: 90,
+      align: 'center',
+      render: (value) => (
+        <Tag style={{ fontWeight: 700 }}>
+          {Number(value) || 0}
+        </Tag>
+      )
+    },
+    {
+      title: 'Percentage',
+      dataIndex: 'percentage',
+      key: 'percentage',
+      width: 180,
+      render: (value) => {
+        const percentage = Math.max(
+          0,
+          Math.min(100, Number(value) || 0)
+        );
+
+        let strokeColor = '#52c41a';
+        if (percentage < 75) strokeColor = '#ff4d4f';
+        else if (percentage < 90) strokeColor = '#1677ff';
+
         return (
-          <Progress 
-            percent={value} 
-            strokeColor={color} 
-            size="small" 
-            format={(p) => `${p}%`}
-            style={{ minWidth: 140 }}
-          />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              minWidth: 120
+            }}
+          >
+            <Progress
+              percent={percentage}
+              showInfo={false}
+              size="small"
+              strokeColor={strokeColor}
+              style={{ flex: 1, minWidth: 65 }}
+            />
+            <Text style={{ minWidth: 34 }}>
+              {percentage}%
+            </Text>
+          </div>
         );
       }
     }
@@ -547,22 +648,58 @@ const fetchAttendanceSummary = async () => {
           </div>
         }
         open={isSummaryModalVisible}
-        onCancel={() => setIsSummaryModalVisible(false)}
+        onCancel={() => {
+          setIsSummaryModalVisible(false);
+          setSummaryPage(1);
+        }}
         footer={[
-          <Button key="close" onClick={() => setIsSummaryModalVisible(false)} style={{ borderRadius: 8 }}>
+          <Button
+            key="close"
+            onClick={() => {
+              setIsSummaryModalVisible(false);
+              setSummaryPage(1);
+            }}
+            style={{ borderRadius: 8 }}
+          >
             Close
           </Button>
         ]}
-        width={850}
+        width={1200}
         centered
+        styles={{
+          body: {
+            padding: 18,
+            maxHeight: 'calc(100vh - 190px)',
+            overflow: 'hidden'
+          }
+        }}
       >
-        <Table 
+        <Table
+          size="middle"
           columns={summaryColumns}
           dataSource={summaryData}
-          rowKey="id"
+          rowKey={(record, index) => record.student_id || `student-${index}`}
           loading={loading}
-          pagination={false}
-          scroll={{ x: 'max-content' }}
+          pagination={{
+            current: summaryPage,
+            pageSize: 8,
+            total: summaryData.length,
+            showSizeChanger: false,
+            showQuickJumper: true,
+            showLessItems: false,
+            position: ['bottomCenter'],
+            onChange: (page) => setSummaryPage(page),
+            itemRender: (page, type, originalElement) => {
+              if (type === 'prev') {
+                return <Button size="small">Previous</Button>;
+              }
+              if (type === 'next') {
+                return <Button size="small">Next</Button>;
+              }
+              return originalElement;
+            }
+          }}
+          scroll={{ x: 1120, y: 470 }}
         />
       </Modal>
     </div>

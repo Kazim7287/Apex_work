@@ -152,22 +152,44 @@ const Performance = () => {
      ========================================================= */
 
   useEffect(() => {
-    const fetchSections = async () => {
-      const data = await fetchWithAuth(
-        "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php"
-      );
+  const fetchSections = async () => {
+    const data = await fetchWithAuth(
+      "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Read.php"
+    );
 
-      if (data) {
-        setSections(data);
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      setSections([]);
+      return;
+    }
 
-        if (data.length > 0) {
-          fetchPerformanceData(data[0].id, data[0].name);
-        }
-      }
-    };
+    setSections(data);
 
-    fetchSections();
-  }, []);
+    // Check if a previously selected section was saved
+    const savedSectionId = localStorage.getItem(
+      "performance_selected_section"
+    );
+
+    const savedSection = savedSectionId
+      ? data.find(
+          (section) =>
+            String(section.id) === String(savedSectionId)
+        )
+      : null;
+
+    // Use saved section if available, otherwise use first section
+    const sectionToLoad = savedSection || data[0];
+
+    setSelectedSection(sectionToLoad.id);
+    setSelectedSectionName(sectionToLoad.name);
+
+    fetchPerformanceData(
+      sectionToLoad.id,
+      sectionToLoad.name
+    );
+  };
+
+  fetchSections();
+}, []);
 
   /* =========================================================
      FETCH PERFORMANCE DATA
@@ -360,9 +382,14 @@ const Performance = () => {
     });
 
     setColumns(tableColumns);
-    setPerformances(rows);
-    setSelectedSection(sectionId);
-    setSelectedSectionName(sectionName);
+setPerformances(rows);
+setSelectedSection(sectionId);
+setSelectedSectionName(sectionName);
+
+localStorage.setItem(
+  "performance_selected_section",
+  sectionId
+);
   };
 
   /* =========================================================
@@ -850,10 +877,10 @@ const Performance = () => {
 
             <div className="header-left">
 
-              <div className="page-icon">
+              {/* <div className="page-icon">
                 <TrophyOutlined />
-              </div>
-
+              </div> */}
+                
               <div>
                 <Text className="eyebrow">
                   ACADEMIC MANAGEMENT
@@ -894,37 +921,45 @@ const Performance = () => {
               </Button>
 
               <Select
-                value={
-                  selectedSection ||
-                  undefined
-                }
-                placeholder="Select Section"
-                className="section-select"
-                suffixIcon={
-                  <FilterOutlined />
-                }
-                loading={loading}
-                onChange={(
-                  value,
-                  option
-                ) =>
-                  fetchPerformanceData(
-                    value,
-                    option.children
-                  )
-                }
-              >
-                {sections.map(
-                  (section) => (
-                    <Option
-                      key={section.id}
-                      value={section.id}
-                    >
-                      {section.name}
-                    </Option>
-                  )
-                )}
-              </Select>
+  value={selectedSection || undefined}
+  placeholder="Select Section"
+  className="section-select"
+  suffixIcon={<FilterOutlined />}
+  loading={loading}
+  onChange={(value) => {
+    const selected = sections.find(
+      (section) =>
+        String(section.id) === String(value)
+    );
+
+    if (!selected) return;
+
+    // Update selected section immediately
+    setSelectedSection(selected.id);
+    setSelectedSectionName(selected.name);
+
+    // Remember selected section
+    localStorage.setItem(
+      "performance_selected_section",
+      selected.id
+    );
+
+    // Load its performance data
+    fetchPerformanceData(
+      selected.id,
+      selected.name
+    );
+  }}
+>
+  {sections.map((section) => (
+    <Option
+      key={section.id}
+      value={section.id}
+    >
+      {section.name}
+    </Option>
+  ))}
+</Select>
 
             </div>
 

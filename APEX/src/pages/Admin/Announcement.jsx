@@ -46,11 +46,7 @@ const Timetable = () => {
         const fetchSections = async () => {
             try {
                 const response = await publicApi.get("Sec_Read.php");
-                if (response.status === 401) {
-                    navigate('/admin-signin');
-                    return;
-                }
-                setSections(response.data);
+                setSections(response.data || []);
                 setLoading(false);
             } catch (err) {
                 if (err.response?.status === 401) {
@@ -70,23 +66,24 @@ const Timetable = () => {
         }
     }, [selectedSection]);
 
+    // NOTE: endpoint names/response shapes below match the backend
+    // (GetAdTimetable.php returns { status: 'success', timetable: [...] },
+    // not a bare array) — this was the source of the failed requests.
     const fetchDataForSection = async (sectionId) => {
         try {
             setLoadingSectionData(true);
             setLoadingTimetable(true);
-            
+
             const filterResponse = await publicApi.get(`FilterAd.php?section_id=${sectionId}`);
-            setSectionData(filterResponse.data);
+            setSectionData(filterResponse.data || []);
             setLoadingSectionData(false);
 
-            const timetableResponse = await publicApi.get(`get_timetable.php?section_id=${sectionId}`);
-            
-            if (timetableResponse.data && Array.isArray(timetableResponse.data)) {
-                setTimetableData(timetableResponse.data);
-                groupTimetableData(timetableResponse.data);
-            } else if (timetableResponse.data && timetableResponse.data.data) {
-                setTimetableData(timetableResponse.data.data);
-                groupTimetableData(timetableResponse.data.data);
+            const timetableResponse = await publicApi.get(`GetAdTimetable.php?section_id=${sectionId}`);
+
+            if (timetableResponse.data?.status === 'success') {
+                const entries = timetableResponse.data.timetable || [];
+                setTimetableData(entries);
+                groupTimetableData(entries);
             } else {
                 setTimetableData([]);
                 setGroupedTimetableData({});
@@ -94,7 +91,17 @@ const Timetable = () => {
             setLoadingTimetable(false);
         } catch (err) {
             console.error("Error fetching data:", err);
-            message.error("Failed to load section details");
+            if (err.response?.status === 401) {
+                navigate('/admin-signin');
+                return;
+            }
+            if (err.response?.status === 404) {
+                // No timetable created yet for this section — not a real error
+                setTimetableData([]);
+                setGroupedTimetableData({});
+            } else {
+                message.error("Failed to load section details");
+            }
             setLoadingSectionData(false);
             setLoadingTimetable(false);
         }
@@ -145,18 +152,24 @@ const Timetable = () => {
         try {
             const dataToSend = {
                 ...scheduleData,
+                teacher_id: selectedRecord?.teacher_id,
+                subject_id: selectedRecord?.subject_id,
                 section_id: selectedSection
             };
-            const response = await authApi.post('schedule_insert.php', dataToSend);
-            if (response.data.status === 'success') {
+            const response = await authApi.post('timetable.php', dataToSend);
+            if (response.data?.success) {
                 message.success('Schedule created successfully!');
                 setIsModalVisible(false);
                 fetchDataForSection(selectedSection);
             } else {
-                message.error(response.data.message || 'Failed to create schedule');
+                message.error(response.data?.error || response.data?.message || 'Failed to create schedule');
             }
         } catch (err) {
-            message.error(err.response?.data?.message || 'Error submitting schedule');
+            if (err.response?.status === 401) {
+                navigate('/admin-signin');
+                return;
+            }
+            message.error(err.response?.data?.error || err.response?.data?.message || 'Error submitting schedule');
         }
     };
 
@@ -165,19 +178,25 @@ const Timetable = () => {
             const dataToSend = {
                 ...scheduleData,
                 id: selectedTimetableEntry.id,
+                teacher_id: selectedTimetableEntry?.teacher_id,
+                subject_id: selectedTimetableEntry?.subject_id,
                 section_id: selectedSection
             };
-            const response = await authApi.post('timetable_update.php', dataToSend);
-            if (response.data.status === 'success') {
+            const response = await authApi.put('timetableupdate.php', dataToSend);
+            if (response.data?.success) {
                 message.success('Schedule updated successfully!');
                 setIsEditModalVisible(false);
                 setSelectedTimetableEntry(null);
                 fetchDataForSection(selectedSection);
             } else {
-                message.error(response.data.message || 'Failed to update schedule');
+                message.error(response.data?.error || response.data?.message || 'Failed to update schedule');
             }
         } catch (err) {
-            message.error('Error updating schedule');
+            if (err.response?.status === 401) {
+                navigate('/admin-signin');
+                return;
+            }
+            message.error(err.response?.data?.error || 'Error updating schedule');
         }
     };
 
@@ -193,15 +212,19 @@ const Timetable = () => {
 
     const handleDeleteClick = async (id) => {
         try {
-            const response = await authApi.delete('timetable_delete.php', { data: { id } });
-            if (response.data.status === 'success') {
-                message.success('Entry deleted successfully!');
+            const response = await authApi.delete(`timetabledelete.php?id=${id}`);
+            if (response.data?.success) {
+                message.success(response.data?.message || 'Entry deleted successfully!');
                 fetchDataForSection(selectedSection);
             } else {
-                message.error(response.data.message || 'Failed to delete entry');
+                message.error(response.data?.error || response.data?.message || 'Failed to delete entry');
             }
         } catch (err) {
-            message.error('Error deleting entry');
+            if (err.response?.status === 401) {
+                navigate('/admin-signin');
+                return;
+            }
+            message.error(err.response?.data?.error || 'Error deleting entry');
         }
     };
 
@@ -216,17 +239,22 @@ const Timetable = () => {
     const confirmBulkDelete = async () => {
         setBulkDeleteLoading(true);
         try {
-            const response = await authApi.post('timetable_bulk_delete.php', { ids: selectedRowKeys });
-            if (response.data.status === 'success') {
-                message.success(`Successfully deleted ${selectedRowKeys.length} entries!`);
+            const idsParam = selectedRowKeys.join(',');
+            const response = await authApi.delete(`timetabledelete.php?ids=${idsParam}`);
+            if (response.data?.success) {
+                message.success(response.data?.message || `Successfully deleted ${selectedRowKeys.length} entries!`);
                 setSelectedRowKeys([]);
                 setIsBulkDeleteModalVisible(false);
                 fetchDataForSection(selectedSection);
             } else {
-                message.error(response.data.message || 'Failed to delete entries');
+                message.error(response.data?.error || response.data?.message || 'Failed to delete entries');
             }
         } catch (err) {
-            message.error('Error deleting entries');
+            if (err.response?.status === 401) {
+                navigate('/admin-signin');
+                return;
+            }
+            message.error(err.response?.data?.error || 'Error deleting entries');
         } finally {
             setBulkDeleteLoading(false);
         }
@@ -301,7 +329,7 @@ const Timetable = () => {
     const getTimetableColumns = () => [
         { title: 'Day', dataIndex: 'day', key: 'day', render: (day) => <Tag color="blue" style={{ borderRadius: 12, fontWeight: 700 }}>{day}</Tag> },
         { title: 'Subject', dataIndex: 'subject_name', key: 'subject_name', render: (sub) => <Text strong style={{ color: '#0f172a' }}>{sub}</Text> },
-        { title: 'Teacher', dataIndex: 'teach_name', key: 'teach_name' },
+        { title: 'Teacher', dataIndex: 'teacher_name', key: 'teacher_name' },
         {
             title: 'Time Slot',
             key: 'time',
@@ -327,6 +355,9 @@ const Timetable = () => {
         selectedRowKeys,
         onChange: (keys) => setSelectedRowKeys(keys)
     };
+
+    if (loading) return <Spin size="large" fullscreen />;
+    if (error) return <div className="error-message">Error: {error}</div>;
 
     return (
         <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -379,6 +410,11 @@ const Timetable = () => {
                                 loading={loadingSectionData}
                                 pagination={false}
                                 scroll={{ x: 'max-content' }}
+                                locale={{
+                                    emptyText: (
+                                        <Empty description="No teachers assigned to this section" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                                    )
+                                }}
                             />
                             <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
                                 <Button type="primary" icon={<ScheduleOutlined />} onClick={showTimetableModal} className="apex-btn-gold">
@@ -451,6 +487,11 @@ const Timetable = () => {
                     loading={loadingTimetable}
                     scroll={{ x: 'max-content' }}
                     pagination={{ pageSize: 10 }}
+                    locale={{
+                        emptyText: (
+                            <Empty description="No timetable entries found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                        )
+                    }}
                 />
             </Modal>
 

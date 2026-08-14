@@ -279,39 +279,135 @@ const FeedbackManagement = () => {
 
       {/* View Message Modal */}
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Avatar style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700 }}>
-              {getInitial(selectedFeedback?.name)}
-            </Avatar>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#0b1b3d' }}>{selectedFeedback?.name}</div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>{selectedFeedback?.email}</div>
-            </div>
-          </div>
-        }
-        open={isViewModalVisible}
-        onCancel={() => setIsViewModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setIsViewModalVisible(false)} style={{ borderRadius: 8 }}>
-            Close
-          </Button>
-        ]}
-        width={600}
-        centered
+  title={
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <Avatar
+        style={{
+          background: '#0b1b3d',
+          color: '#d4af37',
+          fontWeight: 700
+        }}
       >
-        {selectedFeedback && (
-          <div style={{ paddingTop: 12 }}>
-            <Text strong style={{ color: '#0b1b3d', fontSize: 15, display: 'block', marginBottom: 8 }}>
-              Subject: {selectedFeedback.subject}
-            </Text>
-            <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <Text style={{ fontSize: 14, lineHeight: 1.6 }}>{selectedFeedback.message}</Text>
-            </Card>
-          </div>
-        )}
-      </Modal>
+        {getInitial(selectedFeedback?.name)}
+      </Avatar>
 
+      <div>
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: '#0b1b3d'
+          }}
+        >
+          {selectedFeedback?.name || 'Unknown User'}
+        </div>
+
+        <div
+          style={{
+            fontSize: 12,
+            color: '#64748b'
+          }}
+        >
+          {selectedFeedback?.email || 'No email available'}
+        </div>
+      </div>
+    </div>
+  }
+  open={isViewModalVisible}
+  onCancel={() => setIsViewModalVisible(false)}
+  footer={[
+    <Button
+      key="close"
+      onClick={() => setIsViewModalVisible(false)}
+      style={{ borderRadius: 8 }}
+    >
+      Close
+    </Button>
+  ]}
+  width={600}
+  centered
+>
+  {selectedFeedback && (
+    <div style={{ paddingTop: 16 }}>
+
+      {/* SUBJECT */}
+      <div style={{ marginBottom: 18 }}>
+        <Text
+          strong
+          style={{
+            display: 'block',
+            color: '#64748b',
+            fontSize: 12,
+            marginBottom: 6,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5
+          }}
+        >
+          Subject
+        </Text>
+
+        <div
+          style={{
+            padding: '12px 14px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            color: '#0b1b3d',
+            fontSize: 15,
+            fontWeight: 600
+          }}
+        >
+          {selectedFeedback.subject ||
+            selectedFeedback.title ||
+            'No subject provided'}
+        </div>
+      </div>
+
+      {/* ACTUAL USER MESSAGE */}
+      <div>
+        <Text
+          strong
+          style={{
+            display: 'block',
+            color: '#64748b',
+            fontSize: 12,
+            marginBottom: 6,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5
+          }}
+        >
+          Message
+        </Text>
+
+        <Card
+          size="small"
+          style={{
+            background: '#ffffff',
+            borderRadius: 8,
+            border: '1px solid #e2e8f0'
+          }}
+        >
+          <div
+            style={{
+              color: '#334155',
+              fontSize: 14,
+              lineHeight: 1.7,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}
+          >
+            {selectedFeedback.message ||
+              selectedFeedback.feedback ||
+              selectedFeedback.description ||
+              selectedFeedback.content ||
+              'No message provided.'}
+          </div>
+        </Card>
+      </div>
+
+    </div>
+  )}
+</Modal>
       {/* Update Status Modal */}
       <Modal
         title="Update Feedback Status"

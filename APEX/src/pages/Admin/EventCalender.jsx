@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-key */
 import { useState, useEffect } from "react";
 import { 
   Card,
@@ -12,11 +13,9 @@ import {
   Alert,
   Row,
   Col,
-  Spin,
   notification,
   Modal,
   Calendar,
-  Badge,
   Tag,
   Popconfirm,
   Tooltip
@@ -51,6 +50,7 @@ const EventCalendar = () => {
     const [nextEvent, setNextEvent] = useState(null);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingEvent, setEditingEvent] = useState(null);
+    const [selectedDate, setSelectedDate] = useState(dayjs());
 
     // API endpoints
     const API_BASE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
@@ -79,38 +79,51 @@ const EventCalendar = () => {
             const response = await fetch(GET_EVENTS_API, {
                 credentials: 'include'
             });
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+
             const data = await response.json();
-            if (Array.isArray(data)) {
-                setEvents(data);
+            
+            // Support both wrapped response { success: true, data: [...] } and raw array
+            const rawEvents = data.data || (Array.isArray(data) ? data : []);
+
+            if (data.success || Array.isArray(data)) {
+                const formattedEvents = rawEvents.map(event => ({
+                    ...event,
+                    id: event.id,
+                    formattedDate: dayjs(event.event_date).format('MMMM D, YYYY'),
+                    formattedTime: event.event_time ? dayjs(event.event_time, 'HH:mm:ss').format('h:mm A') : 'No time specified',
+                    dayName: dayjs(event.event_date).format('dddd'),
+                    dateTime: dayjs(`${event.event_date} ${event.event_time || '00:00:00'}`)
+                }));
+
+                setEvents(formattedEvents);
+                calculateNextEvent(formattedEvents);
                 setError('');
             } else {
-                setError(data.error || 'Failed to fetch events');
+                throw new Error(data.message || data.error || 'Failed to fetch events');
             }
         } catch (err) {
             setError(err.message || 'Failed to fetch events');
+            api.error({ message: 'Error', description: err.message });
         } finally {
             setLoading(false);
         }
     };
 
-    const updateNextEventCountdown = () => {
-        const upcomingEvents = events.filter(e => {
-            const dateStr = `${e.event_date} ${e.event_time || '00:00:00'}`;
-            return dayjs(dateStr).isAfter(currentTime);
-        });
+    const calculateNextEvent = (eventList) => {
+        const now = dayjs();
+        const upcoming = eventList
+            .filter(e => e.dateTime && e.dateTime.isAfter(now))
+            .sort((a, b) => a.dateTime.diff(b.dateTime));
+        setNextEvent(upcoming.length > 0 ? upcoming[0] : null);
+    };
 
-        if (upcomingEvents.length > 0) {
-            upcomingEvents.sort((a, b) => {
-                const dateA = dayjs(`${a.event_date} ${a.event_time || '00:00:00'}`);
-                const dateB = dayjs(`${b.event_date} ${b.event_time || '00:00:00'}`);
-                return dateA.diff(dateB);
-            });
-            setNextEvent(upcomingEvents[0]);
-        } else {
-            setNextEvent(null);
+    const updateNextEventCountdown = () => {
+        if (nextEvent && nextEvent.dateTime && nextEvent.dateTime.isBefore(currentTime)) {
+            calculateNextEvent(events);
         }
     };
 
@@ -140,7 +153,7 @@ const EventCalendar = () => {
                     icon: <CheckCircleOutlined style={{ color: '#10b981' }} />
                 });
                 addForm.resetFields();
-                fetchEvents();
+                await fetchEvents();
             } else {
                 throw new Error(data.message || data.error || 'Failed to add event');
             }
@@ -175,7 +188,8 @@ const EventCalendar = () => {
                 api.success({ message: 'Event Updated', description: 'Event modified successfully.' });
                 setIsEditModalVisible(false);
                 setEditingEvent(null);
-                fetchEvents();
+                form.resetFields();
+                await fetchEvents();
             } else {
                 throw new Error(data.message || 'Failed to update event');
             }
@@ -189,14 +203,17 @@ const EventCalendar = () => {
     const handleDelete = async (id) => {
         try {
             setLoading(true);
-            const response = await fetch(`${DELETE_EVENT_API}?id=${id}`, {
-                method: 'DELETE',
-                credentials: 'include'
+            const response = await fetch(DELETE_EVENT_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ id })
             });
+
             const data = await response.json();
             if (data.status === 'success' || data.success) {
                 api.success({ message: 'Event Deleted' });
-                fetchEvents();
+                await fetchEvents();
             } else {
                 throw new Error(data.message || 'Failed to delete event');
             }
@@ -220,11 +237,15 @@ const EventCalendar = () => {
     };
 
     const formatCountdown = (event) => {
-        if (!event) return null;
-        const target = dayjs(`${event.event_date} ${event.event_time || '00:00:00'}`);
-        const diff = dayjs.duration(target.diff(currentTime));
+        if (!event || !event.dateTime) return null;
+        const diff = dayjs.duration(event.dateTime.diff(currentTime));
+        if (diff.asSeconds() <= 0) return "Event ended";
         return `${diff.days()}d ${diff.hours()}h ${diff.minutes()}m ${diff.seconds()}s`;
     };
+
+    const filteredEventsForDate = events.filter(e => 
+        dayjs(e.event_date).isSame(selectedDate, 'day')
+    );
 
     return (
         <div style={{ maxWidth: 1400, margin: '0 auto' }}>
@@ -247,9 +268,11 @@ const EventCalendar = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                 <BellOutlined style={{ color: '#d4af37', fontSize: 24 }} />
                                 <div>
-                                    <Text strong style={{ color: '#ffffff', fontSize: 16 }}>Upcoming Event: {nextEvent.event_name}</Text>
+                                    <Text strong style={{ color: '#ffffff', fontSize: 16 }}>
+                                        Upcoming Event: {nextEvent.event_name}
+                                    </Text>
                                     <Text style={{ color: '#cbd5e1', fontSize: 12, display: 'block' }}>
-                                        Scheduled for {nextEvent.event_date} at {nextEvent.event_time}
+                                        Scheduled for {nextEvent.formattedDate || nextEvent.event_date} at {nextEvent.formattedTime || nextEvent.event_time}
                                     </Text>
                                 </div>
                             </div>
@@ -268,61 +291,211 @@ const EventCalendar = () => {
                         className="apex-card"
                         title={
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(212, 175, 55, 0.15)', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                                <div
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 8,
+                                        background: 'rgba(212, 175, 55, 0.15)',
+                                        color: '#d4af37',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: 18
+                                    }}
+                                >
                                     <CalendarOutlined />
                                 </div>
-                                <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>Academic Events & Calendar</Title>
+
+                                <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                                    Academic Events & Calendar
+                                </Title>
                             </div>
                         }
                     >
-                        <List
-                            loading={loading}
-                            dataSource={events}
-                            renderItem={(item) => (
-                                <List.Item
-                                    style={{ padding: '16px 0', borderBottom: '1px solid #f1f5f9' }}
-                                    actions={[
-                                        <Tooltip key="edit" title="Edit Event">
-                                            <Button type="text" icon={<EditOutlined style={{ color: '#1e3a8a' }} />} onClick={() => openEditModal(item)} style={{ borderRadius: 6, background: '#f1f5f9' }} />
-                                        </Tooltip>,
-                                        <Popconfirm
-                                            key="delete"
-                                            title="Delete Event"
-                                            description="Are you sure to delete this event?"
-                                            onConfirm={() => handleDelete(item.id)}
-                                            okText="Yes"
-                                            cancelText="No"
-                                            okButtonProps={{ danger: true }}
-                                        >
-                                            <Tooltip title="Delete Event">
-                                                <Button type="text" danger icon={<DeleteOutlined />} style={{ borderRadius: 6, background: '#fef2f2' }} />
-                                            </Tooltip>
-                                        </Popconfirm>
-                                    ]}
+                        <Row gutter={[24, 24]}>
+
+                            {/* CALENDAR */}
+                            <Col xs={24} xl={12}>
+                                <div
+                                    style={{
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: 12,
+                                        padding: '12px 8px',
+                                        background: '#ffffff'
+                                    }}
                                 >
-                                    <List.Item.Meta
-                                        avatar={
-                                            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                                <CalendarOutlined style={{ color: '#d4af37', fontSize: 18 }} />
-                                            </div>
+                                    <style>{`
+                                        .custom-calendar .ant-picker-calendar-header {
+                                            padding: 4px 8px 12px 8px !important;
+                                            display: flex !important;
+                                            justify-content: flex-end !important;
                                         }
-                                        title={
-                                            <Text strong style={{ color: '#0b1b3d', fontSize: 15 }}>{item.event_name}</Text>
+                                        .custom-calendar .ant-picker-panel {
+                                            background: transparent !important;
+                                            border-top: none !important;
                                         }
-                                        description={
-                                            <Space direction="vertical" size={2}>
-                                                <Text style={{ color: '#64748b', fontSize: 13 }}>{item.event_description || 'No description provided.'}</Text>
-                                                <Space size="large" style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
-                                                    <span><CalendarOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />{item.event_date}</span>
-                                                    <span><ClockCircleOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />{item.event_time}</span>
-                                                    <span><UserOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />Organizer: {item.event_manager}</span>
-                                                </Space>
-                                            </Space>
+                                        .custom-calendar .ant-picker-cell {
+                                            padding: 4px 0 !important;
                                         }
+                                        .custom-calendar .ant-picker-cell-inner {
+                                            min-width: 28px !important;
+                                            height: 28px !important;
+                                            line-height: 28px !important;
+                                        }
+                                    `}</style>
+
+                                    <div className="custom-calendar">
+                                        <Calendar
+                                            fullscreen={false}
+                                            value={selectedDate}
+                                            onSelect={(date) => setSelectedDate(date)}
+                                            cellRender={(current, info) => {
+                                                if (info.type !== 'date') return null;
+
+                                                const dateStr = current.format('YYYY-MM-DD');
+                                                const hasEvent = events.some(
+                                                    event => event.event_date === dateStr
+                                                );
+
+                                                if (!hasEvent) return null;
+
+                                                return (
+                                                    <div
+                                                        style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'center',
+                                                            alignItems: 'center',
+                                                            marginTop: 2
+                                                        }}
+                                                    >
+                                                        <span
+                                                            style={{
+                                                                width: 6,
+                                                                height: 6,
+                                                                borderRadius: '50%',
+                                                                background: '#d4af37',
+                                                                display: 'inline-block'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </Col>
+
+                            {/* EVENTS LIST */}
+                            <Col xs={24} xl={12}>
+                                <div style={{ marginBottom: 12 }}>
+                                    <Text strong style={{ color: '#0b1b3d', fontSize: 14 }}>
+                                        Events on {selectedDate.format('MMMM D, YYYY')}
+                                    </Text>
+                                </div>
+
+                                <div
+                                    style={{
+                                        maxHeight: 480,
+                                        overflowY: 'auto',
+                                        paddingRight: 4
+                                    }}
+                                >
+                                    <List
+                                        loading={loading}
+                                        dataSource={filteredEventsForDate.length > 0 ? filteredEventsForDate : events}
+                                        locale={{
+                                            emptyText: 'No events found for this date'
+                                        }}
+                                        renderItem={(item) => (
+                                            <List.Item
+                                                style={{
+                                                    padding: '14px 0',
+                                                    borderBottom: '1px solid #f1f5f9'
+                                                }}
+                                                actions={[
+                                                    <Tooltip key="edit" title="Edit Event">
+                                                        <Button
+                                                            type="text"
+                                                            icon={<EditOutlined style={{ color: '#1e3a8a' }} />}
+                                                            onClick={() => openEditModal(item)}
+                                                            style={{ borderRadius: 6, background: '#f1f5f9' }}
+                                                        />
+                                                    </Tooltip>,
+                                                    <Popconfirm
+                                                        key="delete"
+                                                        title="Delete Event"
+                                                        description="Are you sure to delete this event?"
+                                                        onConfirm={() => handleDelete(item.id)}
+                                                        okText="Yes"
+                                                        cancelText="No"
+                                                        okButtonProps={{ danger: true }}
+                                                    >
+                                                        <Tooltip title="Delete Event">
+                                                            <Button
+                                                                type="text"
+                                                                danger
+                                                                icon={<DeleteOutlined />}
+                                                                style={{ borderRadius: 6, background: '#fef2f2' }}
+                                                            />
+                                                        </Tooltip>
+                                                    </Popconfirm>
+                                                ]}
+                                            >
+                                                <List.Item.Meta
+                                                    avatar={
+                                                        <div
+                                                            style={{
+                                                                width: 44,
+                                                                height: 44,
+                                                                borderRadius: 10,
+                                                                background: '#f8fafc',
+                                                                border: '1px solid #e2e8f0',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center'
+                                                            }}
+                                                        >
+                                                            <CalendarOutlined style={{ color: '#d4af37', fontSize: 18 }} />
+                                                        </div>
+                                                    }
+                                                    title={
+                                                        <Text strong style={{ color: '#0b1b3d', fontSize: 15 }}>
+                                                            {item.event_name}
+                                                        </Text>
+                                                    }
+                                                    description={
+                                                        <Space direction="vertical" size={2}>
+                                                            <Text style={{ color: '#64748b', fontSize: 13 }}>
+                                                                {item.event_description || 'No description provided.'}
+                                                            </Text>
+
+                                                            <Space size="small" wrap style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+                                                                <span>
+                                                                    <CalendarOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />
+                                                                    {item.formattedDate || item.event_date}
+                                                                </span>
+
+                                                                <span>
+                                                                    <ClockCircleOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />
+                                                                    {item.formattedTime || item.event_time}
+                                                                </span>
+
+                                                                <span>
+                                                                    <UserOutlined style={{ marginRight: 4, color: '#1e3a8a' }} />
+                                                                    {item.event_manager}
+                                                                </span>
+                                                            </Space>
+                                                        </Space>
+                                                    }
+                                                />
+                                            </List.Item>
+                                        )}
                                     />
-                                </List.Item>
-                            )}
-                        />
+                                </div>
+                            </Col>
+
+                        </Row>
                     </Card>
                 </Col>
 

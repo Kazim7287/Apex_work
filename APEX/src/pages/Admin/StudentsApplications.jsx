@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import {
     Avatar,
     Button,
@@ -18,6 +17,8 @@ import {
     Tooltip,
     Typography,
     message,
+    Empty,
+    Badge,
 } from "antd";
 
 import {
@@ -31,6 +32,8 @@ import {
     ReloadOutlined,
     SolutionOutlined,
     UserOutlined,
+    CloseCircleOutlined,
+    SyncOutlined,
 } from "@ant-design/icons";
 
 const { TextArea } = Input;
@@ -43,13 +46,8 @@ const StudentApplications = () => {
     const navigate = useNavigate();
     const [form] = Form.useForm();
 
-    // =========================================================
-    // STATE
-    // =========================================================
-
     const [applications, setApplications] = useState([]);
-    const [filteredApplications, setFilteredApplications] =
-        useState([]);
+    const [filteredApplications, setFilteredApplications] = useState([]);
 
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -61,18 +59,15 @@ const StudentApplications = () => {
 
     const [activeTab, setActiveTab] = useState("all");
 
+    // Keep the role logic from the working version
     const [userRole, setUserRole] = useState("admin");
 
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-
-    const [bulkDeleteVisible, setBulkDeleteVisible] =
-        useState(false);
-
-    const [bulkDeleteLoading, setBulkDeleteLoading] =
-        useState(false);
+    const [bulkDeleteVisible, setBulkDeleteVisible] = useState(false);
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
     // =========================================================
-    // API HELPER
+    // API
     // =========================================================
 
     const apiFetch = async (endpoint, options = {}) => {
@@ -80,6 +75,7 @@ const StudentApplications = () => {
             ...options,
             credentials: "include",
             headers: {
+                Accept: "application/json",
                 "Content-Type": "application/json",
                 ...options.headers,
             },
@@ -87,31 +83,33 @@ const StudentApplications = () => {
     };
 
     // =========================================================
-    // CHECK USER ROLE
+    // CHECK ROLE
     // =========================================================
 
     useEffect(() => {
-        const checkUserRole = async () => {
+        const checkRole = async () => {
             try {
                 const response = await apiFetch(
                     "read_leave_applications.php"
                 );
 
-                setUserRole(
-                    response.status === 200
-                        ? "teacher"
-                        : "admin"
-                );
-            } catch {
+                if (response.status === 200) {
+                    setUserRole("teacher");
+                } else {
+                    setUserRole("admin");
+                }
+            } catch (error) {
+                console.error("Role check error:", error);
                 setUserRole("admin");
             }
         };
 
-        checkUserRole();
+        checkRole();
     }, []);
 
     // =========================================================
     // FETCH APPLICATIONS
+    // IMPORTANT: RESTORED WORKING ENDPOINTS
     // =========================================================
 
     const fetchApplications = async () => {
@@ -119,39 +117,85 @@ const StudentApplications = () => {
 
         try {
             const endpoint =
-                userRole === "teacher"
-                    ? "read_leave_applications.php"
-                    : "adRead_leave_applications.php";
+                userRole === "admin"
+                    ? "AdminApplications.php"
+                    : "read_leave_applications.php";
+
+            console.log("Fetching applications from:", API_BASE + endpoint);
 
             const response = await apiFetch(endpoint);
 
+            console.log(
+                "Applications response:",
+                response.status,
+                response.url
+            );
+
             if (response.status === 401) {
-                message.error(
-                    "Session expired. Please sign in again."
+                message.error("Session expired. Please sign in again.");
+
+                navigate(
+                    userRole === "admin"
+                        ? "/admin/login"
+                        : "/teacher/login"
                 );
 
-                navigate("/admin-signIn");
                 return;
             }
 
             if (!response.ok) {
                 throw new Error(
-                    "Failed to fetch applications"
+                    `HTTP ${response.status}: ${response.statusText}`
                 );
             }
 
             const data = await response.json();
 
-            if (data.status === "success" || data.success) {
-                const list = Array.isArray(data.data)
-                    ? data.data
-                    : [];
+            console.log("Applications data:", data);
 
-                setApplications(list);
-                applyFilter(list, activeTab);
-            } else {
-                setApplications([]);
-                setFilteredApplications([]);
+            let list = [];
+
+            // ADMIN RESPONSE
+            if (userRole === "admin") {
+                if (data?.success && Array.isArray(data.data)) {
+                    list = data.data;
+                } else if (Array.isArray(data?.data)) {
+                    list = data.data;
+                } else if (Array.isArray(data)) {
+                    list = data;
+                }
+            }
+
+            // TEACHER RESPONSE
+            else {
+                if (Array.isArray(data)) {
+                    list = data;
+                } else if (Array.isArray(data?.data)) {
+                    list = data.data;
+                }
+            }
+
+            // Make sure IDs are consistent
+            const validApplications = list
+                .filter(Boolean)
+                .map((app) => ({
+                    ...app,
+                    id: app.id ?? app.application_id,
+                }))
+                .filter((app) => app.id != null);
+
+            console.log(
+                "Valid applications:",
+                validApplications
+            );
+
+            setApplications(validApplications);
+            setSelectedRowKeys([]);
+
+            applyFilter(validApplications, activeTab);
+
+            if (validApplications.length === 0) {
+                message.info("No student applications found");
             }
         } catch (error) {
             console.error(
@@ -162,6 +206,9 @@ const StudentApplications = () => {
             message.error(
                 "Failed to load student applications"
             );
+
+            setApplications([]);
+            setFilteredApplications([]);
         } finally {
             setLoading(false);
         }
@@ -172,7 +219,7 @@ const StudentApplications = () => {
     }, [userRole]);
 
     // =========================================================
-    // FILTER APPLICATIONS
+    // FILTER
     // =========================================================
 
     const applyFilter = (data, tab) => {
@@ -181,50 +228,67 @@ const StudentApplications = () => {
             return;
         }
 
-        const filtered = data.filter(
-            (application) =>
-                application.status?.toLowerCase() ===
-                tab.toLowerCase()
+        setFilteredApplications(
+            data.filter(
+                (app) =>
+                    String(app.status || "").toLowerCase() ===
+                    String(tab).toLowerCase()
+            )
         );
-
-        setFilteredApplications(filtered);
     };
 
     const handleTabChange = (key) => {
         setActiveTab(key);
         applyFilter(applications, key);
+        setSelectedRowKeys([]);
     };
 
     // =========================================================
-    // DELETE SINGLE APPLICATION
+    // DELETE SINGLE
+    // RESTORED: delete_applications.php
     // =========================================================
 
     const handleSingleDelete = async (id) => {
         try {
             const response = await apiFetch(
-                `delete_leave_application.php?id=${id}`,
+                `delete_applications.php?id=${encodeURIComponent(id)}`,
                 {
                     method: "DELETE",
                 }
             );
 
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
             const data = await response.json();
 
-            if (data.status === "success") {
+            console.log("Delete response:", data);
+
+            if (data.success) {
                 message.success(
-                    "Application deleted successfully"
+                    data.message ||
+                        "Application deleted successfully"
                 );
 
-                await fetchApplications();
+                setApplications((prev) =>
+                    prev.filter((app) => app.id !== id)
+                );
+
+                setFilteredApplications((prev) =>
+                    prev.filter((app) => app.id !== id)
+                );
+
+                setSelectedRowKeys((prev) =>
+                    prev.filter((key) => key !== id)
+                );
             } else {
                 message.error(
-                    data.message ||
-                        "Failed to delete application"
+                    data.message || "Delete failed"
                 );
             }
         } catch (error) {
-            console.error(error);
-
+            console.error("Delete error:", error);
             message.error(
                 "Error deleting application"
             );
@@ -233,56 +297,70 @@ const StudentApplications = () => {
 
     // =========================================================
     // BULK DELETE
+    // RESTORED: delete_applications.php?ids=
     // =========================================================
 
-    const handleBulkDelete = () => {
-        if (selectedRowKeys.length === 0) {
-            message.warning(
-                "Select at least one application to delete"
-            );
-
-            return;
-        }
-
-        setBulkDeleteVisible(true);
-    };
-
     const confirmBulkDelete = async () => {
+        if (!selectedRowKeys.length) return;
+
         setBulkDeleteLoading(true);
 
         try {
+            const ids = selectedRowKeys.join(",");
+
             const response = await apiFetch(
-                "bulk_delete_leave_applications.php",
+                `delete_applications.php?ids=${encodeURIComponent(ids)}`,
                 {
-                    method: "POST",
-                    body: JSON.stringify({
-                        ids: selectedRowKeys,
-                    }),
+                    method: "DELETE",
                 }
             );
 
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
             const data = await response.json();
 
-            if (data.status === "success") {
+            console.log("Bulk delete response:", data);
+
+            if (data.success) {
                 message.success(
-                    `Successfully deleted ${selectedRowKeys.length} application(s)`
+                    data.message ||
+                        `Successfully deleted ${selectedRowKeys.length} application(s)`
+                );
+
+                const deletedIds = [...selectedRowKeys];
+
+                setApplications((prev) =>
+                    prev.filter(
+                        (app) =>
+                            !deletedIds.includes(app.id)
+                    )
+                );
+
+                setFilteredApplications((prev) =>
+                    prev.filter(
+                        (app) =>
+                            !deletedIds.includes(app.id)
+                    )
                 );
 
                 setSelectedRowKeys([]);
                 setBulkDeleteVisible(false);
-
-                await fetchApplications();
             } else {
                 message.error(
                     data.message ||
-                        "Failed to delete applications"
+                        "Bulk delete failed"
                 );
             }
         } catch (error) {
-            console.error(error);
+            console.error(
+                "Bulk delete error:",
+                error
+            );
 
             message.error(
-                "Error deleting applications"
+                "Error performing bulk delete"
             );
         } finally {
             setBulkDeleteLoading(false);
@@ -291,69 +369,150 @@ const StudentApplications = () => {
 
     // =========================================================
     // UPDATE APPLICATION
+    // RESTORED: read_leave_applications.php
     // =========================================================
 
     const handleResponseSubmit = async (values) => {
         if (!selectedApp?.id) {
+            message.error(
+                "Application ID is missing"
+            );
             return;
         }
 
         setSubmitting(true);
 
         try {
-            let endpoint;
-            let payload;
+            const payload =
+                userRole === "admin"
+                    ? {
+                          id: selectedApp.id,
+                          status: values.status,
+                          response:
+                              values.response || "",
+                          response_description:
+                              values.response_description ||
+                              "",
+                          teacher_id:
+                              values.teacher_id ||
+                              null,
+                      }
+                    : {
+                          id: selectedApp.id,
+                          status: values.status,
+                          response_description:
+                              values.response_description ||
+                              "",
+                      };
 
-            if (userRole === "teacher") {
-                endpoint =
-                    "teacher_update_leave_application.php";
+            console.log(
+                "Updating application:",
+                payload
+            );
 
-                payload = {
-                    id: selectedApp.id,
-                    status: values.status,
-                    review_comments:
-                        values.response_description,
-                };
-            } else {
-                endpoint =
-                    "update_leave_application.php";
+            // This is the endpoint from your working version.
+            const response = await apiFetch(
+                "read_leave_applications.php",
+                {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                }
+            );
 
-                payload = {
-                    id: selectedApp.id,
-                    status: values.status,
-                    response: values.response || "",
-                    response_description:
-                        values.response_description,
-                    teacher_id:
-                        values.teacher_id ||
-                        selectedApp.teacher_id ||
-                        "",
-                };
+            if (response.status === 401) {
+                navigate(
+                    userRole === "admin"
+                        ? "/admin/login"
+                        : "/teacher/login"
+                );
+                return;
             }
 
-            const response = await apiFetch(endpoint, {
-                method: "POST",
-                body: JSON.stringify(payload),
-            });
+            if (!response.ok) {
+                throw new Error(
+                    `HTTP ${response.status}`
+                );
+            }
 
             const data = await response.json();
 
-            if (data.status === "success" || data.success) {
+            console.log(
+                "Update response:",
+                data
+            );
+
+            if (data.success) {
                 message.success(
                     "Application updated successfully"
                 );
 
-                closeResponseModal();
+                // Update locally immediately
+                setApplications((prev) =>
+                    prev.map((app) =>
+                        app.id === selectedApp.id
+                            ? {
+                                  ...app,
+                                  status:
+                                      values.status,
+                                  response:
+                                      values.response ||
+                                      "",
+                                  response_discription:
+                                      values.response_description ||
+                                      "",
+                                  response_description:
+                                      values.response_description ||
+                                      "",
+                                  teacher_id:
+                                      values.teacher_id ||
+                                      app.teacher_id,
+                              }
+                            : app
+                    )
+                );
 
+                setFilteredApplications((prev) =>
+                    prev.map((app) =>
+                        app.id === selectedApp.id
+                            ? {
+                                  ...app,
+                                  status:
+                                      values.status,
+                                  response:
+                                      values.response ||
+                                      "",
+                                  response_discription:
+                                      values.response_description ||
+                                      "",
+                                  response_description:
+                                      values.response_description ||
+                                      "",
+                                  teacher_id:
+                                      values.teacher_id ||
+                                      app.teacher_id,
+                              }
+                            : app
+                    )
+                );
+
+                setResponseVisible(false);
+                setSelectedApp(null);
+                form.resetFields();
+
+                // Refresh from backend
                 await fetchApplications();
             } else {
                 message.error(
                     data.message ||
+                        data.error ||
                         "Failed to update application"
                 );
             }
         } catch (error) {
-            console.error(error);
+            console.error(
+                "Submit error:",
+                error
+            );
 
             message.error(
                 "Error submitting response"
@@ -364,7 +523,81 @@ const StudentApplications = () => {
     };
 
     // =========================================================
-    // OPEN RESPONSE MODAL
+    // STATUS
+    // =========================================================
+
+    const getStatusTag = (status) => {
+        const value =
+            String(status || "Pending");
+
+        const normalized =
+            value.toLowerCase();
+
+        if (normalized === "approved") {
+            return (
+                <Tag
+                    icon={<CheckCircleOutlined />}
+                    color="success"
+                    style={{
+                        borderRadius: 12,
+                        padding: "3px 10px",
+                        fontWeight: 600,
+                    }}
+                >
+                    Approved
+                </Tag>
+            );
+        }
+
+        if (normalized === "rejected") {
+            return (
+                <Tag
+                    icon={<CloseCircleOutlined />}
+                    color="error"
+                    style={{
+                        borderRadius: 12,
+                        padding: "3px 10px",
+                        fontWeight: 600,
+                    }}
+                >
+                    Rejected
+                </Tag>
+            );
+        }
+
+        if (normalized === "processing") {
+            return (
+                <Tag
+                    icon={<SyncOutlined />}
+                    color="processing"
+                    style={{
+                        borderRadius: 12,
+                        padding: "3px 10px",
+                        fontWeight: 600,
+                    }}
+                >
+                    Processing
+                </Tag>
+            );
+        }
+
+        return (
+            <Tag
+                icon={<ClockCircleOutlined />}
+                color="warning"
+                style={{
+                    borderRadius: 12,
+                    padding: "3px 10px",
+                    fontWeight: 600,
+                }}
+            >
+                Pending
+            </Tag>
+        );
+    };
+
+    // =========================================================
+    // OPEN RESPONSE
     // =========================================================
 
     const openResponseModal = (record) => {
@@ -372,105 +605,26 @@ const StudentApplications = () => {
 
         form.setFieldsValue({
             status: record.status || "Pending",
-            response: record.response || "",
+
+            response:
+                record.response || "",
+
+            // IMPORTANT:
+            // Your old backend uses response_discription
             response_description:
+                record.response_discription ||
                 record.response_description ||
-                record.review_comments ||
                 "",
-            teacher_id: record.teacher_id || "",
+
+            teacher_id:
+                record.teacher_id || "",
         });
 
         setResponseVisible(true);
     };
 
-    const closeResponseModal = () => {
-        setResponseVisible(false);
-        setSelectedApp(null);
-        form.resetFields();
-    };
-
     // =========================================================
-    // DETAILS MODAL
-    // =========================================================
-
-    const openDetailModal = (record) => {
-        setSelectedApp(record);
-        setDetailVisible(true);
-    };
-
-    const closeDetailModal = () => {
-        setDetailVisible(false);
-        setSelectedApp(null);
-    };
-
-    // =========================================================
-    // STATUS TAG
-    // =========================================================
-
-    const getStatusTag = (status) => {
-        switch (status?.toLowerCase()) {
-            case "approved":
-                return (
-                    <Tag
-                        icon={<CheckCircleOutlined />}
-                        color="success"
-                        style={{
-                            borderRadius: 12,
-                            padding: "3px 10px",
-                            fontWeight: 600,
-                        }}
-                    >
-                        Approved
-                    </Tag>
-                );
-
-            case "rejected":
-                return (
-                    <Tag
-                        color="error"
-                        style={{
-                            borderRadius: 12,
-                            padding: "3px 10px",
-                            fontWeight: 600,
-                        }}
-                    >
-                        Rejected
-                    </Tag>
-                );
-
-            case "processing":
-                return (
-                    <Tag
-                        color="processing"
-                        style={{
-                            borderRadius: 12,
-                            padding: "3px 10px",
-                            fontWeight: 600,
-                        }}
-                    >
-                        Processing
-                    </Tag>
-                );
-
-            default:
-                return (
-                    <Tag
-                        icon={<ClockCircleOutlined />}
-                        color="warning"
-                        style={{
-                            borderRadius: 12,
-                            padding: "3px 10px",
-                            fontWeight: 600,
-                        }}
-                    >
-                        Pending
-                    </Tag>
-                );
-        }
-    };
-
-    // =========================================================
-    // TABLE COLUMNS
+    // TABLE
     // =========================================================
 
     const columns = [
@@ -484,7 +638,8 @@ const StudentApplications = () => {
                     <Avatar
                         icon={<UserOutlined />}
                         style={{
-                            background: "#0b1b3d",
+                            background:
+                                "#0b1b3d",
                             color: "#d4af37",
                             fontWeight: 700,
                         }}
@@ -494,21 +649,26 @@ const StudentApplications = () => {
                         <Text
                             strong
                             style={{
-                                display: "block",
-                                color: "#0f172a",
+                                display:
+                                    "block",
+                                color:
+                                    "#0f172a",
                             }}
                         >
-                            {name || "Unknown Student"}
+                            {name ||
+                                "Unknown Student"}
                         </Text>
 
                         <Text
                             style={{
                                 fontSize: 11,
-                                color: "#64748b",
+                                color:
+                                    "#64748b",
                             }}
                         >
                             Section:{" "}
-                            {record.section_name || "N/A"}
+                            {record.section_name ||
+                                "N/A"}
                         </Text>
                     </div>
                 </Space>
@@ -517,31 +677,47 @@ const StudentApplications = () => {
 
         {
             title: "Application",
-            dataIndex: "leave_title",
-            key: "leave_title",
+            key: "application",
 
-            render: (title) => (
-                <Text
-                    strong
-                    style={{
-                        color: "#1e3a8a",
-                    }}
-                >
-                    {title || "Untitled Application"}
-                </Text>
+            render: (_, record) => (
+                <div>
+                    <Text
+                        strong
+                        style={{
+                            color: "#1e3a8a",
+                            display: "block",
+                        }}
+                    >
+                        {record.title ||
+                            record.type ||
+                            "Student Application"}
+                    </Text>
+
+                    {record.type && (
+                        <Text
+                            type="secondary"
+                            style={{
+                                fontSize: 11,
+                            }}
+                        >
+                            {record.type}
+                        </Text>
+                    )}
+                </div>
             ),
         },
 
         {
             title: "Date",
-            key: "dates",
+            key: "date",
 
             render: (_, record) => (
                 <Text
                     style={{
                         fontSize: 13,
                         color: "#334155",
-                        whiteSpace: "nowrap",
+                        whiteSpace:
+                            "nowrap",
                     }}
                 >
                     <CalendarOutlined
@@ -551,8 +727,11 @@ const StudentApplications = () => {
                         }}
                     />
 
-                    {record.start_date || "N/A"}{" "}
-                    → {record.end_date || "N/A"}
+                    {record.submission_date
+                        ? new Date(
+                              record.submission_date
+                          ).toLocaleDateString()
+                        : "N/A"}
                 </Text>
             ),
         },
@@ -579,12 +758,20 @@ const StudentApplications = () => {
                         <Button
                             type="primary"
                             size="small"
-                            icon={<EyeOutlined />}
-                            onClick={() =>
-                                openDetailModal(record)
+                            icon={
+                                <EyeOutlined />
                             }
+                            onClick={() => {
+                                setSelectedApp(
+                                    record
+                                );
+                                setDetailVisible(
+                                    true
+                                );
+                            }}
                             style={{
-                                background: "#0b1b3d",
+                                background:
+                                    "#0b1b3d",
                                 borderRadius: 6,
                             }}
                         />
@@ -594,11 +781,21 @@ const StudentApplications = () => {
                         <Button
                             type="primary"
                             size="small"
-                            icon={<MessageOutlined />}
+                            icon={
+                                <MessageOutlined />
+                            }
                             onClick={() =>
-                                openResponseModal(record)
+                                openResponseModal(
+                                    record
+                                )
                             }
                             className="apex-btn-gold"
+                            disabled={
+                                userRole ===
+                                    "teacher" &&
+                                record.status !==
+                                    "Pending"
+                            }
                         />
                     </Tooltip>
 
@@ -606,7 +803,9 @@ const StudentApplications = () => {
                         title="Delete Application"
                         description="Are you sure you want to delete this application?"
                         onConfirm={() =>
-                            handleSingleDelete(record.id)
+                            handleSingleDelete(
+                                record.id
+                            )
                         }
                         okText="Yes"
                         cancelText="No"
@@ -616,10 +815,11 @@ const StudentApplications = () => {
                     >
                         <Tooltip title="Delete">
                             <Button
-                                type="primary"
                                 danger
                                 size="small"
-                                icon={<DeleteOutlined />}
+                                icon={
+                                    <DeleteOutlined />
+                                }
                                 style={{
                                     borderRadius: 6,
                                 }}
@@ -644,7 +844,7 @@ const StudentApplications = () => {
     };
 
     // =========================================================
-    // TAB ITEMS
+    // TABS
     // =========================================================
 
     const tabItems = [
@@ -653,15 +853,19 @@ const StudentApplications = () => {
             label: "All Applications",
         },
         {
-            key: "pending",
+            key: "Pending",
             label: "Pending Review",
         },
         {
-            key: "approved",
+            key: "Processing",
+            label: "Processing",
+        },
+        {
+            key: "Approved",
             label: "Approved",
         },
         {
-            key: "rejected",
+            key: "Rejected",
             label: "Rejected",
         },
     ];
@@ -684,7 +888,8 @@ const StudentApplications = () => {
                     <div
                         style={{
                             display: "flex",
-                            alignItems: "center",
+                            alignItems:
+                                "center",
                             gap: 12,
                         }}
                     >
@@ -697,9 +902,12 @@ const StudentApplications = () => {
                                 background:
                                     "linear-gradient(135deg, #0b1b3d, #1e3a8a)",
                                 color: "#d4af37",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
+                                display:
+                                    "flex",
+                                alignItems:
+                                    "center",
+                                justifyContent:
+                                    "center",
                                 fontSize: 18,
                             }}
                         >
@@ -711,54 +919,66 @@ const StudentApplications = () => {
                                 level={4}
                                 style={{
                                     margin: 0,
-                                    color: "#0b1b3d",
-                                    fontWeight: 700,
+                                    color:
+                                        "#0b1b3d",
+                                    fontWeight:
+                                        700,
                                 }}
                             >
-                                Student Leave Applications
+                                Student Leave
+                                Applications
                             </Title>
 
                             <Text
                                 style={{
-                                    color: "#64748b",
+                                    color:
+                                        "#64748b",
                                     fontSize: 12,
                                 }}
                             >
-                                Review, approve, or reject
-                                student leave requests
+                                Review, approve,
+                                or reject
+                                student leave
+                                requests
                             </Text>
                         </div>
                     </div>
                 }
                 extra={
                     <Space wrap>
-                        {selectedRowKeys.length > 0 && (
+                        {selectedRowKeys.length >
+                            0 && (
                             <Button
                                 danger
-                                icon={<DeleteFilled />}
-                                onClick={
-                                    handleBulkDelete
+                                icon={
+                                    <DeleteFilled />
                                 }
-                                style={{
-                                    borderRadius: 8,
-                                }}
+                                onClick={() =>
+                                    setBulkDeleteVisible(
+                                        true
+                                    )
+                                }
                             >
                                 Delete Selected (
-                                {selectedRowKeys.length})
+                                {
+                                    selectedRowKeys.length
+                                }
+                                )
                             </Button>
                         )}
 
                         <Tooltip title="Refresh">
                             <Button
                                 type="text"
-                                icon={<ReloadOutlined />}
+                                icon={
+                                    <ReloadOutlined />
+                                }
                                 onClick={
                                     fetchApplications
                                 }
-                                loading={loading}
-                                style={{
-                                    borderRadius: 8,
-                                }}
+                                loading={
+                                    loading
+                                }
                             />
                         </Tooltip>
                     </Space>
@@ -767,7 +987,9 @@ const StudentApplications = () => {
                 <Tabs
                     activeKey={activeTab}
                     items={tabItems}
-                    onChange={handleTabChange}
+                    onChange={
+                        handleTabChange
+                    }
                     style={{
                         marginBottom: 16,
                     }}
@@ -775,54 +997,105 @@ const StudentApplications = () => {
 
                 <Table
                     columns={columns}
-                    dataSource={filteredApplications}
+                    dataSource={
+                        filteredApplications
+                    }
                     rowKey="id"
-                    rowSelection={rowSelection}
+                    rowSelection={
+                        rowSelection
+                    }
                     loading={loading}
+                    locale={{
+                        emptyText: (
+                            <Empty
+                                description="No student applications found"
+                                image={
+                                    Empty.PRESENTED_IMAGE_SIMPLE
+                                }
+                            />
+                        ),
+                    }}
                     scroll={{
-                        x: "max-content",
+                        x: 900,
                     }}
                     pagination={{
                         pageSize: 10,
                         showSizeChanger: true,
-                        responsive: true,
+                        showQuickJumper: true,
+                        showTotal: (
+                            total,
+                            range
+                        ) =>
+                            `${range[0]}-${range[1]} of ${total} applications`,
                     }}
                 />
             </Card>
 
             {/* =====================================================
-                VIEW DETAILS MODAL
+                DETAILS
             ====================================================== */}
 
             <Modal
-                title="Student Application Details"
+                title={
+                    <Space>
+                        <UserOutlined />
+                        Student Application
+                        Details
+                    </Space>
+                }
                 open={detailVisible}
-                onCancel={closeDetailModal}
+                onCancel={() =>
+                    setDetailVisible(false)
+                }
                 footer={[
                     <Button
                         key="close"
-                        onClick={closeDetailModal}
-                        style={{
-                            borderRadius: 8,
-                        }}
+                        onClick={() =>
+                            setDetailVisible(
+                                false
+                            )
+                        }
                     >
                         Close
                     </Button>,
+
+                    selectedApp &&
+                        (userRole ===
+                            "admin" ||
+                            selectedApp.status ===
+                                "Pending") && (
+                            <Button
+                                key="respond"
+                                type="primary"
+                                onClick={() => {
+                                    setDetailVisible(
+                                        false
+                                    );
+                                    openResponseModal(
+                                        selectedApp
+                                    );
+                                }}
+                            >
+                                Update Status
+                            </Button>
+                        ),
                 ]}
-                width={650}
+                width={700}
                 centered
             >
                 {selectedApp && (
-                    <div style={{ paddingTop: 12 }}>
+                    <>
                         <Descriptions
                             bordered
-                            column={2}
+                            column={1}
                             size="small"
-                            responsive
                         >
                             <Descriptions.Item label="Student">
-                                {selectedApp.student_name ||
-                                    "N/A"}
+                                <Text strong>
+                                    {
+                                        selectedApp.student_name
+                                    }
+                                </Text>
                             </Descriptions.Item>
 
                             <Descriptions.Item label="Section">
@@ -830,12 +1103,25 @@ const StudentApplications = () => {
                                     "N/A"}
                             </Descriptions.Item>
 
-                            <Descriptions.Item label="Duration">
-                                {selectedApp.start_date ||
-                                    "N/A"}{" "}
-                                →{" "}
-                                {selectedApp.end_date ||
+                            <Descriptions.Item label="Type">
+                                {selectedApp.type ||
                                     "N/A"}
+                            </Descriptions.Item>
+
+                            <Descriptions.Item label="Title">
+                                {selectedApp.title ||
+                                    "N/A"}
+                            </Descriptions.Item>
+
+                            <Descriptions.Item label="Submission Date">
+                                <Space>
+                                    <CalendarOutlined />
+                                    {selectedApp.submission_date
+                                        ? new Date(
+                                              selectedApp.submission_date
+                                          ).toLocaleDateString()
+                                        : "N/A"}
+                                </Space>
                             </Descriptions.Item>
 
                             <Descriptions.Item label="Status">
@@ -843,45 +1129,62 @@ const StudentApplications = () => {
                                     selectedApp.status
                                 )}
                             </Descriptions.Item>
+
+                            <Descriptions.Item label="Description">
+                                {selectedApp.description ||
+                                    "No description provided."}
+                            </Descriptions.Item>
                         </Descriptions>
 
-                        <div
-                            style={{
-                                marginTop: 16,
-                                background: "#f8fafc",
-                                padding: 16,
-                                borderRadius: 8,
-                                border: "1px solid #e2e8f0",
-                            }}
-                        >
-                            <Text
-                                strong
+                        {(selectedApp.response ||
+                            selectedApp.response_discription) && (
+                            <div
                                 style={{
-                                    display: "block",
-                                    color: "#0b1b3d",
-                                    marginBottom: 8,
+                                    marginTop: 16,
+                                    padding: 16,
+                                    background:
+                                        "#f8fafc",
+                                    borderRadius: 8,
                                 }}
                             >
-                                Reason for Leave
-                            </Text>
+                                <Text strong>
+                                    Response
+                                </Text>
 
-                            <Text>
-                                {selectedApp.leave_description ||
-                                    "No description provided."}
-                            </Text>
-                        </div>
-                    </div>
+                                {selectedApp.response && (
+                                    <p>
+                                        {
+                                            selectedApp.response
+                                        }
+                                    </p>
+                                )}
+
+                                {selectedApp.response_discription && (
+                                    <p>
+                                        {
+                                            selectedApp.response_discription
+                                        }
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
             </Modal>
 
             {/* =====================================================
-                UPDATE STATUS MODAL
+                RESPONSE
             ====================================================== */}
 
             <Modal
                 title="Update Application Status"
                 open={responseVisible}
-                onCancel={closeResponseModal}
+                onCancel={() => {
+                    setResponseVisible(
+                        false
+                    );
+                    form.resetFields();
+                }}
                 footer={null}
                 width={550}
                 centered
@@ -890,18 +1193,13 @@ const StudentApplications = () => {
                 <Form
                     form={form}
                     layout="vertical"
-                    onFinish={handleResponseSubmit}
-                    style={{
-                        paddingTop: 12,
-                    }}
+                    onFinish={
+                        handleResponseSubmit
+                    }
                 >
                     <Form.Item
                         name="status"
-                        label={
-                            <Text strong>
-                                Decision Status
-                            </Text>
-                        }
+                        label="Decision Status"
                         rules={[
                             {
                                 required: true,
@@ -911,11 +1209,6 @@ const StudentApplications = () => {
                         ]}
                     >
                         <Select
-                            style={{
-                                width: "100%",
-                                borderRadius: 8,
-                            }}
-                            placeholder="Select status"
                             options={[
                                 {
                                     value: "Approved",
@@ -937,40 +1230,61 @@ const StudentApplications = () => {
                         />
                     </Form.Item>
 
+                    {userRole === "admin" && (
+                        <>
+                            <Form.Item
+                                name="teacher_id"
+                                label="Assign Teacher (Optional)"
+                            >
+                                <Input
+                                    placeholder="Teacher ID"
+                                    prefix={
+                                        <UserOutlined />
+                                    }
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                name="response"
+                                label="Response Title"
+                            >
+                                <Input placeholder="Brief response title" />
+                            </Form.Item>
+                        </>
+                    )}
+
                     <Form.Item
                         name="response_description"
                         label={
-                            <Text strong>
-                                Review Comments / Notes
-                            </Text>
+                            userRole ===
+                            "teacher"
+                                ? "Review Comments"
+                                : "Response Details"
                         }
                         rules={[
                             {
                                 required: true,
                                 message:
-                                    "Please enter review comments",
+                                    "Please enter response details",
                             },
                         ]}
                     >
                         <TextArea
                             rows={4}
-                            placeholder="Enter decision explanation or instructions"
-                            style={{
-                                borderRadius: 8,
-                            }}
+                            showCount
+                            maxLength={500}
+                            placeholder="Enter your response..."
                         />
                     </Form.Item>
 
                     <Button
                         type="primary"
                         htmlType="submit"
-                        loading={submitting}
                         block
-                        className="apex-btn-gold"
-                        style={{
-                            height: 40,
-                            marginTop: 8,
-                        }}
+                        loading={submitting}
+                        icon={
+                            <CheckCircleOutlined />
+                        }
                     >
                         Submit Decision
                     </Button>
@@ -978,7 +1292,7 @@ const StudentApplications = () => {
             </Modal>
 
             {/* =====================================================
-                BULK DELETE MODAL
+                BULK DELETE
             ====================================================== */}
 
             <Modal
@@ -992,20 +1306,29 @@ const StudentApplications = () => {
                 cancelText="Cancel"
                 okButtonProps={{
                     danger: true,
-                    loading: bulkDeleteLoading,
+                    loading:
+                        bulkDeleteLoading,
                 }}
                 centered
             >
                 <p>
-                    Are you sure you want to delete{" "}
+                    Are you sure you want to
+                    delete{" "}
                     <strong>
-                        {selectedRowKeys.length}
+                        {
+                            selectedRowKeys.length
+                        }
                     </strong>{" "}
-                    selected application
-                    {selectedRowKeys.length !== 1
-                        ? "s"
-                        : ""}
-                    ?
+                    selected application(s)?
+                </p>
+
+                <p
+                    style={{
+                        color: "#ff4d4f",
+                    }}
+                >
+                    This action cannot be
+                    undone.
                 </p>
             </Modal>
         </div>
