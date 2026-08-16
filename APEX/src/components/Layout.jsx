@@ -297,9 +297,7 @@ const themeConfig = {
 const Layout = () => {
   return (
     <ConfigProvider theme={themeConfig}>
-      <PermissionProvider>
-        <AdminLayoutInner />
-      </PermissionProvider>
+      <AdminLayoutInner />
     </ConfigProvider>
   );
 };

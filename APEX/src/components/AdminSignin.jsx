@@ -334,15 +334,21 @@ const AdminLogin = () => {
         setLoading(true);
 
         try {
-            const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/AdminSignin.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    email: email,
-                    password: password
-                })
-            });
-
+            const response = await fetch(
+  'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/AdminSignin.php',
+  {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  }
+);
             if (!response.ok) throw new Error('Network response was not ok');
 
             const data = await response.json();

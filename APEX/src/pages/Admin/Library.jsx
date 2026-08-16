@@ -18,6 +18,7 @@ import {
   Empty,
   Popconfirm,
   Tooltip,
+  Dropdown,
 } from "antd";
 
 import moment from "moment";
@@ -180,7 +181,17 @@ const DuesListing = () => {
         ? response.data
         : [];
 
-      const formattedDues = data.map((due) => ({
+      const formattedDues = data.map((due) => {
+        console.log("DUE FROM BACKEND:", {
+          id: due.id,
+          student: due.student_name,
+          amount: due.amount,
+          status: due.status,
+          paid_amount: due.paid_amount,
+          remaining_amount: due.remaining_amount,
+        });
+
+        return {
         ...due,
 
         id: due.id,
@@ -212,7 +223,8 @@ const DuesListing = () => {
 
         status:
           due.status || "Pending",
-      }));
+        };
+      });
 
       setDues(formattedDues);
 
@@ -330,45 +342,50 @@ const DuesListing = () => {
 
   const calculateTotals = () => {
     const totalAmount = dues.reduce(
-      (sum, due) =>
-        sum + (Number(due.amount) || 0),
+      (sum, due) => sum + (Number(due.amount) || 0),
       0
     );
 
+    const normalizedStatus = (due) =>
+      String(due.status || "Pending").trim().toLowerCase();
+
     const pendingDues = dues.filter(
-      (due) =>
-        String(due.status).toLowerCase() ===
-        "pending"
+      (due) => normalizedStatus(due) === "pending"
+    );
+
+    const partialDues = dues.filter(
+      (due) => normalizedStatus(due) === "partial"
     );
 
     const paidDues = dues.filter(
-      (due) =>
-        String(due.status).toLowerCase() ===
-        "paid"
+      (due) => normalizedStatus(due) === "paid"
     );
 
-    const cancelledDues = dues.filter(
-      (due) =>
-        String(due.status).toLowerCase() ===
-        "cancelled"
-    );
+    const cancelledDues = dues.filter((due) => {
+      const status = normalizedStatus(due);
+      return status === "cancelled" || status === "canceled";
+    });
 
     return {
       totalAmount,
 
       pendingAmount: pendingDues.reduce(
-        (sum, due) =>
-          sum + (Number(due.amount) || 0),
+        (sum, due) => sum + (Number(due.amount) || 0),
+        0
+      ),
+
+      partialAmount: partialDues.reduce(
+        (sum, due) => sum + (Number(due.amount) || 0),
         0
       ),
 
       paidAmount: paidDues.reduce(
-        (sum, due) =>
-          sum + (Number(due.amount) || 0),
+        (sum, due) => sum + (Number(due.amount) || 0),
         0
       ),
 
       pendingCount: pendingDues.length,
+      partialCount: partialDues.length,
       paidCount: paidDues.length,
       cancelledCount: cancelledDues.length,
     };
@@ -923,22 +940,14 @@ const DuesListing = () => {
       align: "center",
 
       render: (status) => {
-        const normalized =
-          status
-            ? status
-                .charAt(0)
-                .toUpperCase() +
-              status
-                .slice(1)
-                .toLowerCase()
-            : "Pending";
+        const normalized = String(status || "Pending")
+          .trim()
+          .toLowerCase();
 
-        if (normalized === "Paid") {
+        if (normalized === "paid") {
           return (
             <Tag
-              icon={
-                <CheckCircleOutlined />
-              }
+              icon={<CheckCircleOutlined />}
               color="success"
               style={{
                 borderRadius: 12,
@@ -950,33 +959,44 @@ const DuesListing = () => {
           );
         }
 
-        if (
-          normalized === "Pending"
-        ) {
+        if (normalized === "partial") {
           return (
             <Tag
-              icon={
-                <ClockCircleOutlined />
-              }
-              color="warning"
+              color="processing"
               style={{
                 borderRadius: 12,
                 padding: "2px 10px",
               }}
             >
-              Pending
+              Partial
+            </Tag>
+          );
+        }
+
+        if (normalized === "cancelled" || normalized === "canceled") {
+          return (
+            <Tag
+              color="error"
+              style={{
+                borderRadius: 12,
+                padding: "2px 10px",
+              }}
+            >
+              Cancelled
             </Tag>
           );
         }
 
         return (
           <Tag
-            color="error"
+            icon={<ClockCircleOutlined />}
+            color="warning"
             style={{
               borderRadius: 12,
+              padding: "2px 10px",
             }}
           >
-            Cancelled
+            Pending
           </Tag>
         );
       },
@@ -986,66 +1006,101 @@ const DuesListing = () => {
       title: "Actions",
       key: "actions",
       align: "center",
-      width: 140,
+      width: 210,
 
-      render: (_, record) => (
-        <Space size="small">
+      render: (_, record) => {
+        const currentStatus = String(record.status || "Pending")
+          .trim()
+          .toLowerCase();
 
-          {record.status !==
-            "Paid" && (
-            <Tooltip title="Collect Payment">
+        const statusItems = [
+          {
+            key: "Pending",
+            label: "Set Pending",
+          },
+          {
+            key: "Partial",
+            label: "Set Partial",
+          },
+          {
+            key: "Paid",
+            label: "Set Paid",
+          },
+          {
+            key: "Cancelled",
+            label: "Set Cancelled",
+          },
+        ];
 
-              <Button
-                type="primary"
-                icon={
-                  <DollarOutlined />
-                }
-                onClick={() =>
-                  handleOpenPaymentModal(
-                    record
-                  )
-                }
-                size="small"
-                className="apex-btn-gold"
-              />
+        return (
+          <Space size="small">
+            {currentStatus !== "paid" &&
+              currentStatus !== "cancelled" &&
+              currentStatus !== "canceled" && (
+                <Tooltip title="Collect Payment">
+                  <Button
+                    type="primary"
+                    icon={<DollarOutlined />}
+                    onClick={() => handleOpenPaymentModal(record)}
+                    size="small"
+                    className="apex-btn-gold"
+                  />
+                </Tooltip>
+              )}
 
-            </Tooltip>
-          )}
+            <Popconfirm
+              title="Delete Dues Record"
+              description="Are you sure you want to delete this due record?"
+              onConfirm={() => handleDelete(record.id)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{
+                danger: true,
+              }}
+            >
+              <Tooltip title="Delete Dues">
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  size="small"
+                  style={{
+                    borderRadius: 6,
+                  }}
+                />
+              </Tooltip>
+            </Popconfirm>
 
-          <Popconfirm
-            title="Delete Dues Record"
-            description="Are you sure you want to delete this due record?"
-            onConfirm={() =>
-              handleDelete(
-                record.id
-              )
-            }
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{
-              danger: true,
-            }}
-          >
-
-            <Tooltip title="Delete Dues">
-
-              <Button
-                danger
-                icon={
-                  <DeleteOutlined />
-                }
-                size="small"
-                style={{
-                  borderRadius: 6,
-                }}
-              />
-
-            </Tooltip>
-
-          </Popconfirm>
-
-        </Space>
-      ),
+            <Dropdown
+              menu={{
+                items: statusItems.map((item) => ({
+                  ...item,
+                  disabled: currentStatus === item.key.toLowerCase(),
+                })),
+                onClick: ({ key }) => {
+                  if (String(key).toLowerCase() !== currentStatus) {
+                    handleStatusUpdate(record.id, key);
+                  }
+                },
+              }}
+              trigger={["click"]}
+            >
+              <Tooltip title="Change Status">
+                <Button
+                  size="small"
+                  style={{
+                    borderRadius: 6,
+                    borderColor: "#0b1b3d",
+                    color: "#0b1b3d",
+                    fontWeight: 600,
+                  }}
+                >
+                  Status
+                </Button>
+              </Tooltip>
+            </Dropdown>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -1263,6 +1318,36 @@ const DuesListing = () => {
               }}
             >
               <Text type="secondary">
+                Partial
+              </Text>
+
+              <Title
+                level={4}
+                style={{
+                  margin: "5px 0",
+                  color: "#1677ff",
+                }}
+              >
+                Rs. {totals.partialAmount.toLocaleString()}
+              </Title>
+
+              <Text type="secondary">
+                {totals.partialCount} records
+              </Text>
+            </Card>
+          </Col>
+
+          <Col
+            xs={12}
+            sm={6}
+          >
+            <Card
+              size="small"
+              style={{
+                textAlign: "center",
+              }}
+            >
+              <Text type="secondary">
                 Paid
               </Text>
 
@@ -1385,6 +1470,10 @@ const DuesListing = () => {
 
               <Option value="Paid">
                 Paid
+              </Option>
+
+              <Option value="Partial">
+                Partial
               </Option>
 
               <Option value="Cancelled">
