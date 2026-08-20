@@ -108,7 +108,7 @@ const AdminManagement = () => {
   const handleSubmit = async (values) => {
     setSubmitLoading(true);
     try {
-      const endpoint = isEditing ? 'update_admin.php' : 'create_admin.php';
+      const endpoint = isEditing ? 'admindataupdate.php' : 'AddAdmin.php';
       const payload = isEditing ? { ...values, id: currentAdmin.id } : values;
       
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -136,7 +136,7 @@ const AdminManagement = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`${API_BASE_URL}delete_admin.php`, {
+      const response = await fetch(`${API_BASE_URL}adminsdelete.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

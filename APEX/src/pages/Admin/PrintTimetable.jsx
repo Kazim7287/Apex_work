@@ -19,7 +19,6 @@ const PrintTimetable = React.forwardRef(({ section }, ref) => {
     useEffect(() => {
         const fetchTimetable = async () => {
             if (!section?.id) return;
-            
             try {
                 setLoading(true);
                 const response = await axios.get(

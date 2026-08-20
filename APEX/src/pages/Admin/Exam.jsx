@@ -80,9 +80,23 @@ const getExamTitle = (exam) => {
   return exam?.exam_name || exam?.name || exam?.title || "";
 };
 
-const getSubjectId = (subject) => subject?.id ?? subject?.subject_id;
+const toPositiveInt = (value) => {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+};
+
+// The timetable foreign key references Subjects.id.
+// FilterAd.php may return both a mapping-row id and the real subject_id,
+// so subject_id must be preferred over id.
+const getSubjectId = (subject) =>
+  toPositiveInt(subject?.subject_id ?? subject?.subjectId ?? subject?.id);
+
 const getSubjectName = (subject) =>
-  subject?.name || subject?.subject_name || subject?.subject || "Unnamed Subject";
+  subject?.name ||
+  subject?.subject_name ||
+  subject?.subject ||
+  subject?.title ||
+  "Unnamed Subject";
 
 const getDayFromDate = (date) => (date ? date.format("dddd") : "");
 
@@ -192,16 +206,50 @@ const ExamTimetable = () => {
       }
 
       const result = await response.json();
-      const subjects = getArray(result);
+      const rawSubjects = getArray(result);
+
+      // Normalize the API response so every record uses Subjects.id.
+      const subjects = Array.from(
+        new Map(
+          rawSubjects
+            .map((subject) => {
+              const subjectId = getSubjectId(subject);
+
+              return [
+                subjectId,
+                {
+                  ...subject,
+                  id: subjectId,
+                  subject_id: subjectId,
+                  name: getSubjectName(subject),
+                },
+              ];
+            })
+            .filter(([subjectId]) => subjectId !== null)
+        ).values()
+      );
+
+      const invalidSubjects = rawSubjects.filter(
+        (subject) => getSubjectId(subject) === null
+      );
+
+      if (invalidSubjects.length > 0) {
+        console.error(
+          "Subjects without a valid Subjects.id:",
+          invalidSubjects
+        );
+        message.error(
+          `${invalidSubjects.length} subject record(s) have no valid subject_id.`
+        );
+      }
 
       setSectionSubjects(subjects);
 
       const initialForms = {};
       subjects.forEach((subject) => {
-        const id = getSubjectId(subject);
-        initialForms[id] = emptyForm({
-          id,
-          name: getSubjectName(subject),
+        initialForms[subject.id] = emptyForm({
+          id: subject.id,
+          name: subject.name,
         });
       });
 
@@ -283,55 +331,77 @@ const ExamTimetable = () => {
     setIsSubmitting(true);
 
     try {
-      /*
-       * The original working backend contract is preserved:
-       * section_id, exam_name, subject_id, exam_date, start_time,
-       * end_time, total_marks and passing_marks remain unchanged.
-       *
-       * day and room are included as optional fields. A PHP endpoint
-       * that ignores unknown JSON keys will continue working normally.
-       * If the database endpoint already supports room/day columns,
-       * those values will also be available to it.
-       */
+      // NOTE: field names and the "exam_timetable" wrapper key below match
+      // exactly what examtimetableinsert.php expects (confirmed against the
+      // previously working version of this page). Do not rename these keys
+      // or send a bare array without the wrapper — the backend's validation
+      // checks specifically for data.exam_timetable being an array.
       const timetableData = Object.values(subjectForms).map((item) => ({
-        section_id: selectedSection.id,
-        exam_name: selectedExam,
-        subject_id: item.subject_id,
+        subject_id: Number(item.subject_id),
+        section_id: Number(selectedSection.id),
+        room_no: item.room.trim(),
+        time_one: item.time_range[0].format("HH:mm:ss"),
+        time_two: item.time_range[1].format("HH:mm:ss"),
         exam_date: item.exam_date.format("YYYY-MM-DD"),
-        day: item.day || item.exam_date.format("dddd"),
-        start_time: item.time_range[0].format("HH:mm:ss"),
-        end_time: item.time_range[1].format("HH:mm:ss"),
-        room: item.room.trim(),
+        exam_day: item.day || item.exam_date.format("dddd"),
+        exam_name: selectedExam,
       }));
+
+      const invalidPayload = timetableData.filter(
+        (row) =>
+          !Number.isInteger(row.subject_id) ||
+          row.subject_id <= 0 ||
+          !Number.isInteger(row.section_id) ||
+          row.section_id <= 0
+      );
+
+      if (invalidPayload.length > 0) {
+        message.error("One or more subjects have an invalid database ID.");
+        console.error("Invalid timetable rows:", invalidPayload);
+        return;
+      }
+
+      console.log("Sending exam timetable:", timetableData);
 
       const response = await fetchWithAuth(EXAM_TIMETABLE_INSERT_API, {
         method: "POST",
-        body: JSON.stringify({ timetable: timetableData }),
+        body: JSON.stringify({ exam_timetable: timetableData }),
       });
 
       if (!response) return;
 
       const result = await response.json().catch(() => ({}));
 
+      console.log("Exam timetable API response:", result);
+
       if (!response.ok) {
         throw new Error(
-          result?.message || `Server returned ${response.status}`
+          result?.message ||
+            result?.error ||
+            `Server returned ${response.status}`
         );
       }
 
-      if (!result?.success) {
+      if (result?.success === false || result?.status === "error") {
         message.error(
-          result?.message || "The server rejected the exam timetable."
+          result?.message ||
+            result?.error ||
+            "The server rejected the exam timetable."
         );
         return;
       }
 
-      message.success("Exam timetable scheduled successfully.");
+      message.success(
+        result?.message || "Exam timetable scheduled successfully."
+      );
+
       await handleViewTimetable();
     } catch (error) {
       console.error("Error submitting exam timetable:", error);
+
       message.error(
-        error?.message || "Error submitting exam timetable. Please try again."
+        error?.message ||
+          "Error submitting exam timetable. Please try again."
       );
     } finally {
       setIsSubmitting(false);
@@ -458,9 +528,15 @@ const ExamTimetable = () => {
       lines.push(
         `${index + 1}. ${item.subject_name || item.name || "Subject"}`,
         `Date: ${item.exam_date || "-"}`,
-        `Day: ${item.day || (item.exam_date ? dayjs(item.exam_date).format("dddd") : "-")}`,
-        `Room: ${item.room || item.room_number || "-"}`,
-        `Time: ${item.start_time || "-"} - ${item.end_time || "-"}`,
+        `Day: ${
+          item.exam_day ||
+          item.day ||
+          (item.exam_date ? dayjs(item.exam_date).format("dddd") : "-")
+        }`,
+        `Room: ${item.room_no || item.room || "-"}`,
+        `Time: ${item.time_one || item.start_time || "-"} - ${
+          item.time_two || item.end_time || "-"
+        }`,
         "----------------------------------------"
       );
     });
@@ -499,7 +575,8 @@ const ExamTimetable = () => {
       key: "day",
       render: (_, record) => (
         <Tag color="blue">
-          {record.day ||
+          {record.exam_day ||
+            record.day ||
             (record.exam_date
               ? dayjs(record.exam_date).format("dddd")
               : "-")}
@@ -522,7 +599,7 @@ const ExamTimetable = () => {
       render: (_, record) => (
         <Space size={5}>
           <HomeOutlined style={{ color: "#d4af37" }} />
-          <Text>{record.room || record.room_number || "-"}</Text>
+          <Text>{record.room_no || record.room || "-"}</Text>
         </Space>
       ),
     },
@@ -534,7 +611,8 @@ const ExamTimetable = () => {
           <ClockCircleOutlined
             style={{ marginRight: 6, color: "#d4af37" }}
           />
-          {record.start_time || "-"} - {record.end_time || "-"}
+          {record.time_one || record.start_time || "-"} -{" "}
+          {record.time_two || record.end_time || "-"}
         </Text>
       ),
     },
@@ -551,7 +629,7 @@ const ExamTimetable = () => {
     >
       <Card
         className="apex-card"
-        bordered={false}
+        variant="borderless"
         title={
           <div
             style={{
@@ -632,12 +710,14 @@ const ExamTimetable = () => {
           </Text>
 
           <Row gutter={[10, 10]}>
-            {sections.map((section) => {
+            {sections.map((section, index) => {
               const isSelected =
                 String(selectedSection?.id) === String(section.id);
 
               return (
-                <Col key={section.id}>
+                <Col
+                  key={`section-${section.id}-${section.name || "unknown"}-${index}`}
+                >
                   <Button
                     type={isSelected ? "primary" : "default"}
                     loading={loadingSections}
@@ -676,14 +756,14 @@ const ExamTimetable = () => {
             </Text>
 
             <Row gutter={[10, 10]}>
-              {examNames.map((exam) => {
+              {examNames.map((exam, index) => {
                 const examTitle = getExamTitle(exam);
                 if (!examTitle) return null;
 
                 const isSelected = selectedExam === examTitle;
 
                 return (
-                  <Col key={exam?.id || examTitle}>
+                  <Col key={`exam-${exam?.id || examTitle}-${index}`}>
                     <Button
                       type={isSelected ? "primary" : "default"}
                       onClick={() => handleExamSelect(examTitle)}
@@ -770,15 +850,19 @@ const ExamTimetable = () => {
 
                 return (
                   <Card
-                    key={subjectId}
-                    size="small"
-                    style={{
-                      marginBottom: 14,
-                      borderRadius: 10,
-                      border: "1px solid #e2e8f0",
-                    }}
-                    bodyStyle={{ padding: "16px" }}
-                  >
+                      key={`subject-${subjectId || subjectName}-${idx}`}
+                      size="small"
+                      style={{
+                        marginBottom: 14,
+                        borderRadius: 10,
+                        border: "1px solid #e2e8f0",
+                      }}
+                      styles={{
+                        body: {
+                          padding: "16px",
+                        },
+                      }}
+                    >
                     <Row gutter={[12, 12]} align="middle">
                       {/* Subject */}
                       <Col xs={24} sm={24} md={4} lg={3}>
@@ -899,10 +983,6 @@ const ExamTimetable = () => {
                           }
                         />
                       </Col>
-
-
-
-
                     </Row>
                   </Card>
                 );

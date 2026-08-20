@@ -77,7 +77,22 @@ const AboutManagement = () => {
         return;
       }
 
-      const apiSections = data.data || [];
+      const apiSections = (data.data || []).map((section) => ({
+        ...section,
+        // Normalize possible API field names to the fields used by the UI.
+        title:
+          section.title ||
+          section.section_title ||
+          section.heading ||
+          'Untitled Section',
+        content:
+          section.content ??
+          section.text_content ??
+          section.description ??
+          section.body ??
+          section.text ??
+          '',
+      }));
 
       const sectionsWithImages = await Promise.all(
         apiSections.map(async (section) => {
@@ -141,64 +156,87 @@ const AboutManagement = () => {
     try {
       setUploading(true);
 
-      const formData = new FormData();
+      const sectionTitle = values.title?.trim() || '';
+      const sectionDescription = values.content || '';
 
-      if (currentSection) {
-        formData.append('id', currentSection.id);
-        formData.append('action', 'update');
-      } else {
-        formData.append('action', 'create');
-      }
+      const url = currentSection
+        ? `${API_BASE_URL}/updateabout.php?id=${currentSection.id}`
+        : `${API_BASE_URL}/add_about_section.php`;
 
-      formData.append('title', values.title);
-      formData.append('content', values.content || '');
+      const method = currentSection ? 'PUT' : 'POST';
 
-      if (
-        fileList.length > 0 &&
-        fileList[0].originFileObj
-      ) {
-        formData.append(
-          'image',
-          fileList[0].originFileObj
-        );
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/aboutuspost.php`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      // This is the exact JSON format used by the previously working file.
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: sectionTitle,
+          description: sectionDescription,
+        }),
+      });
 
       if (!response.ok) {
-        throw new Error(
-          `HTTP error! status: ${response.status}`
-        );
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
 
-      if (data.status === 'success') {
-        message.success(
-          data.message ||
-            (currentSection
-              ? 'Section updated successfully'
-              : 'Section created successfully')
+      if (data.status !== 'success') {
+        throw new Error(data.message || 'Operation failed');
+      }
+
+      const sectionId = data.id || currentSection?.id;
+
+      // Images are uploaded separately after the section is saved.
+      const newFiles = fileList.filter(
+        (file) => file.originFileObj
+      );
+
+      if (newFiles.length > 0 && sectionId) {
+        const imageFormData = new FormData();
+
+        newFiles.forEach((file) => {
+          imageFormData.append('images[]', file.originFileObj);
+        });
+
+        const imageResponse = await fetch(
+          `${API_BASE_URL}/imagupload.php?section_id=${sectionId}`,
+          {
+            method: 'POST',
+            body: imageFormData,
+          }
         );
 
-        closeModal();
-        fetchSections();
-      } else {
-        message.error(
-          data.message || 'Failed to save section'
-        );
+        if (!imageResponse.ok) {
+          throw new Error(
+            `Image upload failed: HTTP ${imageResponse.status}`
+          );
+        }
+
+        const imageData = await imageResponse.json();
+
+        if (imageData.status !== 'success') {
+          throw new Error(
+            imageData.message ||
+              'Section saved but image upload failed'
+          );
+        }
       }
-    } catch (error) {
-      console.error('Error saving section:', error);
-      message.error(
-        'An error occurred while saving the section'
+
+      message.success(
+        currentSection
+          ? 'Section updated successfully'
+          : 'Section added successfully'
       );
+
+      closeModal();
+      await fetchSections();
+    } catch (error) {
+      console.error('Submission error:', error);
+      message.error(`Failed: ${error.message}`);
     } finally {
       setUploading(false);
     }

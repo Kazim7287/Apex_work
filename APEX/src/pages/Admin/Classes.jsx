@@ -122,27 +122,52 @@ const Classes = () => {
   // Delete a section with credentials
   const handleDelete = async (id) => {
     try {
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/sec_del.php', {
-        method: 'DELETE',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ id }),
-      });
-      
-      const result = await response.json();
+        const response = await fetch(
+            `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sect_Delet.php?id=${id}`,
+            {
+                method: "DELETE",
+                credentials: "include"
+            }
+        );
 
-      if (result.error) {
-        message.error(result.error);
-      } else {
-        message.success(result.message || 'Section deleted successfully');
-        fetchSections();
-      }
+        const result = await response.json();
+
+        if (result.error) {
+            message.error(result.error);
+            return;
+        }
+
+        message.success(
+            result.message || "Section deleted successfully"
+        );
+
+        // Remove from main state
+        setSections((prevSections) =>
+            prevSections.filter(
+                (section) =>
+                    String(section.id) !== String(id)
+            )
+        );
+
+        // Remove from displayed/filtered state too
+        setFilteredSections((prevSections) =>
+            prevSections.filter(
+                (section) =>
+                    String(section.id) !== String(id)
+            )
+        );
+
     } catch (error) {
-      message.error('Failed to delete section');
+        console.error(
+            "Deletion error:",
+            error
+        );
+
+        message.error(
+            "Failed to delete section"
+        );
     }
-  };
+};
 
   // Update section name
   const handleUpdate = async () => {
@@ -153,7 +178,7 @@ const Classes = () => {
 
     try {
       setUpdateLoading(true);
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/sec_update.php', {
+      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Sec_Update.php', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

@@ -39,6 +39,37 @@ axios.defaults.withCredentials = true;
 const API_BASE =
     "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX";
 
+const getArray = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.result)) return payload.result;
+    return [];
+};
+
+const toId = (value) => {
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+const getBookId = (book) =>
+    toId(book?.id ?? book?.book_id ?? book?.subject_id);
+
+const getBookName = (book) =>
+    book?.name ||
+    book?.book_name ||
+    book?.subject_name ||
+    book?.title ||
+    "Unnamed Subject";
+
+const getTeacherId = (teacher) =>
+    toId(teacher?.id ?? teacher?.teach_id ?? teacher?.teacher_id);
+
+const getTeacherName = (teacher) =>
+    teacher?.teach_name ||
+    teacher?.teacher_name ||
+    teacher?.name ||
+    "Unnamed Teacher";
+
 const Assignment = () => {
     const navigate = useNavigate();
     const [form] = Form.useForm();
@@ -51,6 +82,7 @@ const Assignment = () => {
     const [books, setBooks] = useState([]);
     const [teachers, setTeachers] = useState([]);
     const [assignments, setAssignments] = useState([]);
+    const [teacherId, setTeacherId] = useState(null);
 
     const [loading, setLoading] = useState(true);
     const [fetching, setFetching] = useState(false);
@@ -84,7 +116,8 @@ const Assignment = () => {
                 fetchTeachers(),
             ]);
 
-            await fetchAssignments();
+            const sessionTeacherId = await fetchTeacherSession();
+            await fetchAssignments(sessionTeacherId);
         } catch (error) {
             handleRequestError(error, "Failed to load initial data");
         } finally {
@@ -98,10 +131,19 @@ const Assignment = () => {
 
     const fetchSections = async () => {
         const response = await axios.get(
-            `${API_BASE}/Sec_Read.php`
+            `${API_BASE}/sec_read.php`,
+            { withCredentials: true }
         );
 
-        setSections(response.data || []);
+        const data = getArray(response.data)
+            .map((section) => ({
+                ...section,
+                id: toId(section?.id ?? section?.section_id),
+                name: section?.name || section?.section_name || "Unnamed Section",
+            }))
+            .filter((section) => section.id !== null);
+
+        setSections(data);
     };
 
     // =========================================================
@@ -110,10 +152,19 @@ const Assignment = () => {
 
     const fetchBooks = async () => {
         const response = await axios.get(
-            `${API_BASE}/readbook.php`
+            `${API_BASE}/Book_Read.php`,
+            { withCredentials: true }
         );
 
-        setBooks(response.data || []);
+        const data = getArray(response.data)
+            .map((book) => ({
+                ...book,
+                id: getBookId(book),
+                name: getBookName(book),
+            }))
+            .filter((book) => book.id !== null);
+
+        setBooks(data);
     };
 
     // =========================================================
@@ -125,10 +176,42 @@ const Assignment = () => {
             `${API_BASE}/teach_read.php`
         );
 
-        if (response.data?.success) {
-            setTeachers(response.data.data || []);
-        } else {
-            setTeachers([]);
+        const data = getArray(response.data)
+            .map((teacher) => ({
+                ...teacher,
+                id: getTeacherId(teacher),
+                teach_name: getTeacherName(teacher),
+            }))
+            .filter((teacher) => teacher.id !== null);
+
+        setTeachers(data);
+    };
+
+    // =========================================================
+    // FETCH SESSION TEACHER
+    // =========================================================
+
+    const fetchTeacherSession = async () => {
+        try {
+            const response = await axios.get(
+                `${API_BASE}/Assignments.php?action=check_session`,
+                { withCredentials: true }
+            );
+
+            const id = toId(response.data?.user?.id);
+
+            if (id) {
+                setTeacherId(id);
+                setSelectedTeacherIdCreate(id);
+            }
+
+            return id;
+        } catch (error) {
+            console.warn(
+                "Could not fetch session teacher; continuing without a default teacher.",
+                error
+            );
+            return null;
         }
     };
 
@@ -136,19 +219,50 @@ const Assignment = () => {
     // FETCH ASSIGNMENTS
     // =========================================================
 
-    const fetchAssignments = async () => {
+    const fetchAssignments = async (teacherIdOverride = teacherId) => {
         setFetching(true);
 
         try {
+            // Exact endpoint and parameter contract from the previous design.
             const response = await axios.get(
-                `${API_BASE}/readAssigment.php`
+                `${API_BASE}/Filterads.php`,
+                {
+                    params: {
+                        teacher_id: teacherIdOverride,
+                    },
+                    withCredentials: true,
+                }
             );
 
-            setAssignments(
-                Array.isArray(response.data)
-                    ? response.data
-                    : []
-            );
+            const data = getArray(response.data).map((assignment) => ({
+                ...assignment,
+                id: toId(assignment?.id ?? assignment?.assignment_id),
+                sec_id: toId(assignment?.sec_id ?? assignment?.section_id),
+                book_id: toId(
+                    assignment?.book_id ??
+                    assignment?.sub_id ??
+                    assignment?.subject_id
+                ),
+                teach_id: toId(
+                    assignment?.teach_id ??
+                    assignment?.tech_id ??
+                    assignment?.teacher_id
+                ),
+                sec_name:
+                    assignment?.sec_name ||
+                    assignment?.section_name ||
+                    "Unknown Section",
+                book_name:
+                    assignment?.book_name ||
+                    assignment?.subject_name ||
+                    "Unknown Subject",
+                teach_name:
+                    assignment?.teach_name ||
+                    assignment?.teacher_name ||
+                    "Unknown Teacher",
+            }));
+
+            setAssignments(data);
         } catch (error) {
             console.error("Error fetching assignments:", error);
 
@@ -164,8 +278,8 @@ const Assignment = () => {
     // ERROR HANDLER
     // =========================================================
 
-    const handleRequestError = (error, message) => {
-        if (error.response?.status === 401) {
+    const handleRequestError = (error, fallbackMessage) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
             navigate("/admin-signIn");
             return;
         }
@@ -173,7 +287,12 @@ const Assignment = () => {
         console.error(error);
 
         notification.error({
-            message,
+            message: error.response?.data?.message || fallbackMessage,
+            description:
+                error.response?.data?.error ||
+                (error.response?.status
+                    ? `Server returned HTTP ${error.response.status}`
+                    : error.message),
         });
     };
 
@@ -198,14 +317,28 @@ const Assignment = () => {
 
         try {
             const payload = {
-                sec_id: selectedSectionIdCreate,
-                book_id: selectedBookIdCreate,
-                teach_id: selectedTeacherIdCreate,
+                sec_id: toId(selectedSectionIdCreate),
+                sub_id: toId(selectedBookIdCreate),
+                tech_id: toId(selectedTeacherIdCreate),
+                action: "create_assignment",
             };
 
+            if (!payload.sec_id || !payload.sub_id || !payload.tech_id) {
+                notification.warning({
+                    message: "Please select valid Section, Subject, and Teacher values",
+                });
+                return;
+            }
+
             const response = await axios.post(
-                `${API_BASE}/Assignmetpost.php`,
-                payload
+                `${API_BASE}/Assignments.php`,
+                payload,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    withCredentials: true,
+                }
             );
 
             const success =
@@ -261,15 +394,34 @@ const Assignment = () => {
 
         try {
             const payload = {
-                id: editRecord.id,
-                sec_id: values.sec_id,
-                book_id: values.book_id,
-                teach_id: values.teach_id,
+                assignment_id: toId(editRecord.id),
+                sec_id: toId(values.sec_id),
+                sub_id: toId(values.book_id),
+                tech_id: toId(values.teach_id),
+                action: "update_assignment",
             };
 
-            const response = await axios.put(
-                `${API_BASE}/assignment_update.php`,
-                payload
+            if (
+                !payload.assignment_id ||
+                !payload.sec_id ||
+                !payload.sub_id ||
+                !payload.tech_id
+            ) {
+                notification.warning({
+                    message: "Please select valid Section, Subject, and Teacher values",
+                });
+                return;
+            }
+
+            const response = await axios.post(
+                `${API_BASE}/Assignments.php`,
+                payload,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    withCredentials: true,
+                }
             );
 
             const success =
@@ -308,8 +460,19 @@ const Assignment = () => {
 
     const handleDelete = async (id) => {
         try {
+            const assignment = assignments.find(
+                (item) => String(item.id) === String(id)
+            );
+
             const response = await axios.delete(
-                `${API_BASE}/Assignmentdelete.php?id=${id}`
+                `${API_BASE}/Asign_delete.php`,
+                {
+                    params: {
+                        assignment_id: toId(id),
+                        teacher_id: toId(teacherId),
+                    },
+                    withCredentials: true,
+                }
             );
 
             const success =
@@ -599,9 +762,9 @@ const Assignment = () => {
                                     width: "100%",
                                 }}
                             >
-                                {sections.map((section) => (
+                                {sections.map((section, index) => (
                                     <Option
-                                        key={section.id}
+                                        key={`create-section-${section.id}-${index}`}
                                         value={section.id}
                                     >
                                         Section {section.name}
@@ -620,9 +783,9 @@ const Assignment = () => {
                                     width: "100%",
                                 }}
                             >
-                                {books.map((book) => (
+                                {books.map((book, index) => (
                                     <Option
-                                        key={book.id}
+                                        key={`create-book-${book.id}-${index}`}
                                         value={book.id}
                                     >
                                         {book.name}
@@ -643,9 +806,9 @@ const Assignment = () => {
                                     width: "100%",
                                 }}
                             >
-                                {teachers.map((teacher) => (
+                                {teachers.map((teacher, index) => (
                                     <Option
-                                        key={teacher.id}
+                                        key={`create-teacher-${teacher.id}-${index}`}
                                         value={teacher.id}
                                     >
                                         {teacher.teach_name}
@@ -677,7 +840,12 @@ const Assignment = () => {
                 <Table
                     columns={columns}
                     dataSource={assignments}
-                    rowKey="id"
+                    rowKey={(record, index) =>
+                        record.id ||
+                        `assignment-${record.sec_id || "section"}-${
+                            record.book_id || "book"
+                        }-${record.teach_id || "teacher"}-${index}`
+                    }
                     loading={fetching}
                     scroll={{
                         x: "max-content",
@@ -744,9 +912,9 @@ const Assignment = () => {
                                 width: "100%",
                             }}
                         >
-                            {sections.map((section) => (
+                            {sections.map((section, index) => (
                                 <Option
-                                    key={section.id}
+                                    key={`edit-section-${section.id}-${index}`}
                                     value={section.id}
                                 >
                                     Section {section.name}
@@ -777,9 +945,9 @@ const Assignment = () => {
                                 width: "100%",
                             }}
                         >
-                            {books.map((book) => (
+                            {books.map((book, index) => (
                                 <Option
-                                    key={book.id}
+                                    key={`edit-book-${book.id}-${index}`}
                                     value={book.id}
                                 >
                                     {book.name}
@@ -810,9 +978,9 @@ const Assignment = () => {
                                 width: "100%",
                             }}
                         >
-                            {teachers.map((teacher) => (
+                            {teachers.map((teacher, index) => (
                                 <Option
-                                    key={teacher.id}
+                                    key={`edit-teacher-${teacher.id}-${index}`}
                                     value={teacher.id}
                                 >
                                     {teacher.teach_name}

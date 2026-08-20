@@ -115,7 +115,7 @@ const StudentReports = () => {
 
     const handleSingleDelete = async (reportId) => {
         try {
-            const response = await authApi.delete(`adstdreports_bulk_delete.php`, {
+            const response = await authApi.delete(`admin_std_reports_delete.php`, {
                 data: { ids: [reportId] }
             });
 
