@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+// src/pages/Students/Performance.jsx
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
-  Layout, 
   Card, 
   Select, 
   Row, 
@@ -14,10 +14,9 @@ import {
   Alert,
   notification,
   Button,
-  Drawer,
-  Space
+  Space,
+  Tag
 } from 'antd';
-import styled from 'styled-components'; 
 import { 
   LineChartOutlined, 
   FilterOutlined, 
@@ -25,10 +24,8 @@ import {
   BookOutlined,
   PercentageOutlined,
   RiseOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   TrophyOutlined,
-  BarChartOutlined
+  ReloadOutlined
 } from '@ant-design/icons';
 import { Line } from 'react-chartjs-2';
 import {
@@ -42,7 +39,6 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import Sidebar from './Sidebar';
 
 ChartJS.register(
   CategoryScale,
@@ -55,87 +51,9 @@ ChartJS.register(
   Filler
 );
 
-const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
-
-// Styled components for better organization
-const StyledCard = styled(Card)`
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  }
-`;
-
-const StatisticCard = styled(StyledCard)`
-  .ant-statistic-content {
-    font-size: 24px;
-    color: #1890ff;
-  }
-  
-  .ant-statistic-title {
-    font-size: 14px;
-    color: #666;
-  }
-`;
-
-const PerformanceHeader = styled(Header)`
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  padding: 0 16px !important;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  
-  .ant-typography {
-    color: white !important;
-    margin: 0 !important;
-    font-size: 16px !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
-  }
-`;
-
-const HeaderContent = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-  min-width: 0;
-`;
-
-const HeaderTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-`;
-
-const MainContent = styled(Content)`
-  margin: 24px 16px 0;
-  transition: padding 0.2s ease;
-  background: #f5f7fa;
-  min-height: calc(100vh - 112px);
-`;
-
-const ChartContainer = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
-  margin-bottom: 24px;
-`;
 
 const PerformanceSection = () => {
   const [performanceData, setPerformanceData] = useState([]);
@@ -143,52 +61,15 @@ const PerformanceSection = () => {
   const [error, setError] = useState(null);
   const [selectedExamType, setSelectedExamType] = useState('All');
   const [activePaperTab, setActivePaperTab] = useState(null);
-  const [collapsed, setCollapsed] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
-  const isMobile = windowWidth < 768;
-
-  const handleResize = useCallback(() => {
-    const resizeTimer = setTimeout(() => {
-      setWindowWidth(window.innerWidth);
-      if (window.innerWidth >= 768) {
-        setDrawerVisible(false);
-      }
-    }, 100);
-    return () => clearTimeout(resizeTimer);
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [handleResize]);
-
-  useEffect(() => {
-    const savedCollapsed = localStorage.getItem('sidebarCollapsed');
-    if (savedCollapsed && !isMobile) {
-      setCollapsed(JSON.parse(savedCollapsed));
-    }
-  }, [isMobile]);
-
-  useEffect(() => {
-    if (!isMobile) {
-      localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
-    }
-  }, [collapsed, isMobile]);
-
-  useEffect(() => {
-    if (!isMobile) {
-      setDrawerVisible(false);
-    }
-  }, [isMobile]);
+  const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX';
 
   const fetchPerformanceData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/fetchPerformance.php', {
+      const response = await fetch(`${API_BASE_URL}/fetchPerformance.php`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -221,11 +102,6 @@ const PerformanceSection = () => {
     } catch (err) {
       console.error("Fetch error:", err);
       setError(err.message);
-      notification.error({
-        message: 'Error Loading Data',
-        description: 'Failed to load performance data. Please try again later.',
-        placement: 'topRight'
-      });
     } finally {
       setLoading(false);
     }
@@ -261,13 +137,13 @@ const PerformanceSection = () => {
     datasets: [{
       label: 'Marks Percentage',
       data: filteredData.map(item => item.percentage.toFixed(2)),
-      backgroundColor: 'rgba(24, 144, 255, 0.2)',
-      borderColor: '#1890ff',
+      backgroundColor: 'rgba(212, 175, 55, 0.15)',
+      borderColor: '#d4af37',
       borderWidth: 3,
-      tension: 0.4,
+      tension: 0.35,
       fill: true,
-      pointBackgroundColor: '#1890ff',
-      pointBorderColor: '#fff',
+      pointBackgroundColor: '#0b1b3d',
+      pointBorderColor: '#d4af37',
       pointBorderWidth: 2,
       pointRadius: 6,
       pointHoverRadius: 8
@@ -282,24 +158,27 @@ const PerformanceSection = () => {
         position: 'top',
         labels: {
           usePointStyle: true,
-          padding: 20
+          padding: 20,
+          font: { family: "'Plus Jakarta Sans', sans-serif", weight: '600' }
         }
       },
       tooltip: { 
         mode: 'index', 
         intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleFont: { size: 14 },
-        bodyFont: { size: 13 },
+        backgroundColor: '#061129',
+        titleFont: { size: 14, family: "'Plus Jakarta Sans', sans-serif", weight: 'bold' },
+        bodyFont: { size: 13, family: "'Plus Jakarta Sans', sans-serif" },
         padding: 12,
+        borderColor: '#d4af37',
+        borderWidth: 1,
         callbacks: {
           label: (context) => {
             const dataItem = filteredData[context.dataIndex];
             return [
               `Subject: ${dataItem.subject_name || 'Unknown'}`,
-              `Marks: ${dataItem.obtained_marks}/${dataItem.total_marks}`,
+              `Score: ${dataItem.obtained_marks}/${dataItem.total_marks}`,
               `Percentage: ${dataItem.percentage.toFixed(2)}%`,
-              dataItem.teacher_name && `Teacher: ${dataItem.teacher_name}`
+              dataItem.teacher_name ? `Teacher: ${dataItem.teacher_name}` : ''
             ].filter(Boolean);
           }
         }
@@ -310,348 +189,261 @@ const PerformanceSection = () => {
         beginAtZero: true, 
         max: 100,
         grid: {
-          color: 'rgba(0, 0, 0, 0.05)'
+          color: 'rgba(226, 232, 240, 0.6)'
         },
         ticks: {
-          callback: function(value) {
-            return value + '%';
-          }
+          callback: (value) => value + '%',
+          font: { family: "'Plus Jakarta Sans', sans-serif" }
         }
       },
       x: {
         grid: {
           display: false
+        },
+        ticks: {
+          font: { family: "'Plus Jakarta Sans', sans-serif", weight: '500' }
         }
       }
     }
   };
 
-  const toggleSidebar = () => {
-    if (isMobile) {
-      setDrawerVisible(prev => !prev);
-    } else {
-      setCollapsed(prev => !prev);
-    }
-  };
-
-  if (error) {
+  if (loading) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
-        {!isMobile && (
-          <Sider 
-            width={250} 
-            theme="light" 
-            collapsible
-            collapsed={collapsed}
-            onCollapse={setCollapsed}
-            breakpoint="lg"
-            collapsedWidth={80}
-            style={{
-              boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)'
-            }}
-          >
-            <Sidebar />
-          </Sider>
-        )}
-        <Layout>
-          <PerformanceHeader>
-            <HeaderContent>
-              {isMobile && (
-                <Button 
-                  type="text"
-                  icon={drawerVisible ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                  onClick={toggleSidebar}
-                  style={{ color: 'white', flexShrink: 0 }}
-                />
-              )}
-              <HeaderTitle>
-                <BarChartOutlined />
-                <Text strong>Performance Analytics</Text>
-              </HeaderTitle>
-            </HeaderContent>
-          </PerformanceHeader>
-          <MainContent style={{ paddingLeft: isMobile ? 0 : (collapsed ? 80 : 250) }}>
-            <Alert
-              message="Error Loading Data"
-              description={error}
-              type="error"
-              showIcon
-              style={{ 
-                margin: 24,
-                borderRadius: 12
-              }}
-              action={
-                <Button 
-                  type="primary" 
-                  size="small" 
-                  onClick={fetchPerformanceData}
-                >
-                  Retry
-                </Button>
-              }
-            />
-          </MainContent>
-        </Layout>
-
-        {isMobile && (
-          <Drawer
-            title="Navigation Menu"
-            placement="left"
-            closable={true}
-            onClose={() => setDrawerVisible(false)}
-            open={drawerVisible}
-            bodyStyle={{ padding: 0 }}
-            width={280}
-          >
-            <Sidebar />
-          </Drawer>
-        )}
-      </Layout>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" tip="Loading academic performance..." />
+      </div>
     );
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {!isMobile && (
-        <Sider 
-          width={280} 
-          theme="light" 
-          collapsible
-          collapsed={collapsed}
-          onCollapse={setCollapsed}
-          breakpoint="lg"
-          collapsedWidth={80}
-          style={{
-            boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)'
-          }}
-        >
-          <Sidebar />
-        </Sider>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      {/* Header Banner */}
+      <Card
+        className="apex-card"
+        style={{ marginBottom: 24 }}
+        bodyStyle={{ padding: '20px 24px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)',
+                color: '#d4af37',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+                boxShadow: '0 4px 12px rgba(11, 27, 61, 0.2)',
+              }}
+            >
+              <LineChartOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 800 }}>
+                Academic Performance Analytics
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 13 }}>
+                Monitor term exam scores, subject-wise trends, and overall academic standing
+              </Text>
+            </div>
+          </div>
+
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={fetchPerformanceData}
+            loading={loading}
+            style={{ borderRadius: 8 }}
+          >
+            Refresh Data
+          </Button>
+        </div>
+      </Card>
+
+      {error && (
+        <Alert
+          message="Notice"
+          description={error}
+          type="info"
+          showIcon
+          style={{ marginBottom: 24, borderRadius: 12 }}
+        />
       )}
 
-      <Layout>
-        <PerformanceHeader>
-          <HeaderContent>
-            {isMobile && (
-              <Button 
-                type="text"
-                icon={drawerVisible ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={toggleSidebar}
-                style={{ color: 'white', flexShrink: 0 }}
-              />
-            )}
-            <HeaderTitle>
-              <BarChartOutlined />
-              <Text strong>Performance Analytics</Text>
-            </HeaderTitle>
-          </HeaderContent>
-        </PerformanceHeader>
+      {/* 4 Statistics Cards */}
+      <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="apex-card apex-card-gold-header" bodyStyle={{ padding: 20 }}>
+            <Statistic
+              title={<Text style={{ color: '#64748b', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>Exam Papers</Text>}
+              value={totalPapers}
+              prefix={<BookOutlined style={{ color: '#0b1b3d' }} />}
+              valueStyle={{ color: '#0b1b3d', fontWeight: 800, fontSize: 22 }}
+            />
+          </Card>
+        </Col>
 
-        <MainContent style={{ 
-          paddingLeft: !isMobile ? (collapsed ? 80 : 280) : 0,
-        }}>
-          <Spin spinning={loading} tip="Loading your performance data..." size="large">
-            {performanceData.length === 0 && !loading ? (
-              <Empty 
-                description="No performance data available" 
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                style={{ 
-                  marginTop: 100,
-                  color: '#999'
-                }}
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="apex-card apex-card-gold-header" bodyStyle={{ padding: 20 }}>
+            <Statistic
+              title={<Text style={{ color: '#64748b', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>Marks Obtained</Text>}
+              value={totalMarks}
+              prefix={<RiseOutlined style={{ color: '#10b981' }} />}
+              valueStyle={{ color: '#10b981', fontWeight: 800, fontSize: 22 }}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="apex-card apex-card-gold-header" bodyStyle={{ padding: 20 }}>
+            <Statistic
+              title={<Text style={{ color: '#64748b', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>Average Score</Text>}
+              value={averagePercentage}
+              suffix="%"
+              prefix={<PercentageOutlined style={{ color: '#f59e0b' }} />}
+              valueStyle={{ color: '#f59e0b', fontWeight: 800, fontSize: 22 }}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="apex-card apex-card-gold-header" bodyStyle={{ padding: 20 }}>
+            <Statistic
+              title={<Text style={{ color: '#64748b', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>Top Performing Subject</Text>}
+              value={topSubject ? topSubject.percentage.toFixed(1) : 0}
+              suffix={topSubject ? '%' : ''}
+              prefix={<TrophyOutlined style={{ color: '#d4af37' }} />}
+              valueStyle={{ color: '#d4af37', fontWeight: 800, fontSize: 22 }}
+            />
+            {topSubject && (
+              <Text style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block', marginTop: 2 }}>
+                {topSubject.subject_name}
+              </Text>
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Main Performance Card with Tabs and Charts */}
+      <Card
+        className="apex-card"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4af37', fontSize: 16 }}>
+              <LineChartOutlined />
+            </div>
+            <div>
+              <Title level={5} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                Exam Assessment Breakdown
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 11 }}>Visual percentage curves and subject scores</Text>
+            </div>
+          </div>
+        }
+        extra={
+          <Space wrap>
+            <Text style={{ color: '#64748b', fontSize: 12 }}>Filter Category:</Text>
+            <Select
+              defaultValue="All"
+              style={{ width: 180 }}
+              onChange={setSelectedExamType}
+              suffixIcon={<FilterOutlined />}
+            >
+              {examTypes.map((type, idx) => (
+                <Option key={idx} value={type}>
+                  {type}
+                </Option>
+              ))}
+            </Select>
+          </Space>
+        }
+      >
+        {papers.length > 0 ? (
+          <Tabs
+            activeKey={activePaperTab || (papers[0] ?? '')}
+            onChange={setActivePaperTab}
+            type="card"
+          >
+            {papers.map((paper) => (
+              <TabPane 
+                tab={
+                  <Space>
+                    <BookOutlined />
+                    {paper}
+                  </Space>
+                } 
+                key={paper}
               >
-                <Button type="primary" onClick={fetchPerformanceData}>
-                  Refresh Data
-                </Button>
-              </Empty>
-            ) : (
-              <>
-                {/* Statistics Cards */}
-                <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
-                  <Col xs={24} sm={12} lg={6}>
-                    <StatisticCard>
-                      <Statistic
-                        title="Total Papers"
-                        value={totalPapers}
-                        prefix={<BookOutlined style={{ color: '#1890ff' }} />}
-                        valueStyle={{ color: '#1890ff' }}
-                      />
-                    </StatisticCard>
-                  </Col>
-                  <Col xs={24} sm={12} lg={6}>
-                    <StatisticCard>
-                      <Statistic
-                        title="Total Marks"
-                        value={totalMarks}
-                        prefix={<RiseOutlined style={{ color: '#52c41a' }} />}
-                        valueStyle={{ color: '#52c41a' }}
-                      />
-                    </StatisticCard>
-                  </Col>
-                  <Col xs={24} sm={12} lg={6}>
-                    <StatisticCard>
-                      <Statistic
-                        title="Average %"
-                        value={averagePercentage}
-                        suffix="%"
-                        prefix={<PercentageOutlined style={{ color: '#faad14' }} />}
-                        valueStyle={{ color: '#faad14' }}
-                      />
-                    </StatisticCard>
-                  </Col>
-                  <Col xs={24} sm={12} lg={6}>
-                    <StatisticCard>
-                      <Statistic
-                        title="Top Subject"
-                        value={topSubject ? topSubject.percentage.toFixed(2) : 0}
-                        suffix={topSubject ? '%' : ''}
-                        prefix={<TrophyOutlined style={{ color: '#f5222d' }} />}
-                        valueStyle={{ color: '#f5222d' }}
-                      />
-                      {topSubject && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {topSubject.subject_name}
-                        </Text>
-                      )}
-                    </StatisticCard>
-                  </Col>
+                {/* Chart Container */}
+                <div style={{ 
+                  background: '#ffffff', 
+                  borderRadius: 12, 
+                  padding: '20px 24px', 
+                  border: '1px solid #e2e8f0',
+                  marginBottom: 24 
+                }}>
+                  <Title level={5} style={{ color: '#0b1b3d', marginBottom: 16 }}>
+                    Score Trajectory — {paper}
+                  </Title>
+                  <div style={{ height: 280, position: 'relative' }}>
+                    <Line data={lineChartData} options={lineChartOptions} />
+                  </div>
+                </div>
+
+                {/* Subject-Wise Detailed Score Cards */}
+                <Title level={5} style={{ color: '#0b1b3d', marginBottom: 16 }}>
+                  Individual Subject Scores — {paper}
+                </Title>
+                <Row gutter={[16, 16]}>
+                  {filteredData.map((item, index) => (
+                    <Col xs={24} sm={12} lg={8} key={index}>
+                      <Card 
+                        hoverable 
+                        className="apex-card" 
+                        bodyStyle={{ padding: 18 }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                          <div>
+                            <Text strong style={{ color: '#0b1b3d', fontSize: 15, display: 'block' }}>
+                              {item.subject_name || 'Subject'}
+                            </Text>
+                            {item.teacher_name && (
+                              <Text style={{ color: '#64748b', fontSize: 12 }}>
+                                <UserOutlined /> {item.teacher_name}
+                              </Text>
+                            )}
+                          </div>
+                          <Tag 
+                            color={item.percentage >= 80 ? 'green' : item.percentage >= 50 ? 'orange' : 'red'}
+                            style={{ borderRadius: 10, fontWeight: 700, padding: '2px 8px' }}
+                          >
+                            {item.percentage.toFixed(1)}%
+                          </Tag>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                          <Text style={{ color: '#64748b', fontSize: 12 }}>Score Obtained</Text>
+                          <Text strong style={{ color: '#0b1b3d', fontSize: 14 }}>
+                            {item.obtained_marks} / {item.total_marks}
+                          </Text>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
                 </Row>
-
-                {/* Main Content Area */}
-                <StyledCard
-                  title={
-                    <Space>
-                      <LineChartOutlined />
-                      Exam Performance Analysis
-                    </Space>
-                  }
-                  extra={
-                    <Select
-                      defaultValue="All"
-                      style={{ width: isMobile ? '100%' : 200, marginTop: isMobile ? 16 : 0 }}
-                      onChange={setSelectedExamType}
-                      suffixIcon={<FilterOutlined />}
-                      loading={loading}
-                      size={isMobile ? 'large' : 'middle'}
-                    >
-                      {examTypes.map((type, index) => (
-                        <Option key={index} value={type}>
-                          {type}
-                        </Option>
-                      ))}
-                    </Select>
-                  }
-                >
-                  {papers.length > 0 ? (
-                    <Tabs
-                      activeKey={activePaperTab || (papers[0] ?? '')}
-                      onChange={setActivePaperTab}
-                      type={isMobile ? "line" : "card"}
-                      size={isMobile ? "small" : "middle"}
-                    >
-                      {papers.map(paper => (
-                        <TabPane 
-                          tab={
-                            <Space>
-                              <BookOutlined />
-                              {paper}
-                            </Space>
-                          } 
-                          key={paper}
-                        >
-                          <ChartContainer>
-                            <Title level={5} style={{ marginBottom: 24 }}>
-                              Performance Trend - {paper}
-                            </Title>
-                            <div style={{ height: 300 }}>
-                              <Line data={lineChartData} options={lineChartOptions} />
-                            </div>
-                          </ChartContainer>
-
-                          <StyledCard title={`Detailed Results - ${paper}`}>
-                            <List
-                              itemLayout="horizontal"
-                              dataSource={filteredData}
-                              renderItem={(item, index) => (
-                                <List.Item
-                                  style={{
-                                    padding: '16px 0',
-                                    borderBottom: '1px solid #f0f0f0',
-                                    backgroundColor: index % 2 === 0 ? '#fafafa' : 'white'
-                                  }}
-                                >
-                                  <List.Item.Meta
-                                    avatar={
-                                      <div style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #1890ff 0%, #52c41a 100%)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: 'white',
-                                        fontWeight: 'bold'
-                                      }}>
-                                        {index + 1}
-                                      </div>
-                                    }
-                                    title={
-                                      <Text strong style={{ fontSize: 16 }}>
-                                        {item.subject_name || 'Unknown Subject'}
-                                      </Text>
-                                    }
-                                    description={
-                                      item.teacher_name && (
-                                        <Text type="secondary">
-                                          <UserOutlined /> Taught by: {item.teacher_name}
-                                        </Text>
-                                      )
-                                    }
-                                  />
-                                  <div style={{ textAlign: 'right' }}>
-                                    <Text strong style={{ fontSize: 16, color: '#1890ff' }}>
-                                      {item.obtained_marks}/{item.total_marks}
-                                    </Text>
-                                    <br />
-                                    <Text type={item.percentage >= 80 ? 'success' : item.percentage >= 50 ? 'warning' : 'danger'}>
-                                      ({item.percentage.toFixed(2)}%)
-                                    </Text>
-                                  </div>
-                                </List.Item>
-                              )}
-                            />
-                          </StyledCard>
-                        </TabPane>
-                      ))}
-                    </Tabs>
-                  ) : (
-                    <Empty 
-                      description={loading ? "Loading exam data..." : "No exams found for selected type"} 
-                      style={{ padding: 40 }}
-                    />
-                  )}
-                </StyledCard>
-              </>
-            )}
-          </Spin>
-        </MainContent>
-      </Layout>
-
-      {isMobile && (
-        <Drawer
-          title="Navigation Menu"
-          placement="left"
-          closable={true}
-          onClose={() => setDrawerVisible(false)}
-          open={drawerVisible}
-          bodyStyle={{ padding: 0 }}
-          width={280}
-        >
-          <Sidebar />
-        </Drawer>
-      )}
-    </Layout>
+              </TabPane>
+            ))}
+          </Tabs>
+        ) : (
+          <Empty 
+            description="No examination records found for selected category" 
+            style={{ padding: 40 }}
+          />
+        )}
+      </Card>
+    </div>
   );
 };
 

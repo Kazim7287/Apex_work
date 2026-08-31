@@ -1,3 +1,5 @@
+/* Timetable.css */
+
 /* Schedule Modal Styles */
 .schedule-modal {
     max-width: 100%;
@@ -16,9 +18,9 @@
 }
 
 .form-label {
-    font-weight: 500;
+    font-weight: 600;
     font-size: 14px;
-    color: #333;
+    color: #0b1b3d;
 }
 
 .day-select, .time-range-picker {
@@ -28,7 +30,7 @@
 .save-btn {
     height: auto;
     padding: 8px 16px;
-    font-weight: 500;
+    font-weight: 600;
     border-radius: 6px;
     margin-top: 16px;
 }
@@ -40,18 +42,18 @@
     }
     
     .form-label {
-        font-size: 16px;
+        font-size: 15px;
     }
     
     .day-select .ant-select-selector,
     .time-range-picker .ant-picker-input input {
-        height: 48px !important;
-        font-size: 16px;
+        height: 44px !important;
+        font-size: 15px;
     }
     
     .save-btn {
-        padding: 12px;
-        font-size: 16px;
+        padding: 10px;
+        font-size: 15px;
     }
 }
 
@@ -89,7 +91,8 @@
         margin-top: 8px;
     }
 }
-/* Add these to your existing CSS */
+
+/* Responsive timetable table */
 @media (max-width: 768px) {
     .timetable-container .ant-layout {
         flex-direction: column;
@@ -115,26 +118,23 @@
     }
 }
 
-/* Mobile menu button */
-.mobile-menu-button {
-    position: fixed;
-    top: 16px;
-    left: 16px;
-    z-index: 1000;
-}
-
-/* Ensure sidebar doesn't take space on mobile when hidden */
-.ant-drawer-content-wrapper {
-    width: 200px !important;
-}
-
-/* Print styles */
+/* Print Styles */
 @media print {
     .no-print {
         display: none !important;
     }
     
+    @page {
+        size: landscape;
+        margin: 8mm 10mm;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
     .ant-table {
-        font-size: 12px !important;
+        font-size: 11px !important;
     }
 }

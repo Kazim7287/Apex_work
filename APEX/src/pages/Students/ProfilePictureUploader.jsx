@@ -1,225 +1,82 @@
-/* eslint-disable react/jsx-key */
-import { useState, useEffect } from 'react';
-import { Card, Avatar, Descriptions, Spin, message, Typography, Row, Col, Button, Modal } from 'antd';
-import { UserOutlined, EditOutlined } from '@ant-design/icons';
-import ProfilePictureUploader from './ProfilePictureUploader';
-import ProfileEditForm from './ProfileEditForm';
+// src/pages/Students/ProfilePictureUploader.jsx
+import React, { useState } from 'react';
+import { Upload, Button, Avatar, message, Spin } from 'antd';
+import { UserOutlined, UploadOutlined } from '@ant-design/icons';
 
-const { Title, Text } = Typography;
+const ProfilePictureUploader = ({ onUploadSuccess, initialPicture, studentId }) => {
+  const [uploading, setUploading] = useState(false);
+  const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX';
 
-const StudentProfile = () => {
-  const [loading, setLoading] = useState(true);
-  const [profileData, setProfileData] = useState(null);
-  const [error, setError] = useState(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [profilePicture, setProfilePicture] = useState(null);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-
-  // Get student_id from localStorage
-  const studentId = localStorage.getItem('student_id');
-
-  // Fetch profile details
-  useEffect(() => {
-    const fetchProfileDetails = async () => {
-      try {
-        setLoading(true);
-        
-        if (!studentId) {
-          throw new Error('Student ID not found');
-        }
-
-        // Fetch basic profile data with credentials
-        const profileResponse = await fetch(
-          `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/Std_profileDetail.php?student_id=${studentId}`,
-          {
-            credentials: 'include' // Important for session cookies
-          }
-        );
-
-        if (!profileResponse.ok) {
-          throw new Error(`HTTP error! status: ${profileResponse.status}`);
-        }
-
-        const profileData = await profileResponse.json();
-
-        if (profileData.success) {
-          setProfileData(profileData);
-        } else {
-          throw new Error(profileData.error || 'Failed to fetch profile data');
-        }
-
-        // Fetch profile picture with credentials
-        const pictureResponse = await fetch(
-          `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/fetchPicture.php?student_id=${studentId}`,
-          {
-            credentials: 'include' // Important for session cookies
-          }
-        );
-
-        if (pictureResponse.ok) {
-          const pictureData = await pictureResponse.json();
-          if (pictureData.success) {
-            setProfilePicture(pictureData.full_url);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching profile details:', error);
-        setError(error.message);
-        message.error('Failed to load profile details');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfileDetails();
-  }, [studentId, refreshTrigger]);
-
-  const handleUploadSuccess = () => {
-    setRefreshTrigger(prev => prev + 1);
-    message.success('Profile picture updated successfully');
-  };
-
-  const handleEditProfile = () => {
-    setIsEditModalVisible(true);
-  };
-
-  const handleEditSubmit = async (values) => {
+  const handleUpload = async (options) => {
+    const { file } = options;
+    setUploading(true);
+    
     try {
-      const response = await fetch(
-        `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/updateProfile.php?student_id=${studentId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(values),
-          credentials: 'include'
-        }
-      );
+      const formData = new FormData();
+      formData.append('profile_picture', file);
+      formData.append('student_id', studentId);
+
+      const response = await fetch(`${API_BASE_URL}/updateprofilepicture.php`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
 
       const result = await response.json();
 
       if (result.success) {
-        message.success('Profile updated successfully');
-        setRefreshTrigger(prev => prev + 1);
-        setIsEditModalVisible(false);
+        message.success('Profile photo uploaded successfully');
+        if (onUploadSuccess) onUploadSuccess();
       } else {
-        throw new Error(result.error || 'Failed to update profile');
+        throw new Error(result.error || 'Upload failed');
       }
-    } catch (error) {
-      message.error(error.message);
+    } catch (err) {
+      console.error('Upload error:', err);
+      message.error(err.message || 'Failed to upload image');
+    } finally {
+      setUploading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}>
-        <Spin size="large" tip="Loading profile..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '24px' }}>
-        <Text type="danger">{error}</Text>
-        <Button 
-          type="primary" 
-          onClick={() => setRefreshTrigger(prev => prev + 1)}
-          style={{ marginTop: 16 }}
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (!profileData) {
-    return (
-      <div style={{ padding: '24px' }}>
-        <Text>No profile data available</Text>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: '24px' }}>
-      <Row gutter={[24, 24]}>
-        <Col xs={24} md={8}>
-          <Card
-            style={{ textAlign: 'center' }}
-            actions={[
-              <Button 
-                type="primary" 
-                icon={<EditOutlined />}
-                onClick={handleEditProfile}
-              >
-                Edit Profile
-              </Button>
-            ]}
-          >
-            <ProfilePictureUploader 
-              onUploadSuccess={handleUploadSuccess} 
-              initialPicture={profilePicture}
-              studentId={studentId}
-            />
-            <Title level={4} style={{ marginTop: 16 }}>
-              {profileData.student.name}
-            </Title>
-            <Text type="secondary">Student ID: {profileData.student.id}</Text>
-          </Card>
-        </Col>
-        
-        <Col xs={24} md={16}>
-          <Card title="Profile Details">
-            <Descriptions bordered column={1}>
-              <Descriptions.Item label="Father's Name">
-                {profileData.student.father_name || 'N/A'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Class">
-                {profileData.student.class_no}
-              </Descriptions.Item>
-              <Descriptions.Item label="Section">
-                {profileData.sections?.name || 'N/A'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Admission Status">
-                <Text
-                  type={
-                    profileData.student.admission_status === 'Active'
-                      ? 'success'
-                      : 'warning'
-                  }
-                >
-                  {profileData.student.admission_status}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Discipline">
-                {profileData.student.discipline || 'N/A'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Guardian Contact">
-                {profileData.student.guardian_contact || 'N/A'}
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Edit Profile Modal */}
-      <Modal
-        title="Edit Profile"
-        visible={isEditModalVisible}
-        onCancel={() => setIsEditModalVisible(false)}
-        footer={null}
-        width={800}
-      >
-        <ProfileEditForm 
-          initialValues={profileData.student}
-          onSubmit={handleEditSubmit}
-          onCancel={() => setIsEditModalVisible(false)}
+    <div style={{ textAlign: 'center', marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
+        <Avatar
+          size={96}
+          src={initialPicture || undefined}
+          icon={<UserOutlined />}
+          style={{
+            background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)',
+            color: '#ffffff',
+            border: '2px solid #d4af37',
+            boxShadow: '0 4px 14px rgba(212, 175, 55, 0.25)'
+          }}
         />
-      </Modal>
+      </div>
+      <Upload
+        customRequest={handleUpload}
+        showUploadList={false}
+        accept="image/jpeg,image/png,image/gif"
+        disabled={uploading}
+        beforeUpload={(file) => {
+          const isImg = ['image/jpeg', 'image/png', 'image/gif'].includes(file.type);
+          if (!isImg) {
+            message.error('Please upload JPG, PNG, or GIF format!');
+            return Upload.LIST_IGNORE;
+          }
+          if (file.size / 1024 / 1024 > 2) {
+            message.error('Image must be smaller than 2MB!');
+            return Upload.LIST_IGNORE;
+          }
+          return true;
+        }}
+      >
+        <Button icon={<UploadOutlined />} loading={uploading} size="small" style={{ borderRadius: 6 }}>
+          {uploading ? 'Uploading...' : 'Change Photo'}
+        </Button>
+      </Upload>
     </div>
   );
 };
 
-export default StudentProfile;
+export default ProfilePictureUploader;

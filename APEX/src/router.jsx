@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import Layout from "../src/components/Layout"; // 👈 Import layout
+import StudentLayout from "../src/components/StudentLayout";
 
 // Public components
 import AboutManagement from "../src/pages/Admin/AboutManagement";
@@ -113,7 +114,7 @@ export const router = createBrowserRouter([
   // Student section
   {
     path: "/student",
-    element: <Layout />,
+    element: <StudentLayout />,
     children: [
       { path: "dashboard", element: <StudentDashboard /> },
       { path: "exams", element: <ExamSection /> },
@@ -131,26 +132,27 @@ export const router = createBrowserRouter([
   },
 
   // Teacher section
-  {
-    path: "/teacher",
-    element: <Layout />,
-    children: [
-      { path: "dashboard", element: <TeacherDashboard /> },
-      { path: "classes", element: <ClassSection /> },
-      { path: "students", element: <StudentSection /> },
-      { path: "teachers", element: <TeacherSection /> },
-      { path: "assignments", element: <AssignmentsSection /> },
-      { path: "exams", element: <CheckExamSection /> },
-      { path: "performance", element: <CheckPerformanceSection /> },
-      { path: "attendance", element: <CheckAttendanceSection /> },
-      { path: "communication", element: <CheckAnnouncementSection /> },
-      { path: "events", element: <EventSection /> },
-      { path: "settings", element: <TeacherProfileSection /> },
-      { path: "register", element: <List /> },
-      { path: "list", element: <TeacherList /> },
-      { path: "class/list", element: <ClassList /> },
-    ],
-  },
+  // Teacher section — do not wrap with the Admin Layout
+{
+  path: "/teacher",
+  children: [
+    { path: "dashboard", element: <TeacherDashboard /> },
+    { path: "classes", element: <ClassSection /> },
+    { path: "students", element: <StudentSection /> },
+    { path: "teachers", element: <TeacherSection /> },
+    { path: "assignments", element: <AssignmentsSection /> },
+    { path: "exams", element: <CheckExamSection /> },
+    { path: "performance", element: <CheckPerformanceSection /> },
+    { path: "attendance", element: <CheckAttendanceSection /> },
+    { path: "communication", element: <CheckAnnouncementSection /> },
+    { path: "events", element: <EventSection /> },
+    { path: "settings", element: <TeacherProfileSection /> },
+    { path: "register", element: <List /> },
+    { path: "list", element: <TeacherList /> },
+    { path: "class/list", element: <ClassList /> },
+  ],
+},
+
 
   // Fallback route for 404
   {

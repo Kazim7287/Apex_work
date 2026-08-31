@@ -1,6 +1,33 @@
-import { useState, useEffect } from 'react';
-import { Card, Avatar, Descriptions, Spin, message, Typography, Row, Col, Button, Upload } from 'antd';
-import { UserOutlined, UploadOutlined } from '@ant-design/icons';
+// src/pages/Students/Profile.jsx
+import React, { useState, useEffect } from 'react';
+import { 
+  Card, 
+  Avatar, 
+  Descriptions, 
+  Spin, 
+  message, 
+  Typography, 
+  Row, 
+  Col, 
+  Button, 
+  Upload, 
+  Tag, 
+  Space, 
+  Modal,
+  Divider 
+} from 'antd';
+import { 
+  UserOutlined, 
+  UploadOutlined, 
+  EditOutlined, 
+  CheckCircleOutlined, 
+  ReloadOutlined,
+  IdcardOutlined,
+  PhoneOutlined,
+  BookOutlined,
+  SafetyCertificateOutlined
+} from '@ant-design/icons';
+import ProfileEditForm from './ProfileEditForm';
 
 const { Title, Text } = Typography;
 
@@ -12,60 +39,52 @@ const StudentProfile = () => {
   const [profilePicture, setProfilePicture] = useState(null);
   const [pictureLoading, setPictureLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
-  // Get student_id from localStorage
   const studentId = localStorage.getItem('student_id');
+  const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX';
 
-  // Base URL configuration
-  const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
-  const DEFAULT_PROFILE_IMAGE = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/images/default-profile.png';
-
-  // Fetch profile details
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
         setLoading(true);
-        
         if (!studentId) {
-          throw new Error('Student ID not found. Please login again.');
+          throw new Error('Student ID not found. Please log in again.');
         }
 
         const profileResponse = await fetch(
-          `${API_BASE_URL}/Std_profileDetail.php?student_id=${studentId}`,
+          `${API_BASE_URL}/Std_profileDetail.php?student_id=${encodeURIComponent(studentId)}`,
           { credentials: 'include' }
         );
 
         if (!profileResponse.ok) {
-          const errorText = await profileResponse.text();
-          throw new Error(`Failed to load profile: ${errorText}`);
+          throw new Error('Failed to load student profile details');
         }
 
         const responseData = await profileResponse.json();
         
-        if (!responseData?.success) {
+        if (responseData && (responseData.success || responseData.student)) {
+          const rawStudent = responseData.student || {};
+          const transformedData = {
+            student: {
+              id: rawStudent.id || studentId,
+              name: rawStudent.name || rawStudent.Name || '',
+              father_name: rawStudent.father_name || rawStudent.Fathers_Name || '',
+              class_no: rawStudent.class_no || rawStudent.Class_No || '',
+              admission_status: rawStudent.admission_status || rawStudent.Admission_Status || 'Active',
+              guardian_contact: rawStudent.guardian_contact || rawStudent.Guardian_Contact || '',
+              discipline: rawStudent.discipline || rawStudent.Discipline || 'General',
+              section_id: rawStudent.section_id || rawStudent.Section_id || ''
+            },
+            section: responseData.section || responseData.sections || { name: 'A' }
+          };
+          setProfileData(transformedData);
+        } else {
           throw new Error(responseData?.error || 'Failed to fetch profile data');
         }
-
-        // Transform the data to match the expected structure
-        const transformedData = {
-          student: {
-            id: responseData.student.id,
-            Name: responseData.student.name,
-            Fathers_Name: responseData.student.father_name,
-            Class_No: responseData.student.class_no,
-            Admission_Status: responseData.student.admission_status,
-            Guardian_Contact: responseData.student.guardian_contact,
-            Discipline: responseData.student.discipline,
-            Section_id: responseData.student.section_id
-          },
-          section: responseData.section
-        };
-
-        setProfileData(transformedData);
-      } catch (error) {
-        console.error('Profile data error:', error);
-        setError(error.message);
-        message.error('Failed to load profile: ' + error.message);
+      } catch (err) {
+        console.error('Profile data error:', err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -74,42 +93,22 @@ const StudentProfile = () => {
     const fetchProfilePicture = async () => {
       try {
         setPictureLoading(true);
-        
-        if (!studentId) {
-          setProfilePicture(null);
-          return;
-        }
+        if (!studentId) return;
 
         const response = await fetch(
-          `${API_BASE_URL}/fetchStudentPicture.php?student_id=${studentId}`,
+          `${API_BASE_URL}/fetchStudentPicture.php?student_id=${encodeURIComponent(studentId)}`,
           { credentials: 'include' }
         );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.success && data.exists && data.url) {
-          // Clean URL and verify it
-          const cleanUrl = data.url.replace(/\\\//g, '/');
-          try {
-            new URL(cleanUrl); // Validate URL format
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.exists && (data.url || data.full_url)) {
+            const cleanUrl = (data.url || data.full_url).replace(/\\\//g, '/');
             setProfilePicture(cleanUrl);
-          } catch (e) {
-            console.error('Invalid image URL:', cleanUrl);
-            setProfilePicture(null);
           }
-        } else {
-          setProfilePicture(null);
         }
-      } catch (error) {
-        console.error('Picture fetch failed:', error);
-        setProfilePicture(null);
-        if (!error.message.includes('No profile picture found')) {
-          message.error('Failed to load profile picture: ' + error.message);
-        }
+      } catch (err) {
+        console.warn('Picture fetch error:', err);
       } finally {
         setPictureLoading(false);
       }
@@ -142,108 +141,173 @@ const StudentProfile = () => {
       } else {
         throw new Error(result.error || 'Failed to update profile picture');
       }
-    } catch (error) {
-      console.error('Upload error:', error);
-      message.error(error.message);
+    } catch (err) {
+      console.error('Upload error:', err);
+      message.error(err.message || 'Failed to upload image');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleRetry = () => {
-    setError(null);
-    setRefreshTrigger(prev => prev + 1);
+  const handleEditSubmit = async (values) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/updateProfile.php?student_id=${encodeURIComponent(studentId)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(values),
+          credentials: 'include'
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        message.success('Profile details updated successfully');
+        setRefreshTrigger(prev => prev + 1);
+        setIsEditModalVisible(false);
+      } else {
+        throw new Error(result.error || 'Failed to update profile');
+      }
+    } catch (err) {
+      message.error(err.message || 'Failed to update profile');
+    }
   };
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}>
-        <Spin size="large" tip="Loading profile..." />
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" tip="Loading student credentials..." />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center' }}>
-        <Text type="danger" style={{ fontSize: '16px', marginBottom: '16px' }}>
-          {error}
-        </Text>
-        <br />
-        <Button 
-          type="primary" 
-          onClick={handleRetry}
-          style={{ marginTop: '16px' }}
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (!profileData) {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center' }}>
-        <Text>No profile data available</Text>
-      </div>
-    );
-  }
+  const student = profileData?.student || {};
+  const section = profileData?.section || {};
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Row gutter={[24, 24]}>
-        <Col xs={24} md={8}>
-          <Card style={{ textAlign: 'center' }}>
-            {pictureLoading ? (
-              <Spin size="large" style={{ margin: '40px 0' }} />
-            ) : profilePicture ? (
-              <div style={{
-                width: 128,
-                height: 128,
-                margin: '0 auto',
-                borderRadius: '50%',
-                overflow: 'hidden',
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      {/* Header Banner */}
+      <Card
+        className="apex-card"
+        style={{ marginBottom: 24 }}
+        bodyStyle={{ padding: '20px 24px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)',
+                color: '#d4af37',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#f0f0f0'
-              }}>
-                <img 
-                  src={profilePicture} 
-                  alt="Profile" 
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = DEFAULT_PROFILE_IMAGE;
-                  }}
-                />
-              </div>
-            ) : (
+                fontSize: 22,
+                boxShadow: '0 4px 12px rgba(11, 27, 61, 0.2)',
+              }}
+            >
+              <IdcardOutlined />
+            </div>
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#0b1b3d', fontWeight: 800 }}>
+                Student Profile & Credentials
+              </Title>
+              <Text style={{ color: '#64748b', fontSize: 13 }}>
+                Verified student enrollment data, official guardian details, and identity documents
+              </Text>
+            </div>
+          </div>
+
+          <Space wrap>
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => setIsEditModalVisible(true)}
+              className="apex-btn-gold"
+              style={{ borderRadius: 8 }}
+            >
+              Edit Profile
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => setRefreshTrigger(prev => prev + 1)}
+              style={{ borderRadius: 8 }}
+            >
+              Refresh
+            </Button>
+          </Space>
+        </div>
+      </Card>
+
+      <Row gutter={[24, 24]}>
+        {/* Left Profile Avatar Card */}
+        <Col xs={24} lg={8}>
+          <Card 
+            className="apex-card apex-card-gold-header"
+            style={{ textAlign: 'center' }}
+            bodyStyle={{ padding: '32px 24px' }}
+          >
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: 20 }}>
               <Avatar
-                size={128}
+                size={110}
+                src={profilePicture || undefined}
                 icon={<UserOutlined />}
-                style={{ margin: '0 auto', display: 'block' }}
-              />
-            )}
-            
+                style={{
+                  background: 'linear-gradient(135deg, #0b1b3d 0%, #1e3a8a 100%)',
+                  color: '#ffffff',
+                  fontSize: 42,
+                  border: '3px solid #d4af37',
+                  boxShadow: '0 8px 24px rgba(11, 27, 61, 0.25)'
+                }}
+              >
+                {!profilePicture && (student.name?.charAt(0)?.toUpperCase() || 'S')}
+              </Avatar>
+            </div>
+
+            <Title level={4} style={{ color: '#0b1b3d', margin: '0 0 4px 0', fontWeight: 800 }}>
+              {student.name || 'Student Name'}
+            </Title>
+            <Text style={{ color: '#64748b', fontSize: 13, display: 'block', marginBottom: 12 }}>
+              Student ID: <strong style={{ color: '#0b1b3d' }}>#{student.id || studentId}</strong>
+            </Text>
+
+            <Space wrap style={{ justifyContent: 'center', marginBottom: 24 }}>
+              {student.class_no && (
+                <Tag color="blue" style={{ borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>
+                  Class {student.class_no}
+                </Tag>
+              )}
+              {section.name && (
+                <Tag color="cyan" style={{ borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>
+                  Section {section.name}
+                </Tag>
+              )}
+              <Tag color={student.admission_status === 'Active' ? 'green' : 'orange'} style={{ borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>
+                {student.admission_status || 'Active'}
+              </Tag>
+            </Space>
+
+            <Divider style={{ margin: '16px 0' }} />
+
             <Upload
               customRequest={handleUpload}
               showUploadList={false}
               accept="image/jpeg,image/png,image/gif"
               disabled={pictureLoading || uploading}
               beforeUpload={(file) => {
-                const isImage = ['image/jpeg', 'image/png', 'image/gif'].includes(file.type);
-                if (!isImage) {
-                  message.error('You can only upload JPG/PNG/GIF files!');
+                const isImg = ['image/jpeg', 'image/png', 'image/gif'].includes(file.type);
+                if (!isImg) {
+                  message.error('Please upload JPG, PNG, or GIF format!');
                   return Upload.LIST_IGNORE;
                 }
-                const isLt2M = file.size / 1024 / 1024 < 2;
-                if (!isLt2M) {
-                  message.error('Image must be smaller than 2MB!');
+                if (file.size / 1024 / 1024 > 2) {
+                  message.error('Image must be under 2MB!');
                   return Upload.LIST_IGNORE;
                 }
                 return true;
@@ -251,54 +315,103 @@ const StudentProfile = () => {
             >
               <Button 
                 icon={<UploadOutlined />} 
-                style={{ marginTop: '16px' }}
                 loading={uploading}
-                disabled={pictureLoading || uploading}
+                style={{ borderRadius: 8 }}
+                block
               >
-                {uploading ? 'Uploading...' : 'Upload Profile Picture'}
+                {uploading ? 'Uploading Photo...' : 'Upload Profile Photo'}
               </Button>
             </Upload>
-            
-            <Title level={4} style={{ marginTop: 16 }}>
-              {profileData.student.Name || 'N/A'}
-            </Title>
-            <Text type="secondary">Student ID: {profileData.student.id || 'N/A'}</Text>
           </Card>
         </Col>
-        
-        <Col xs={24} md={16}>
-          <Card title="Profile Details">
-            <Descriptions bordered column={1}>
+
+        {/* Right Details Card */}
+        <Col xs={24} lg={16}>
+          <Card 
+            className="apex-card"
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(212, 175, 55, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d4af37', fontSize: 16 }}>
+                  <IdcardOutlined />
+                </div>
+                <div>
+                  <Title level={5} style={{ margin: 0, color: '#0b1b3d', fontWeight: 700 }}>
+                    Official Enrollment Details
+                  </Title>
+                  <Text style={{ color: '#64748b', fontSize: 11 }}>Registered academic credentials</Text>
+                </div>
+              </div>
+            }
+          >
+            <Descriptions 
+              bordered 
+              column={{ xs: 1, sm: 2 }} 
+              size="middle"
+              labelStyle={{ fontWeight: 600, color: '#0b1b3d', background: '#f8fafc', width: '35%' }}
+            >
+              <Descriptions.Item label="Full Name">
+                <Text strong style={{ color: '#0b1b3d' }}>{student.name || 'N/A'}</Text>
+              </Descriptions.Item>
+              
               <Descriptions.Item label="Father's Name">
-                {profileData.student.Fathers_Name || 'N/A'}
+                {student.father_name || 'N/A'}
               </Descriptions.Item>
-              <Descriptions.Item label="Class">
-                {profileData.student.Class_No || 'N/A'}
+
+              <Descriptions.Item label="Enrolled Class">
+                {student.class_no ? `Class ${student.class_no}` : 'N/A'}
               </Descriptions.Item>
-              <Descriptions.Item label="Section">
-                {profileData.section?.name || 'N/A'}
+
+              <Descriptions.Item label="Section Assigned">
+                {section.name ? `Section ${section.name}` : 'N/A'}
               </Descriptions.Item>
-              <Descriptions.Item label="Admission Status">
-                <Text
-                  type={
-                    profileData.student.Admission_Status === 'Active'
-                      ? 'success'
-                      : 'warning'
-                  }
-                >
-                  {profileData.student.Admission_Status || 'N/A'}
-                </Text>
+
+              <Descriptions.Item label="Academic Discipline">
+                {student.discipline || 'General Studies'}
               </Descriptions.Item>
-              <Descriptions.Item label="Discipline">
-                {profileData.student.Discipline || 'N/A'}
-              </Descriptions.Item>
+
               <Descriptions.Item label="Guardian Contact">
-                {profileData.student.Guardian_Contact || 'N/A'}
+                <Space>
+                  <PhoneOutlined style={{ color: '#10b981' }} />
+                  <span>{student.guardian_contact || 'N/A'}</span>
+                </Space>
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Enrollment Status" span={2}>
+                <Tag color={student.admission_status === 'Active' ? 'success' : 'warning'} style={{ borderRadius: 6, fontWeight: 700 }}>
+                  <CheckCircleOutlined /> {student.admission_status || 'Active'}
+                </Tag>
               </Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
       </Row>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#0b1b3d', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EditOutlined />
+            </div>
+            <span>Edit Profile Details</span>
+          </div>
+        }
+        open={isEditModalVisible}
+        onCancel={() => setIsEditModalVisible(false)}
+        footer={null}
+        width={750}
+        centered
+        destroyOnClose
+      >
+        <ProfileEditForm 
+          initialValues={{
+            ...student,
+            section_name: section.name
+          }}
+          onSubmit={handleEditSubmit}
+          onCancel={() => setIsEditModalVisible(false)}
+        />
+      </Modal>
     </div>
   );
 };

@@ -1,25 +1,24 @@
-import { useState, useEffect } from "react";
+// src/pages/Students/EditApplication.jsx
+import React, { useEffect, useState } from "react";
 import { Form, Input, Select, Button, message, Modal, Typography } from "antd";
+import { EditOutlined, SaveOutlined, CloseOutlined } from "@ant-design/icons";
 
-const { Title } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// eslint-disable-next-line react/prop-types
 const EditApplication = ({ application, visible, onCancel, onSuccess }) => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
+  const API_BASE_URL = "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX";
+
   useEffect(() => {
     if (application) {
       form.setFieldsValue({
-        // eslint-disable-next-line react/prop-types
         title: application.title,
-        // eslint-disable-next-line react/prop-types
         description: application.description,
-        // eslint-disable-next-line react/prop-types
         type: application.type,
-        // Include any other fields that need to be edited
       });
     }
   }, [application, form]);
@@ -29,17 +28,13 @@ const EditApplication = ({ application, visible, onCancel, onSuccess }) => {
       const values = await form.validateFields();
       setSubmitting(true);
 
-      // Create the complete request payload including the application ID
       const payload = {
-        // eslint-disable-next-line react/prop-types
-        id: application.id,  // Make sure this is included
+        id: application.id,
         ...values
       };
 
-      console.log("Submitting update:", payload);  // Debug log
-
       const response = await fetch(
-        "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/update_std_application.php",
+        `${API_BASE_URL}/update_std_application.php`,
         {
           method: "PUT",
           headers: {
@@ -71,11 +66,20 @@ const EditApplication = ({ application, visible, onCancel, onSuccess }) => {
 
   return (
     <Modal
-      title={<Title level={4}>Edit Application</Title>}
+      title={
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: "#0b1b3d", color: "#d4af37", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <EditOutlined />
+          </div>
+          <span style={{ color: "#0b1b3d", fontWeight: 700 }}>Edit Application #{application?.id}</span>
+        </div>
+      }
       open={visible}
       onCancel={onCancel}
+      centered
+      destroyOnClose
       footer={[
-        <Button key="back" onClick={onCancel} disabled={submitting}>
+        <Button key="back" onClick={onCancel} disabled={submitting} style={{ borderRadius: 8 }} icon={<CloseOutlined />}>
           Cancel
         </Button>,
         <Button
@@ -83,19 +87,22 @@ const EditApplication = ({ application, visible, onCancel, onSuccess }) => {
           type="primary"
           loading={submitting}
           onClick={handleSubmit}
+          className="apex-btn-gold"
+          style={{ borderRadius: 8 }}
+          icon={<SaveOutlined />}
         >
-          {submitting ? "Updating..." : "Update"}
+          Update Application
         </Button>,
       ]}
-      maskClosable={false}  // Prevent closing by clicking outside
+      maskClosable={false}
     >
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" style={{ paddingTop: 8 }}>
         <Form.Item
-          label="Application Type"
+          label={<Text strong style={{ color: "#0b1b3d" }}>Application Type</Text>}
           name="type"
           rules={[{ required: true, message: "Please select application type" }]}
         >
-          <Select disabled>
+          <Select disabled size="large" style={{ borderRadius: 8 }}>
             <Option value="general">General Inquiry</Option>
             <Option value="leave">Leave Application</Option>
             <Option value="academic">Academic Concern</Option>
@@ -105,19 +112,19 @@ const EditApplication = ({ application, visible, onCancel, onSuccess }) => {
         </Form.Item>
 
         <Form.Item
-          label="Application Title"
+          label={<Text strong style={{ color: "#0b1b3d" }}>Application Title</Text>}
           name="title"
           rules={[{ required: true, message: "Please enter application title" }]}
         >
-          <Input placeholder="Enter application title" />
+          <Input placeholder="Enter application title" size="large" style={{ borderRadius: 8 }} />
         </Form.Item>
 
         <Form.Item
-          label="Description"
+          label={<Text strong style={{ color: "#0b1b3d" }}>Description</Text>}
           name="description"
           rules={[{ required: true, message: "Please enter description" }]}
         >
-          <TextArea rows={4} placeholder="Enter detailed description" />
+          <TextArea rows={4} placeholder="Enter detailed description" style={{ borderRadius: 8 }} />
         </Form.Item>
       </Form>
     </Modal>

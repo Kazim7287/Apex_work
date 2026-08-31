@@ -1,6 +1,9 @@
+// src/pages/Students/TimetableModal.jsx
 import React, { useState } from 'react';
-import { Modal, Button, Table, Tag, Spin, Alert, message } from 'antd';
-import { CalendarOutlined } from '@ant-design/icons';
+import { Modal, Button, Table, Tag, Spin, Alert, Typography } from 'antd';
+import { CalendarOutlined, ArrowRightOutlined } from '@ant-design/icons';
+
+const { Title, Text } = Typography;
 
 const TimetableModal = () => {
   const [state, setState] = useState({
@@ -11,52 +14,49 @@ const TimetableModal = () => {
     error: null
   });
 
+  const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX';
+
   const fetchTimetable = async () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      // Get section_id from localStorage
-      const sectionId = localStorage.getItem('section_id');
-      
-      if (!sectionId) {
-        throw new Error('Section ID not found in local storage');
-      }
+      const sectionId = localStorage.getItem('section_id') || 1;
 
-      const response = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/GetstdTimetable.php?section_id=${sectionId}`);
+      const response = await fetch(`${API_BASE_URL}/GetstdTimetable.php?section_id=${sectionId}`);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to load timetable');
+        throw new Error('Failed to load timetable data');
       }
 
       const data = await response.json();
 
-      // Transform timetable data for display
-      const formattedTimetable = data.timetable.reduce((acc, item) => {
-        const timeSlot = `${item.start_time} - ${item.end_time}`;
-        acc[timeSlot] = acc[timeSlot] || {};
-        acc[timeSlot][item.day] = {
-          subject: item.subject_name,
-          teacher: item.teach_name,
-          room: item.room_number
-        };
-        return acc;
-      }, {});
+      if (data.timetable && Array.isArray(data.timetable)) {
+        const formattedTimetable = data.timetable.reduce((acc, item) => {
+          const timeSlot = `${item.start_time} - ${item.end_time}`;
+          acc[timeSlot] = acc[timeSlot] || {};
+          acc[timeSlot][item.day] = {
+            subject: item.subject_name,
+            teacher: item.teach_name,
+            room: item.room_number
+          };
+          return acc;
+        }, {});
 
-      setState(prev => ({
-        ...prev,
-        timetable: Object.entries(formattedTimetable).map(([time, days]) => ({
-          time,
-          ...days
-        })),
-        sectionName: data.section_name,
-        loading: false
-      }));
-
+        setState(prev => ({
+          ...prev,
+          timetable: Object.entries(formattedTimetable).map(([time, days]) => ({
+            time,
+            ...days
+          })),
+          sectionName: data.section_name || 'Section Schedule',
+          loading: false
+        }));
+      } else {
+        setState(prev => ({ ...prev, timetable: [], loading: false }));
+      }
     } catch (error) {
       console.error('Timetable fetch error:', error);
       setState(prev => ({ ...prev, error: error.message, loading: false }));
-      message.error(error.message);
     }
   };
 
@@ -67,20 +67,20 @@ const TimetableModal = () => {
       dataIndex: 'time',
       key: 'time',
       fixed: 'left',
-      width: 150,
-      render: time => <Tag color="blue">{time}</Tag>
+      width: 140,
+      render: (time) => <Tag color="navy" style={{ background: '#0b1b3d', color: '#d4af37', fontWeight: 700, borderRadius: 6 }}>{time}</Tag>
     },
     ...days.map(day => ({
       title: day,
       dataIndex: day,
       key: day,
-      render: entry => entry ? (
-        <div style={{ padding: 8 }}>
-          <strong>{entry.subject}</strong><br />
-          <span style={{ color: '#666' }}>{entry.teacher}</span><br />
-          {entry.room && <span style={{ color: '#666' }}>Room: {entry.room}</span>}
+      render: (entry) => entry ? (
+        <div style={{ padding: '6px 8px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+          <Text strong style={{ color: '#0b1b3d', display: 'block', fontSize: 13 }}>{entry.subject}</Text>
+          <Text style={{ color: '#64748b', fontSize: 11, display: 'block' }}>{entry.teacher}</Text>
+          {entry.room && <Text style={{ color: '#d4af37', fontSize: 10, fontWeight: 600 }}>Room {entry.room}</Text>}
         </div>
-      ) : '-'
+      ) : <Text style={{ color: '#cbd5e1' }}>—</Text>
     }))
   ];
 
@@ -88,41 +88,47 @@ const TimetableModal = () => {
     <>
       <Button
         type="primary"
-        icon={<CalendarOutlined />}
+        block
         onClick={() => {
           setState(prev => ({ ...prev, visible: true }));
           fetchTimetable();
         }}
+        style={{ borderRadius: 8, background: '#0b1b3d' }}
       >
-        View Timetable
+        View Timetable <ArrowRightOutlined />
       </Button>
 
       <Modal
         title={
-          <>
-            <CalendarOutlined style={{ marginRight: 8 }} />
-            Class Timetable
-            {state.sectionName && (
-              <Tag color="blue" style={{ marginLeft: 8 }}>
-                {state.sectionName}
-              </Tag>
-            )}
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#0b1b3d', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CalendarOutlined />
+            </div>
+            <div>
+              <span style={{ color: '#0b1b3d', fontWeight: 700 }}>Class Timetable Schedule</span>
+              {state.sectionName && (
+                <Tag color="gold" style={{ marginLeft: 8, borderRadius: 6, fontWeight: 600 }}>
+                  {state.sectionName}
+                </Tag>
+              )}
+            </div>
+          </div>
         }
         open={state.visible}
         onCancel={() => setState(prev => ({ ...prev, visible: false }))}
         width={1000}
         footer={null}
+        centered
         destroyOnClose
       >
         {state.loading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
-            <Spin size="large" tip="Loading timetable..." />
+            <Spin size="large" tip="Loading class schedule..." />
           </div>
         ) : state.error ? (
           <Alert
-            type="error"
-            message="Error"
+            type="info"
+            message="Notice"
             description={state.error}
             action={
               <Button size="small" onClick={fetchTimetable}>
@@ -140,7 +146,7 @@ const TimetableModal = () => {
             rowKey="time"
           />
         ) : (
-          <span style={{ color: '#999' }}>No timetable data available</span>
+          <Alert message="No timetable records have been mapped for your section yet." type="info" showIcon />
         )}
       </Modal>
     </>

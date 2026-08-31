@@ -269,30 +269,401 @@ const Timetable = () => {
     };
 
     const handlePrint = () => {
-        const printWindow = window.open('', '_blank');
-        const selectedSecName = sections.find(s => s.id === selectedSection)?.name;
+        const printWindow = window.open('', `TimetablePrint_${Date.now()}`, 'width=1100,height=800');
+        if (!printWindow) {
+            message.error("Please allow pop-ups to print the timetable.");
+            return;
+        }
+
+        const selectedSecObj = sections.find(s => s.id === selectedSection);
+        const selectedSecName = selectedSecObj ? selectedSecObj.name : 'All';
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        // Get sorted unique time slots from timetableData
+        let uniqueSlots = Array.from(
+            new Set(
+                timetableData
+                    .filter(item => item.start_time && item.end_time)
+                    .map(item => `${item.start_time}_${item.end_time}`)
+            )
+        ).sort((a, b) => {
+            const [aStart] = a.split('_');
+            const [bStart] = b.split('_');
+            return aStart.localeCompare(bStart);
+        });
+
+        // If no dynamic slots found, provide standard fallback periods
+        if (uniqueSlots.length === 0) {
+            uniqueSlots = [
+                '08:00:00_09:00:00',
+                '09:00:00_10:00:00',
+                '10:00:00_11:00:00',
+                '11:00:00_12:00:00',
+                '12:00:00_13:00:00',
+                '13:00:00_14:00:00',
+                '14:00:00_15:00:00',
+                '15:00:00_16:00:00'
+            ];
+        }
+
+        // Build unique subjects & teachers for the reference legend
+        const subjectMap = {};
+        timetableData.forEach(item => {
+            if (item.subject_name) {
+                const key = `${item.subject_name}_${item.teacher_name || item.teach_name || ''}`;
+                if (!subjectMap[key]) {
+                    subjectMap[key] = {
+                        subject: item.subject_name,
+                        teacher: item.teacher_name || item.teach_name || 'Faculty Member',
+                        room: item.room_number || 'Main Classroom',
+                        count: 0
+                    };
+                }
+                subjectMap[key].count += 1;
+            }
+        });
+        const legendEntries = Object.values(subjectMap);
+
+        // Generate matrix rows
+        const matrixRowsHTML = uniqueSlots.map((slot, idx) => {
+            const [startTime, endTime] = slot.split('_');
+            const formattedTime = `${formatTimeDisplay(startTime)} - ${formatTimeDisplay(endTime)}`;
+
+            const dayCells = days.map(day => {
+                const classInfo = timetableData.find(item => 
+                    item.day?.toLowerCase() === day.toLowerCase() && 
+                    item.start_time === startTime && 
+                    item.end_time === endTime
+                );
+
+                if (classInfo) {
+                    return `
+                        <td class="slot-cell">
+                            <div class="class-block">
+                                <div class="subject-title">${classInfo.subject_name}</div>
+                                <div class="teacher-name">${classInfo.teacher_name || classInfo.teach_name || 'Faculty'}</div>
+                                ${classInfo.room_number ? `<div class="room-pill">Room ${classInfo.room_number}</div>` : ''}
+                            </div>
+                        </td>
+                    `;
+                }
+
+                return `<td class="slot-cell empty-cell"><div class="empty-slot">—</div></td>`;
+            }).join('');
+
+            return `
+                <tr>
+                    <td class="time-col">
+                        <div class="period-num">Period ${idx + 1}</div>
+                        <div class="time-range">${formattedTime}</div>
+                    </td>
+                    ${dayCells}
+                </tr>
+            `;
+        }).join('');
+
+        // Generate legend rows
+        const legendRowsHTML = legendEntries.map((entry, index) => `
+            <tr>
+                <td style="text-align: center; font-weight: bold; width: 35px;">${index + 1}</td>
+                <td style="font-weight: 700; color: #061129;">${entry.subject}</td>
+                <td>${entry.teacher}</td>
+                <td style="text-align: center;">${entry.room}</td>
+                <td style="text-align: center; font-weight: bold;">${entry.count}</td>
+            </tr>
+        `).join('');
+
         printWindow.document.write(`
-            <html>
+            <!DOCTYPE html>
+            <html lang="en">
                 <head>
-                    <title>Timetable - Section ${selectedSecName}</title>
+                    <meta charset="UTF-8">
+                    <title>APEX College - Timetable (Section ${selectedSecName})</title>
                     <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        h2 { color: #0b1b3d; border-bottom: 2px solid #d4af37; padding-bottom: 10px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background-color: #f8fafc; color: #0b1b3d; }
+                        @page {
+                            size: A4 landscape;
+                            margin: 8mm 10mm;
+                        }
+                        * {
+                            box-sizing: border-box;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            margin: 0;
+                            padding: 8px 12px;
+                            color: #0b1b3d;
+                            background: #ffffff;
+                        }
+                        .print-header {
+                            text-align: center;
+                            border-bottom: 2.5px solid #d4af37;
+                            padding-bottom: 8px;
+                            margin-bottom: 10px;
+                        }
+                        .inst-title {
+                            font-size: 20px;
+                            font-weight: 800;
+                            color: #061129;
+                            letter-spacing: 1.2px;
+                            text-transform: uppercase;
+                        }
+                        .doc-title {
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: #b8860b;
+                            letter-spacing: 1px;
+                            margin-top: 2px;
+                            text-transform: uppercase;
+                        }
+                        .meta-strip {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            background: #f8fafc;
+                            border: 1px solid #e2e8f0;
+                            padding: 6px 14px;
+                            border-radius: 6px;
+                            margin-top: 8px;
+                            font-size: 11px;
+                        }
+                        .meta-item strong {
+                            color: #061129;
+                        }
+                        .badge-gold {
+                            background: #0b1b3d;
+                            color: #d4af37;
+                            padding: 2px 8px;
+                            border-radius: 4px;
+                            font-weight: 700;
+                        }
+                        .timetable-grid {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 10px;
+                            table-layout: fixed;
+                        }
+                        .timetable-grid th {
+                            background: #061129;
+                            color: #ffffff;
+                            border: 1.5px solid #061129;
+                            padding: 8px 4px;
+                            font-size: 11px;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                            text-align: center;
+                        }
+                        .timetable-grid th:first-child {
+                            background: #0b1b3d;
+                            border-right: 2px solid #d4af37;
+                            width: 13%;
+                        }
+                        .timetable-grid td {
+                            border: 1px solid #cbd5e1;
+                            padding: 5px 4px;
+                            text-align: center;
+                            vertical-align: middle;
+                            font-size: 11px;
+                            height: 48px;
+                        }
+                        .time-col {
+                            background: #f8fafc;
+                            border: 1px solid #cbd5e1 !important;
+                            border-right: 2px solid #d4af37 !important;
+                            font-weight: 600;
+                        }
+                        .period-num {
+                            font-size: 10px;
+                            font-weight: 800;
+                            color: #0b1b3d;
+                            text-transform: uppercase;
+                        }
+                        .time-range {
+                            font-size: 10px;
+                            color: #64748b;
+                            margin-top: 1px;
+                            white-space: nowrap;
+                        }
+                        .class-block {
+                            background: #ffffff;
+                            border-left: 3px solid #d4af37;
+                            border-radius: 3px;
+                            padding: 3px 4px;
+                            text-align: center;
+                        }
+                        .subject-title {
+                            font-weight: 800;
+                            font-size: 11px;
+                            color: #061129;
+                            text-transform: uppercase;
+                            line-height: 1.2;
+                        }
+                        .teacher-name {
+                            font-size: 10px;
+                            color: #475569;
+                            margin-top: 2px;
+                            line-height: 1.1;
+                        }
+                        .room-pill {
+                            display: inline-block;
+                            font-size: 9px;
+                            font-weight: 700;
+                            background: #f1f5f9;
+                            color: #0b1b3d;
+                            border: 1px solid #e2e8f0;
+                            padding: 1px 4px;
+                            border-radius: 3px;
+                            margin-top: 2px;
+                        }
+                        .empty-slot {
+                            color: #cbd5e1;
+                            font-weight: bold;
+                        }
+                        .legend-section {
+                            margin-top: 12px;
+                            page-break-inside: avoid;
+                        }
+                        .legend-header {
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: #061129;
+                            text-transform: uppercase;
+                            margin-bottom: 4px;
+                            border-bottom: 1px solid #e2e8f0;
+                            padding-bottom: 2px;
+                        }
+                        .legend-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 10px;
+                        }
+                        .legend-table th {
+                            background: #f1f5f9;
+                            color: #061129;
+                            border: 1px solid #cbd5e1;
+                            padding: 4px 8px;
+                            text-align: left;
+                            font-weight: 700;
+                        }
+                        .legend-table td {
+                            border: 1px solid #e2e8f0;
+                            padding: 3px 8px;
+                            color: #334155;
+                        }
+                        .legend-table tr:nth-child(even) {
+                            background-color: #f8fafc;
+                        }
+                        .signature-section {
+                            display: flex;
+                            justify-content: space-between;
+                            margin-top: 24px;
+                            padding-top: 6px;
+                            page-break-inside: avoid;
+                        }
+                        .sig-box {
+                            text-align: center;
+                            width: 200px;
+                        }
+                        .sig-line {
+                            border-top: 1px solid #061129;
+                            margin-bottom: 4px;
+                        }
+                        .sig-label {
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #061129;
+                            text-transform: uppercase;
+                        }
+                        .sig-sub {
+                            font-size: 9px;
+                            color: #64748b;
+                        }
+                        .footer-note {
+                            text-align: center;
+                            font-size: 8px;
+                            color: #94a3b8;
+                            margin-top: 12px;
+                            border-top: 1px dashed #e2e8f0;
+                            padding-top: 4px;
+                        }
                     </style>
                 </head>
                 <body>
-                    <h2>APEX COLLEGE - TIMETABLE (${selectedSecName})</h2>
-                    ${document.getElementById('printable-timetable')?.innerHTML || ''}
+                    <div class="print-header">
+                        <div class="inst-title">APEX COLLEGE HARICHAND</div>
+                        <div class="doc-title">OFFICIAL WEEKLY CLASS TIMETABLE — SESSION 2025–2026</div>
+                        <div class="meta-strip">
+                            <div class="meta-item"><strong>SECTION:</strong> <span class="badge-gold">Section ${selectedSecName}</span></div>
+                            <div class="meta-item"><strong>CAMPUS:</strong> Harichand Campus</div>
+                            <div class="meta-item"><strong>DATE ISSUED:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                            <div class="meta-item"><strong>SCHEDULED SLOTS:</strong> ${timetableData.length} Weekly Lectures</div>
+                        </div>
+                    </div>
+
+                    <table class="timetable-grid">
+                        <thead>
+                            <tr>
+                                <th>Period / Time</th>
+                                ${days.map(d => `<th>${d}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${matrixRowsHTML}
+                        </tbody>
+                    </table>
+
+                    ${legendEntries.length > 0 ? `
+                        <div class="legend-section">
+                            <div class="legend-header">Faculty & Subject Reference Directory</div>
+                            <table class="legend-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 35px; text-align: center;">#</th>
+                                        <th>Subject Name</th>
+                                        <th>Instructor / Faculty</th>
+                                        <th style="text-align: center;">Room Allocation</th>
+                                        <th style="text-align: center; width: 110px;">Weekly Frequency</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${legendRowsHTML}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+
+                    <div class="signature-section">
+                        <div class="sig-box">
+                            <div class="sig-line"></div>
+                            <div class="sig-label">Prepared By</div>
+                            <div class="sig-sub">Timetable Committee</div>
+                        </div>
+                        <div class="sig-box">
+                            <div class="sig-line"></div>
+                            <div class="sig-label">Verified By</div>
+                            <div class="sig-sub">Academic In-charge</div>
+                        </div>
+                        <div class="sig-box">
+                            <div class="sig-line"></div>
+                            <div class="sig-label">Approved By</div>
+                            <div class="sig-sub">Principal / Administrator</div>
+                        </div>
+                    </div>
+
+                    <div class="footer-note">
+                        Generated automatically via APEX College Management System &bull; Official Document
+                    </div>
                 </body>
             </html>
         `);
         printWindow.document.close();
         printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 300);
     };
 
     const columns = [

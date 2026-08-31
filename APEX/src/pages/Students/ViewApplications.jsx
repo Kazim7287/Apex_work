@@ -1,16 +1,21 @@
-import { useState, useEffect } from "react";
-import { Table, Tag, Button, message, Typography, Layout, Space, Modal } from "antd";
-import { EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+// src/pages/Students/ViewApplications.jsx
+import React, { useState, useEffect } from "react";
+import { Table, Tag, Button, message, Typography, Space, Modal, Card, Input } from "antd";
+import { EditOutlined, DeleteOutlined, ExclamationCircleOutlined, SearchOutlined, ReloadOutlined, FileTextOutlined } from "@ant-design/icons";
 import EditApplication from "./EditApplication";
 
-const { Title } = Typography;
-const { Content } = Layout;
+const { Title, Text } = Typography;
 const { confirm } = Modal;
 
 const ViewApplications = () => {
   const [applications, setApplications] = useState([]);
+  const [filteredApplications, setFilteredApplications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingApp, setEditingApp] = useState(null);
+  const [searchText, setSearchText] = useState("");
+
+  const studentId = localStorage.getItem("student_id");
+  const API_BASE_URL = "https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX";
 
   useEffect(() => {
     fetchApplications();
@@ -19,13 +24,12 @@ const ViewApplications = () => {
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const student_id = localStorage.getItem("student_id");
-      if (!student_id) {
+      if (!studentId) {
         throw new Error("Student data not found. Please log in again.");
       }
 
       const response = await fetch(
-        `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/read_std_application.php?student_id=${student_id}`
+        `${API_BASE_URL}/read_std_application.php?student_id=${studentId}`
       );
       
       if (!response.ok) {
@@ -38,7 +42,7 @@ const ViewApplications = () => {
         throw new Error(data.message || "Failed to fetch applications");
       }
 
-      const formattedApplications = data.data.map(app => ({
+      const formattedApplications = (data.data || []).map(app => ({
         ...app,
         key: app.id,
         section_name: app.section?.name || 'N/A',
@@ -47,12 +51,30 @@ const ViewApplications = () => {
       }));
 
       setApplications(formattedApplications);
+      setFilteredApplications(formattedApplications);
     } catch (error) {
       console.error("Error fetching applications:", error);
-      message.error(error.message || "Failed to fetch applications.");
       setApplications([]);
+      setFilteredApplications([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = (value) => {
+    setSearchText(value);
+    if (!value.trim()) {
+      setFilteredApplications(applications);
+    } else {
+      const q = value.toLowerCase();
+      setFilteredApplications(
+        applications.filter(
+          (app) =>
+            (app.title && app.title.toLowerCase().includes(q)) ||
+            (app.type && app.type.toLowerCase().includes(q)) ||
+            (app.status && app.status.toLowerCase().includes(q))
+        )
+      );
     }
   };
 
@@ -79,18 +101,16 @@ const ViewApplications = () => {
           <p>You can submit a new application after withdrawal.</p>
         </div>
       ),
-      okText: "Yes, withdraw",
+      okText: "Yes, Withdraw",
       okType: "danger",
-      cancelText: "No, keep it",
+      cancelText: "Cancel",
       onOk: async () => {
         try {
           const response = await fetch(
-            `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/delete_std_application.php?id=${record.id}`,
+            `${API_BASE_URL}/delete_std_application.php?id=${record.id}`,
             {
               method: "DELETE",
-              headers: {
-                "Content-Type": "application/json",
-              }
+              headers: { "Content-Type": "application/json" }
             }
           );
 
@@ -112,21 +132,22 @@ const ViewApplications = () => {
 
   const columns = [
     {
-      title: "Title",
+      title: "Title & Subject",
       dataIndex: "title",
       key: "title",
+      render: (title) => <Text strong style={{ color: "#0b1b3d", fontSize: 14 }}>{title}</Text>
     },
     {
-      title: "Type",
+      title: "Request Type",
       dataIndex: "type",
       key: "type",
       render: (type) => {
-        let color = "geekblue";
-        if (type === "leave") color = "volcano";
-        if (type === "academic") color = "green";
+        let color = "cyan";
+        if (type === "leave") color = "gold";
+        if (type === "academic") color = "blue";
         return (
-          <Tag color={color} key={type}>
-            {type.toUpperCase()}
+          <Tag color={color} style={{ borderRadius: 6, fontWeight: 600 }}>
+            {String(type || "GENERAL").toUpperCase()}
           </Tag>
         );
       },
@@ -135,23 +156,26 @@ const ViewApplications = () => {
       title: "Section",
       dataIndex: "section_name",
       key: "section",
+      responsive: ['md']
     },
     {
-      title: "Teacher",
+      title: "Assigned Instructor",
       dataIndex: "teacher_name",
       key: "teacher",
+      responsive: ['md']
     },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      align: 'center',
       render: (status) => {
-        let color = "orange";
-        if (status === "approved") color = "green";
-        if (status === "rejected") color = "red";
+        let color = "warning";
+        if (status === "approved") color = "success";
+        if (status === "rejected") color = "error";
         return (
-          <Tag color={color} key={status}>
-            {status.toUpperCase()}
+          <Tag color={color} style={{ borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>
+            {String(status || "PENDING").toUpperCase()}
           </Tag>
         );
       },
@@ -160,26 +184,31 @@ const ViewApplications = () => {
       title: "Submission Date",
       dataIndex: "submission_date",
       key: "submission_date",
-      render: (date) => new Date(date).toLocaleString()
+      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
     },
     {
       title: "Actions",
       key: "actions",
+      align: 'center',
       render: (_, record) => (
-        <Space size="middle">
+        <Space size="small">
           <Button
             type="primary"
             icon={<EditOutlined />}
+            size="small"
             onClick={() => handleEdit(record)}
             disabled={!record.canEdit}
+            style={{ borderRadius: 6, background: '#1e3a8a' }}
           >
             Edit
           </Button>
           <Button
             danger
             icon={<DeleteOutlined />}
+            size="small"
             onClick={() => handleDelete(record)}
             disabled={!record.canEdit}
+            style={{ borderRadius: 6 }}
           >
             Withdraw
           </Button>
@@ -189,28 +218,64 @@ const ViewApplications = () => {
   ];
 
   return (
-    <Content style={{ padding: "24px", background: "#fff" }}>
-      <Title level={3}>My Applications</Title>
-      <Table
-        columns={columns}
-        dataSource={applications}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: true }}
-      />
-
-      {editingApp && (
-        <EditApplication
-          application={editingApp}
-          visible={!!editingApp}
-          onCancel={() => setEditingApp(null)}
-          onSuccess={() => {
-            setEditingApp(null);
-            fetchApplications();
-          }}
+    <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <Card
+        className="apex-card"
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(212, 175, 55, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#d4af37", fontSize: 16 }}>
+              <FileTextOutlined />
+            </div>
+            <div>
+              <Title level={5} style={{ margin: 0, color: "#0b1b3d", fontWeight: 700 }}>
+                My Applications Directory
+              </Title>
+              <Text style={{ color: "#64748b", fontSize: 11 }}>Review submitted student notices</Text>
+            </div>
+          </div>
+        }
+        extra={
+          <Space wrap>
+            <Input
+              placeholder="Search applications..."
+              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+              value={searchText}
+              onChange={(e) => handleSearch(e.target.value)}
+              allowClear
+              style={{ width: 220, borderRadius: 8 }}
+            />
+            <Button
+              type="text"
+              icon={<ReloadOutlined />}
+              onClick={fetchApplications}
+              loading={loading}
+              style={{ borderRadius: 8 }}
+            />
+          </Space>
+        }
+      >
+        <Table
+          columns={columns}
+          dataSource={filteredApplications}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: true }}
+          pagination={{ pageSize: 8 }}
         />
-      )}
-    </Content>
+
+        {editingApp && (
+          <EditApplication
+            application={editingApp}
+            visible={!!editingApp}
+            onCancel={() => setEditingApp(null)}
+            onSuccess={() => {
+              setEditingApp(null);
+              fetchApplications();
+            }}
+          />
+        )}
+      </Card>
+    </div>
   );
 };
 

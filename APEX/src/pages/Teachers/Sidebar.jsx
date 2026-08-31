@@ -1,251 +1,625 @@
-import { useState, useEffect } from "react";
-import styled from "styled-components";
-import { Link } from "react-router-dom";
+// src/pages/Teacher/Sidebar.jsx
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
-    BsGraphUp,
-    BsPerson,
-    BsFileText,
-    BsBook,
-    BsGraphDown,
-    BsCalendar,
-    BsPeople,
-    BsGear,
-    BsChatDots,
-} from 'react-icons/bs';
+  Layout,
+  Avatar,
+  Typography,
+  Spin,
+  Button,
+  Tooltip,
+} from "antd";
 
-export const SidebarContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: ${({ isOpen }) => (isOpen ? '200px' : '60px')};
-  height: 100%;
-  background-color: white;  /* Changed to white */
-  color: #2c3e50;  /* Dark text color for contrast */
-  overflow-y: auto;
-  padding-top: 60px;
-  transition: width 0.3s ease;
-  z-index: 100;
-  border-right: 1px solid #e0e0e0;  /* Added border for better separation */
-`;
+import {
+  DashboardOutlined,
+  FileTextOutlined,
+  BookOutlined,
+  LineChartOutlined,
+  CalendarOutlined,
+  MessageOutlined,
+  SettingOutlined,
+  CrownOutlined,
+  MenuUnfoldOutlined,
+  MenuFoldOutlined,
+  HomeOutlined,
+} from "@ant-design/icons";
 
-export const SidebarHeader = styled.div`
-  padding: 15px;
-  font-size: 20px;
-  font-weight: bold;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
+import logo from "../../assets/images.png";
 
-export const SidebarNav = styled.ul`
-  list-style: none;
-  padding: 0;
-`;
+const { Sider } = Layout;
+const { Text, Title } = Typography;
 
-export const SidebarNavItem = styled.li`
-  display: flex;
-  align-items: center;
-  padding: 10px 15px;
-  font-size: 16px;
-  border-bottom: 1px solid #f0f0f0;  /* Lighter border color */
-  transition: background-color 0.3s ease;
-  &:hover {
-    background-color: #f5f5f5;  /* Light gray hover */
-  }
-`;
-
-export const StyledLink = styled(Link)`
-  text-decoration: none;
-  color: #2c3e50;  /* Dark text color */
-  margin-left: 8px;
-  font-size: 14px;
-`;
-
-export const SidebarIcon = styled.div`
-  margin-right: 8px;
-  font-size: 18px;
-  color: #2c3e50;  /* Dark icon color */
-`;
-
-export const ProfilePicture = styled.img`
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #e0e0e0;  /* Light gray border */
-  margin-bottom: 10px;
-`;
-
-export const TeacherName = styled.div`
-  font-size: 14px;
-  margin-top: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  color: #2c3e50;  /* Dark text color */
-`;
-
-export const ToggleButton = styled.div`
-  position: absolute;
-  top: 15px;
-  right: 0;
-  width: 25px;
-  height: 25px;
-  background-color: #f0f0f0;  /* Light gray background */
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  &:hover {
-    background-color: #e0e0e0;  /* Slightly darker on hover */
-  }
-`;
-
-export const ToggleIcon = styled.span`
-  color: #2c3e50;  /* Dark icon color */
-  font-size: 16px;
-  transform: ${({ isOpen }) => (isOpen ? 'rotate(180deg)' : 'rotate(0deg)')};
-  transition: transform 0.3s ease;
-`;
-
-const Sidebar = () => {
-  const [isOpen, setIsOpen] = useState(true);
+const Sidebar = ({
+  collapsed: propCollapsed,
+  onCollapse: propOnCollapse,
+  onItemClick,
+}) => {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
-  const [teacherName, setTeacherName] = useState('');
+  const [teacherName, setTeacherName] = useState("Teacher");
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const collapsed =
+    propCollapsed !== undefined ? propCollapsed : internalCollapsed;
+
+  const setCollapsed = propOnCollapse || setInternalCollapsed;
+
+  const toggleCollapsed = () => {
+    setCollapsed(!collapsed);
+  };
+
   useEffect(() => {
+    let cancelled = false;
+
     const fetchTeacherProfile = async () => {
       try {
-        const teacherId = localStorage.getItem('teacher_id');
-        if (!teacherId) {
-          console.error('Teacher ID not found in localStorage');
-          return;
-        }
+        const teacherId = localStorage.getItem("teacher_id");
+        if (!teacherId) return;
 
-        // Fetch teacher name
-        const profileResponse = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/teach_profile.php?id=${teacherId}`);
+        const profileResponse = await fetch(
+          `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/teach_profile.php?id=${encodeURIComponent(
+            teacherId
+          )}`
+        );
         const profileData = await profileResponse.json();
 
-        if (profileData.success) {
-          setTeacherName(profileData.data.teach_name || '');
-          
-          // First try to get the profile picture path from the API
-          try {
-            const pictureResponse = await fetch(`https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_profilePicture.php?teacher_id=${teacherId}`);
-            const pictureData = await pictureResponse.json();
-            
-            if (pictureData.success && pictureData.file_path) {
-              // Use the correct path format with cache busting
-              const pictureUrl = `https://white-trout-460511.hostingersite.com/APEX/${pictureData.file_path}?t=${Date.now()}`;
-              setProfilePicture(pictureUrl);
-              return;
-            }
-          } catch (error) {
-            console.log('Could not fetch profile picture path from API', error);
-          }
+        if (!cancelled && profileData.success) {
+          setTeacherName(profileData.data?.teach_name || "Teacher");
+        }
 
-          // Fallback to checking if image exists directly
-          const pictureUrl = `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/teacher_profile_images/teacher_${teacherId}.jpg`;
-          
-          // Check if image exists
-          const imgCheck = new Image();
-          imgCheck.src = pictureUrl;
-          imgCheck.onload = () => {
-            setProfilePicture(`${pictureUrl}?t=${Date.now()}`);
-          };
-          imgCheck.onerror = () => {
-            setProfilePicture(null);
-          };
+        try {
+          const pictureResponse = await fetch(
+            `https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/get_profilePicture.php?teacher_id=${encodeURIComponent(
+              teacherId
+            )}`
+          );
+          const pictureData = await pictureResponse.json();
+
+          if (!cancelled && pictureData.success && pictureData.file_path) {
+            setProfilePicture(
+              `https://white-trout-460511.hostingersite.com/APEX/${
+                pictureData.file_path
+              }?t=${Date.now()}`
+            );
+          }
+        } catch (error) {
+          console.warn("Could not fetch teacher profile picture:", error);
         }
       } catch (error) {
-        console.error('Error fetching teacher profile:', error);
+        console.error("Error fetching teacher profile:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchTeacherProfile();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const toggleSidebar = () => {
-    setIsOpen(!isOpen);
+  // Preserved original Teacher Menu Items with matching AntD icons
+  const teacherMenuItems = [
+    {
+      key: "/teacher/dashboard",
+      icon: <DashboardOutlined />,
+      label: "Dashboard",
+      description: "Overview & key metrics",
+    },
+    {
+      key: "/teacher/assignments",
+      icon: <FileTextOutlined />,
+      label: "Student Reports",
+      description: "View and manage student assignments",
+    },
+    {
+      key: "/teacher/exams",
+      icon: <BookOutlined />,
+      label: "Exams",
+      description: "Manage class examinations",
+    },
+    {
+      key: "/teacher/performance",
+      icon: <LineChartOutlined />,
+      label: "Performance",
+      description: "Track student performance analytics",
+    },
+    {
+      key: "/teacher/attendance",
+      icon: <CalendarOutlined />,
+      label: "Attendance",
+      description: "Mark & review attendance",
+    },
+    {
+      key: "/teacher/communication",
+      icon: <MessageOutlined />,
+      label: "Announcements",
+      description: "Class communication & notices",
+    },
+    {
+      key: "/teacher/settings",
+      icon: <SettingOutlined />,
+      label: "Settings",
+      description: "Manage account settings",
+    },
+  ];
+
+  const getInitials = (name) =>
+    String(name || "Teacher")
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+  const handleNavigation = (item) => {
+    navigate(item.key);
+    if (onItemClick) {
+      onItemClick();
+    }
   };
 
+  if (loading) {
+    return (
+      <div
+        style={{
+          width: collapsed ? 76 : 250,
+          height: "100vh",
+          minHeight: "100vh",
+          background: "#061129",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          borderRight: "1px solid rgba(212, 175, 55, 0.15)",
+          boxSizing: "border-box",
+        }}
+      >
+        <Spin size="large" />
+        {!collapsed && (
+          <Text style={{ color: "#cbd5e1", marginTop: 12, fontSize: 13 }}>
+            Loading portal...
+          </Text>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <SidebarContainer isOpen={isOpen}>
-      <SidebarHeader>
-        {!loading && (
-          <>
-            {profilePicture ? (
-              <ProfilePicture 
-                src={profilePicture}
-                alt="Teacher Profile"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = '';
-                  setProfilePicture(null);
+    <Sider
+      collapsible
+      collapsed={collapsed}
+      onCollapse={setCollapsed}
+      trigger={null}
+      width={250}
+      collapsedWidth={76}
+      style={{
+        background: "#061129",
+        height: "100vh",
+        minHeight: "100vh",
+        position: "sticky",
+        top: 0,
+        alignSelf: "flex-start",
+        borderRight: "1px solid rgba(212, 175, 55, 0.18)",
+        zIndex: 1000,
+        overflow: "hidden",
+        flexShrink: 0,
+        boxSizing: "border-box",
+        boxShadow: "4px 0 20px rgba(6, 17, 41, 0.30)",
+      }}
+    >
+      <div
+        style={{
+          height: "100vh",
+          minHeight: "100vh",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          background: "#061129",
+          overflow: "hidden",
+        }}
+      >
+        {/* BRAND HEADER */}
+        <div
+          style={{
+            flexShrink: 0,
+            minHeight: 72,
+            padding: collapsed ? "16px 8px" : "16px 14px",
+            borderBottom: "1px solid rgba(212, 175, 55, 0.15)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "space-between",
+            gap: 8,
+            background: "linear-gradient(180deg, #091838 0%, #061129 100%)",
+            boxSizing: "border-box",
+          }}
+        >
+          {!collapsed ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                minWidth: 0,
+              }}
+              onClick={() => navigate("/teacher/dashboard")}
+            >
+              <img
+                src={logo}
+                alt="APEX Logo"
+                style={{
+                  height: 36,
+                  width: 36,
+                  borderRadius: 6,
+                  objectFit: "contain",
+                  flexShrink: 0,
                 }}
               />
-            ) : (
-              <div style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: '#f0f0f0',  /* Light gray background */
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '10px'
-              }}>
-                <BsPerson size={30} color="#2c3e50" />  {/* Dark icon color */}
+
+              <div style={{ minWidth: 0, overflow: "hidden" }}>
+                <Title
+                  level={5}
+                  style={{
+                    color: "#ffffff",
+                    margin: 0,
+                    fontFamily: "Cinzel, serif",
+                    fontSize: "1.05rem",
+                    letterSpacing: "0.5px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  APEX <span style={{ color: "#d4af37" }}>COLLEGE</span>
+                </Title>
+
+                <Text
+                  style={{
+                    color: "#94a3b8",
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                    display: "block",
+                    marginTop: -2,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Teacher Portal
+                </Text>
               </div>
-            )}
-            {isOpen && teacherName && <TeacherName>{teacherName}</TeacherName>}
-          </>
-        )}
-      </SidebarHeader>
-      <SidebarNav>
-        <SidebarNavItem>
-          <SidebarIcon><BsGraphUp /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/dashboard">Dashboard</StyledLink>}
-        </SidebarNavItem>
-        {/*<SidebarNavItem>
-          /* <SidebarIcon><BsPeople /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/classes">Applications</StyledLink>}
-        </SidebarNavItem> */}
-        <SidebarNavItem>
-          <SidebarIcon><BsFileText /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/assignments">Student Reports</StyledLink>}
-        </SidebarNavItem>
-        <SidebarNavItem>
-          <SidebarIcon><BsBook /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/exams">Exams</StyledLink>}
-        </SidebarNavItem>
-        <SidebarNavItem>
-          <SidebarIcon><BsGraphDown /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/performance">Performance</StyledLink>}
-        </SidebarNavItem>
-        <SidebarNavItem>
-          <SidebarIcon><BsCalendar /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/attendance">Attendance</StyledLink>}
-        </SidebarNavItem>
-        <SidebarNavItem>
-          <SidebarIcon><BsChatDots /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/communication">Announcements</StyledLink>}
-        </SidebarNavItem>
-        <SidebarNavItem>
-          <SidebarIcon><BsGear /></SidebarIcon>
-          {isOpen && <StyledLink to="/teacher/settings">Settings</StyledLink>}
-        </SidebarNavItem>
-      </SidebarNav>
-      <ToggleButton onClick={toggleSidebar}>
-        <ToggleIcon isOpen={isOpen}>{isOpen ? '◄' : '►'}</ToggleIcon>
-      </ToggleButton>
-    </SidebarContainer>
+            </div>
+          ) : (
+            <img
+              src={logo}
+              alt="APEX"
+              style={{
+                height: 34,
+                width: 34,
+                borderRadius: 6,
+                cursor: "pointer",
+                objectFit: "contain",
+              }}
+              onClick={() => navigate("/teacher/dashboard")}
+            />
+          )}
+
+          <Button
+            type="text"
+            icon={
+              collapsed ? (
+                <MenuUnfoldOutlined style={{ color: "#d4af37" }} />
+              ) : (
+                <MenuFoldOutlined style={{ color: "#d4af37" }} />
+              )
+            }
+            onClick={toggleCollapsed}
+            style={{
+              flexShrink: 0,
+              fontSize: 16,
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 6,
+              background: "rgba(212, 175, 55, 0.08)",
+            }}
+          />
+        </div>
+
+        {/* TEACHER PROFILE SECTION */}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: collapsed ? "14px 8px" : "15px 12px",
+            borderBottom: "1px solid rgba(212, 175, 55, 0.12)",
+            background: "rgba(255, 255, 255, 0.02)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <Avatar
+              size={collapsed ? 38 : 50}
+              src={profilePicture || undefined}
+              style={{
+                background:
+                  "linear-gradient(135deg, #d4af37 0%, #1e3a8a 100%)",
+                color: "#ffffff",
+                fontSize: collapsed ? 16 : 21,
+                fontWeight: 700,
+                cursor: "pointer",
+                border: "2px solid #d4af37",
+                boxShadow: "0 4px 14px rgba(212, 175, 55, 0.25)",
+              }}
+              onClick={() => navigate("/teacher/settings")}
+            >
+              {!profilePicture && getInitials(teacherName)}
+            </Avatar>
+
+            <CrownOutlined
+              style={{
+                position: "absolute",
+                bottom: -2,
+                right: -4,
+                color: "#d4af37",
+                fontSize: 14,
+                background: "#061129",
+                borderRadius: "50%",
+                padding: 2,
+              }}
+            />
+          </div>
+
+          {!collapsed && (
+            <div
+              style={{
+                marginTop: 9,
+                textAlign: "center",
+                width: "100%",
+              }}
+            >
+              <Text
+                strong
+                style={{
+                  color: "#ffffff",
+                  fontSize: 13,
+                  display: "block",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {teacherName}
+              </Text>
+
+              <Text
+                style={{
+                  color: "#94a3b8",
+                  fontSize: 11,
+                  display: "block",
+                  marginTop: 1,
+                }}
+              >
+                Faculty Member
+              </Text>
+
+              <div style={{ marginTop: 6 }}>
+                <span
+                  style={{
+                    background: "rgba(212, 175, 55, 0.15)",
+                    color: "#d4af37",
+                    border: "1px solid rgba(212, 175, 55, 0.3)",
+                    padding: "2px 8px",
+                    borderRadius: 12,
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >
+                  👑 Teacher Access
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* SCROLLABLE NAVIGATION */}
+        <div
+          style={{
+            flex: "1 1 auto",
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            padding: "10px 8px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+            boxSizing: "border-box",
+          }}
+          className="apex-sidebar-nav"
+        >
+          {teacherMenuItems.map((item) => {
+            const isSelected =
+              location.pathname === item.key ||
+              (item.key === "/teacher/dashboard" &&
+                location.pathname === "/teacher");
+
+            return (
+              <Tooltip
+                key={item.key}
+                title={collapsed ? item.label : item.description}
+                placement="right"
+                mouseEnterDelay={0.3}
+              >
+                <div
+                  onClick={() => handleNavigation(item)}
+                  style={{
+                    flexShrink: 0,
+                    minHeight: 42,
+                    padding: collapsed ? "10px 0" : "10px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: collapsed ? "center" : "space-between",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    backgroundColor: isSelected
+                      ? "rgba(212, 175, 55, 0.14)"
+                      : "transparent",
+                    borderLeft: isSelected
+                      ? "3px solid #d4af37"
+                      : "3px solid transparent",
+                    transition: "all 0.2s ease",
+                    color: isSelected ? "#d4af37" : "#cbd5e1",
+                    boxSizing: "border-box",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor =
+                        "rgba(255, 255, 255, 0.05)";
+                      e.currentTarget.style.color = "#ffffff";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.color = "#cbd5e1";
+                    }
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      minWidth: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 16,
+                        color: isSelected ? "#d4af37" : "#94a3b8",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.icon}
+                    </span>
+
+                    {!collapsed && (
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: isSelected ? 600 : 400,
+                          letterSpacing: "0.2px",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {!collapsed && isSelected && (
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#d4af37",
+                        flexShrink: 0,
+                        marginLeft: 8,
+                      }}
+                    />
+                  )}
+                </div>
+              </Tooltip>
+            );
+          })}
+        </div>
+
+        {/* FIXED FOOTER */}
+        <div
+          style={{
+            flexShrink: 0,
+            width: "100%",
+            padding: collapsed ? "10px 8px" : "10px 12px",
+            borderTop: "1px solid rgba(212, 175, 55, 0.12)",
+            background: "linear-gradient(180deg, #081631 0%, #061129 100%)",
+            boxSizing: "border-box",
+          }}
+        >
+          <Button
+            type="text"
+            icon={<HomeOutlined style={{ color: "#d4af37", fontSize: 15 }} />}
+            onClick={() => navigate("/")}
+            block
+            style={{
+              color: "#cbd5e1",
+              textAlign: collapsed ? "center" : "left",
+              fontSize: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: collapsed ? "center" : "flex-start",
+              gap: 8,
+              padding: collapsed ? "7px 0" : "7px 8px",
+              borderRadius: 7,
+              height: 34,
+              margin: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor =
+                "rgba(212, 175, 55, 0.08)";
+              e.currentTarget.style.color = "#ffffff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "#cbd5e1";
+            }}
+          >
+            {!collapsed && "Visit Public Website"}
+          </Button>
+        </div>
+      </div>
+
+      <style>
+        {`
+          .apex-sidebar-nav {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(212, 175, 55, 0.25) transparent;
+          }
+
+          .apex-sidebar-nav::-webkit-scrollbar {
+            width: 5px;
+          }
+
+          .apex-sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+          }
+
+          .apex-sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(212, 175, 55, 0.25);
+            border-radius: 10px;
+          }
+
+          .apex-sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(212, 175, 55, 0.45);
+          }
+
+          .ant-layout-sider-children {
+            height: 100%;
+            min-height: 100%;
+            overflow: hidden;
+          }
+        `}
+      </style>
+    </Sider>
   );
 };
 

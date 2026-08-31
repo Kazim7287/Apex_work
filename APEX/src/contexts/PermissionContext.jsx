@@ -1,220 +1,217 @@
-// src/contexts/PermissionContext.jsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 const PermissionContext = createContext(null);
 
-const API_BASE_URL = 'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
+const API_BASE_URL =
+  'https://white-trout-460511.hostingersite.com/APEXCOLLEGE_HARICHAND/APC/APEX/';
+
+const normalizeRole = (role) => {
+  const normalized = String(role || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  return ['teacher', 'admin', 'sub_admin', 'super_admin'].includes(normalized)
+    ? normalized
+    : null;
+};
+
+const normalizePermissions = (items) => {
+  if (!Array.isArray(items)) return [];
+
+  return [
+    ...new Set(
+      items
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (item?.permission_value === 0 || item?.permission_value === '0') {
+            return null;
+          }
+          return item?.permission_key;
+        })
+        .filter(Boolean)
+    ),
+  ];
+};
+
+const emptyAccess = () => ({
+  permissions: [],
+  role: null,
+  isSuperAdmin: false,
+  adminData: null,
+});
 
 export const PermissionProvider = ({ children }) => {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState('admin');
+  const [userRole, setUserRole] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [adminData, setAdminData] = useState(null);
 
-  useEffect(() => {
-    fetchUserPermissions();
+  const clearPermissions = useCallback(() => {
+    const empty = emptyAccess();
+    setPermissions(empty.permissions);
+    setUserRole(empty.role);
+    setIsSuperAdmin(empty.isSuperAdmin);
+    setAdminData(empty.adminData);
   }, []);
 
-  const fetchUserPermissions = async () => {
+  const fetchUserPermissions = useCallback(async () => {
     setLoading(true);
-    console.log('🔍 Fetching user permissions...');
-    
+    // clearPermissions();
+
     try {
-      // Get admin email from localStorage adminData
-      let adminEmail = 'superadmin@apex.com'; // Default fallback
-      
-      try {
-        const storedAdminData = localStorage.getItem('adminData');
-        if (storedAdminData) {
+      let adminEmail = null;
+      const storedAdminData = localStorage.getItem('adminData');
+
+      if (storedAdminData) {
+        try {
           const parsedData = JSON.parse(storedAdminData);
-          if (parsedData && parsedData.email) {
-            adminEmail = parsedData.email;
-            console.log('📧 Found admin email from localStorage:', adminEmail);
-          }
+          adminEmail = parsedData?.email || null;
+        } catch (error) {
+          console.warn('Invalid adminData in localStorage:', error);
         }
-      } catch (e) {
-        console.warn('⚠️ Could not parse adminData from localStorage:', e);
       }
-      
-      console.log('📡 Calling Admindata.php for email:', adminEmail);
-      const adminResponse = await fetch(`${API_BASE_URL}Admindata.php?email=${encodeURIComponent(adminEmail)}`, {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
 
-      console.log('📡 Admindata.php response status:', adminResponse.status);
-
-      if (!adminResponse.ok) {
-        console.error('❌ Admindata.php failed with status:', adminResponse.status);
-        setDefaultPermissions();
-        setLoading(false);
+      // Never use a Super Admin email as a fallback.
+      if (!adminEmail) {
+        console.warn('No logged-in account found. Access denied.');
         return;
       }
 
-      const adminResult = await adminResponse.json();
-      console.log('📋 Admindata.php response:', adminResult);
-
-      if (adminResult.success && adminResult.data) {
-        setAdminData(adminResult.data);
-        
-        const adminId = adminResult.data.id;
-        const adminRole = adminResult.data.role;
-        const isSuperAdminFromApi = adminRole === 'super_admin';
-        
-        console.log('✅ Admin found:', adminResult.data.name, 'ID:', adminId, 'Role:', adminRole);
-        console.log('👑 Is Super Admin:', isSuperAdminFromApi);
-        
-        setIsSuperAdmin(isSuperAdminFromApi);
-        
-        if (isSuperAdminFromApi) {
-          console.log('👑 Super Admin detected - granting all permissions');
-          setUserRole('super_admin');
-          const allPerms = [
-            // Dashboard & Core
-            'dashboard_view', 'students_view', 'teachers_view', 'classes_view',
-            
-            // Announcements
-            'teacher-list', 'teacher-list',
-            
-            // Exams
-            'exams_view', 'exams_manage',
-            
-            // Books
-            'books_view', 'books_manage', 'books_delete',
-            
-            // Students Management
-            'students_manage', 'students_delete',
-            
-            // Other Features
-            'assignments_view', 'performance_view', 'attendance_view',
-            'evaluations_view', 'dues_view', 'timetable_view', 'events_view',
-            'applications_view', 'feedback_view', 'about_view',
-            
-            // Admin & Settings
-            'admins_manage', 'permissions_manage', 'settings_view'
-          ];
-          setPermissions(allPerms);
-          setLoading(false);
-          return;
-        }
-
-        // For regular admin, fetch permissions
-        // console.log('📡 Calling get_admin_permissions.php for admin ID:', adminId);
-        const permResponse = await fetch(`${API_BASE_URL}get_admin_permissions.php?admin_id=${adminId}`, {
+      const adminResponse = await fetch(
+        `${API_BASE_URL}Admindata.php?email=${encodeURIComponent(adminEmail)}`,
+        {
           credentials: 'include',
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
-
-        // console.log('📡 get_admin_permissions.php response status:', permResponse.status);
-
-        if (permResponse.ok) {
-          const permData = await permResponse.json();
-         // console.log('📋 get_admin_permissions.php response:', permData);
-          
-          if (permData.success) {
-            const permKeys = permData.data
-              .filter(p => p.permission_value === 1)
-              .map(p => p.permission_key);
-            setPermissions(permKeys);
-            setUserRole('admin');
-            // console.log('✅ Permissions loaded:', permKeys.length, 'permissions:', permKeys);
-          } else {
-            console.warn('⚠️ No permissions found in response');
-            setPermissions([]);
-          }
-        } else {
-          console.error('❌ get_admin_permissions.php failed with status:', permResponse.status);
-          setPermissions([]);
+          headers: { Accept: 'application/json' },
         }
-      } else {
-        console.warn('⚠️ No admin data found, using default permissions');
-        setDefaultPermissions();
+      );
+
+      if (!adminResponse.ok) {
+        throw new Error(`Admindata.php failed: ${adminResponse.status}`);
       }
+
+      const adminResult = await adminResponse.json();
+      const data = adminResult?.data;
+
+      if (!adminResult?.success || !data?.id) {
+        throw new Error(adminResult?.message || 'No user account returned');
+      }
+
+      const role = normalizeRole(data.role);
+
+      if (!role) {
+        throw new Error(`Unknown account role: ${data.role || 'missing'}`);
+      }
+
+      const normalizedAdminData = { ...data, role };
+      setAdminData(normalizedAdminData);
+      setUserRole(role);
+
+      // Full access is possible only when the API explicitly returns this role.
+      if (role === 'super_admin') {
+        setIsSuperAdmin(true);
+        setPermissions(['*']);
+        return;
+      }
+
+      const permissionResponse = await fetch(
+        `${API_BASE_URL}get_admin_permissions.php?admin_id=${encodeURIComponent(
+          data.id
+        )}`,
+        {
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        }
+      );
+
+      if (!permissionResponse.ok) {
+        throw new Error(
+          `get_admin_permissions.php failed: ${permissionResponse.status}`
+        );
+      }
+
+      const permissionResult = await permissionResponse.json();
+      const permissionItems =
+        permissionResult?.data || permissionResult?.permissions || [];
+
+      setIsSuperAdmin(false);
+      setPermissions(normalizePermissions(permissionItems));
     } catch (error) {
-      console.error('❌ Failed to fetch permissions:', error);
-      setDefaultPermissions();
+      console.error('Failed to fetch permissions:', error);
+      // Fail closed. Never grant permissions on error.
+      clearPermissions();
     } finally {
       setLoading(false);
     }
-  };
+  }, [clearPermissions]);
 
-  const setDefaultPermissions = () => {
-    // console.log('📌 Setting default permissions for testing');
-    const defaultPerms = [
-      // Dashboard & Core
-      'dashboard_view', 'students_view', 'teachers_view', 'classes_view',
-      
-      // Announcements
-      'announcements_view', 'announcements_manage',
-      
-      // Exams
-      'exams_view', 'exams_manage',
-      
-      // Books
-      'books_view', 'books_manage', 'books_delete',
-      
-      // Students Management
-      'students_manage', 'students_delete',
-      
-      // Other Features
-      'assignments_view', 'performance_view', 'attendance_view',
-      'evaluations_view', 'dues_view', 'timetable_view', 'events_view',
-      'applications_view', 'feedback_view', 'about_view',
-      
-      // Admin & Settings
-      'admins_manage', 'permissions_manage', 'settings_view'
-    ];
-    setPermissions(defaultPerms);
-    setIsSuperAdmin(true);
-    setUserRole('super_admin');
-    setAdminData({
-      id: 1,
-      name: 'Test Admin',
-      email: 'test@apex.com',
-      designation: 'System Administrator',
-      role: 'super_admin'
-    });
-  };
+  useEffect(() => {
+    fetchUserPermissions();
+  }, [fetchUserPermissions]);
 
-  const hasPermission = (permissionKey) => {
-    // console.log(`🔑 Checking permission: ${permissionKey}, isSuperAdmin: ${isSuperAdmin}`);
-    if (isSuperAdmin) {
-      console.log(`✅ Super Admin - ${permissionKey} granted`);
-      return true;
-    }
-    const result = permissions.includes(permissionKey);
-    console.log(`🔑 ${permissionKey}: ${result}`);
-    return result;
-  };
+  const hasPermission = useCallback(
+    (permissionKey) => {
+      if (!permissionKey || !userRole) return false;
+      if (isSuperAdmin) return true;
+      return permissions.includes(permissionKey);
+    },
+    [isSuperAdmin, permissions, userRole]
+  );
 
-  const hasAnyPermission = (permissionKeys) => {
-    if (isSuperAdmin) return true;
-    if (!permissionKeys || permissionKeys.length === 0) return true;
-    return permissionKeys.some(key => permissions.includes(key));
-  };
+  const hasAnyPermission = useCallback(
+    (permissionKeys = []) => {
+      if (!Array.isArray(permissionKeys) || permissionKeys.length === 0) {
+        return false;
+      }
+      return permissionKeys.some((key) => hasPermission(key));
+    },
+    [hasPermission]
+  );
 
-  const hasAllPermissions = (permissionKeys) => {
-    if (isSuperAdmin) return true;
-    if (!permissionKeys || permissionKeys.length === 0) return true;
-    return permissionKeys.every(key => permissions.includes(key));
-  };
+  const hasAllPermissions = useCallback(
+    (permissionKeys = []) => {
+      if (!Array.isArray(permissionKeys) || permissionKeys.length === 0) {
+        return false;
+      }
+      return permissionKeys.every((key) => hasPermission(key));
+    },
+    [hasPermission]
+  );
 
-  const value = {
-    permissions,
-    loading,
-    userRole,
-    isSuperAdmin,
-    adminData,
-    hasPermission,
-    hasAnyPermission,
-    hasAllPermissions,
-    refreshPermissions: fetchUserPermissions
-  };
+  const value = useMemo(
+    () => ({
+      permissions,
+      loading,
+      userRole,
+      isSuperAdmin,
+      isAdmin: userRole === 'admin' || userRole === 'super_admin',
+      isTeacher: userRole === 'teacher',
+      adminData,
+      hasPermission,
+      hasAnyPermission,
+      hasAllPermissions,
+      refreshPermissions: fetchUserPermissions,
+    }),
+    [
+      permissions,
+      loading,
+      userRole,
+      isSuperAdmin,
+      adminData,
+      hasPermission,
+      hasAnyPermission,
+      hasAllPermissions,
+      fetchUserPermissions,
+    ]
+  );
 
   return (
     <PermissionContext.Provider value={value}>
@@ -225,19 +222,11 @@ export const PermissionProvider = ({ children }) => {
 
 export const usePermissions = () => {
   const context = useContext(PermissionContext);
+
   if (!context) {
-    console.error('❌ usePermissions must be used within PermissionProvider');
-    // Return a default context with all permissions for development
-    return {
-      permissions: [],
-      loading: false,
-      isSuperAdmin: true,
-      adminData: null,
-      hasPermission: () => true,
-      hasAnyPermission: () => true,
-      hasAllPermissions: () => true,
-    };
+    throw new Error('usePermissions must be used inside PermissionProvider');
   }
+
   return context;
 };
 
