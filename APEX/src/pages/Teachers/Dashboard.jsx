@@ -20,9 +20,7 @@ import {
   CalendarOutlined,
   ClockCircleOutlined,
   HomeOutlined,
-  MenuFoldOutlined,
   MenuOutlined,
-  MenuUnfoldOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -32,7 +30,7 @@ import {
 import { useMediaQuery } from 'react-responsive';
 import Sidebar from './Sidebar';
 
-const { Header, Content, Sider } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 const EVENTS_API =
@@ -57,60 +55,6 @@ const Page = styled(Layout)`
   min-height: 100vh;
   background: ${COLORS.bg} !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-`;
-
-/* Wraps the desktop/tablet Sider so the blue trigger button can be
-   pinned to its edge and animate together with the collapse. */
-const SidebarShell = styled.div`
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-`;
-
-const NavigationSider = styled(Sider)`
-  background: ${COLORS.sidebar} !important;
-  transition: all 0.2s ease;
-
-  .ant-layout-sider-children {
-    background: ${COLORS.sidebar};
-  }
-
-  /* antd's built-in trigger is disabled (trigger={null}); this hides
-     any leftover default trigger styling defensively. */
-  .ant-layout-sider-trigger {
-    display: none !important;
-  }
-`;
-
-/* The "additional blue component" — a floating circular toggle that
-   sits on the sidebar's edge. Always present, but this is what the
-   user sees appear/flip when the sidebar is minimized/expanded. */
-const SidebarTrigger = styled.button`
-  position: absolute;
-  top: 26px;
-  right: -14px;
-  z-index: 30;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 50%;
-  background: ${COLORS.actionBlue};
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.3);
-  transition: background 0.2s ease, transform 0.2s ease;
-
-  &:hover {
-    background: ${COLORS.actionBlueHover};
-    transform: scale(1.08);
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${COLORS.actionBlueHover};
-    outline-offset: 2px;
-  }
 `;
 
 const ContentLayout = styled(Layout)`
@@ -687,48 +631,28 @@ const TeacherDashboard = () => {
 
   return (
     <Page>
+      {/* Desktop Sidebar */}
       {!isMobile && (
-        <SidebarShell>
-          <NavigationSider
-            width={240}
-            collapsedWidth={80}
-            collapsible
-            trigger={null}
-            collapsed={collapsed}
-            breakpoint="lg"
-            onBreakpoint={(broken) => setCollapsed(broken)}
-            theme="dark"
-          >
-            {/* Pass `collapsed` down so Sidebar can switch to an
-               icon-only layout when minimized. */}
-            <Sidebar collapsed={collapsed} />
-          </NavigationSider>
-
-          <SidebarTrigger
-            type="button"
-            onClick={() => setCollapsed((prev) => !prev)}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-          >
-            {collapsed ? (
-              <MenuUnfoldOutlined style={{ fontSize: 13 }} />
-            ) : (
-              <MenuFoldOutlined style={{ fontSize: 13 }} />
-            )}
-          </SidebarTrigger>
-        </SidebarShell>
+        <Sidebar
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+        />
       )}
 
+      {/* Mobile Drawer Sidebar */}
       {isMobile && (
         <Drawer
           placement="left"
           closable={false}
           onClose={() => setMobileSidebarVisible(false)}
           open={mobileSidebarVisible}
-          width={240}
-          styles={{ body: { padding: 0, background: COLORS.sidebar } }}
+          width={260}
+          styles={{ body: { padding: 0, overflow: 'hidden', background: '#061129' } }}
         >
-          <Sidebar />
+          <Sidebar
+            collapsed={false}
+            onItemClick={() => setMobileSidebarVisible(false)}
+          />
         </Drawer>
       )}
 
