@@ -513,10 +513,7 @@ const TeacherProfileSection = () => {
           </StyledDrawer>
         ) : (
           /* DESKTOP SIDEBAR */
-          <Sidebar
-            collapsed={sidebarCollapsed}
-            onCollapse={setSidebarCollapsed}
-          />
+          <Sidebar />
         )}
 
         {/* MAIN PAGE CONTENT */}
