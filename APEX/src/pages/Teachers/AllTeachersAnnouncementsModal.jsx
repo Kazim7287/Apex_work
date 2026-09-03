@@ -180,7 +180,7 @@ const AllTeachersAnnouncementsModal = ({ visible, onCancel }) => {
             >
               <TeamOutlined />
             </div>
-            <span>All Faculty Announcements</span>
+            <span style={{ color: '#ffffff' }}>All Faculty Announcements</span>
           </Space>
         }
         open={visible}
