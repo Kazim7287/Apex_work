@@ -7,9 +7,18 @@ const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const ScheduleModal = ({ visible, onCancel, selectedRecord, windowWidth, onSubmit }) => {
     const [form] = Form.useForm();
 
+    const handleFinish = (values) => {
+        const [start, end] = values.time_range;
+        onSubmit({
+            day: values.day,
+            start_time: start.format('HH:mm:ss'),
+            end_time: end.format('HH:mm:ss'),
+        });
+    };
+
     return (
         <Modal
-            title={`Schedule Time for ${selectedRecord?.tech_name} - ${selectedRecord?.subject_name}`}
+            title={`Schedule Time for ${selectedRecord?.teach_name} - ${selectedRecord?.subject_name}`}
             visible={visible}
             onCancel={onCancel}
             footer={null}
@@ -24,7 +33,7 @@ const ScheduleModal = ({ visible, onCancel, selectedRecord, windowWidth, onSubmi
             <Form 
                 form={form} 
                 layout="vertical" 
-                onFinish={onSubmit}
+                onFinish={handleFinish}
                 className="schedule-form"
             >
                 <Form.Item

@@ -468,11 +468,7 @@ const List = () => {
 
   return (
     <Layout style={{ minHeight: "100vh", backgroundColor: THEME.bg }}>
-      {/* 
-        Imported Sidebar component.
-        Ensure your Sidebar.jsx handles its own collapsed/responsive states 
-        (e.g., using <Layout.Sider breakpoint="lg" collapsedWidth="0">).
-      */}
+      
       <Sidebar />
 
       <Layout style={{ flex: 1, backgroundColor: THEME.bg, overflow: "hidden" }}>

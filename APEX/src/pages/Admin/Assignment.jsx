@@ -131,7 +131,7 @@ const Assignment = () => {
 
     const fetchSections = async () => {
         const response = await axios.get(
-            `${API_BASE}/sec_read.php`,
+            `${API_BASE}/Sec_Read.php`,
             { withCredentials: true }
         );
 

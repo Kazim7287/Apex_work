@@ -130,7 +130,7 @@ const Timetable = () => {
     };
 
     const showModal = (record) => {
-        setSelectedRecord(record);
+        setSelectedRecord({ ...record, teacher_name: record.teach_name });
         setIsModalVisible(true);
     };
 
@@ -798,31 +798,57 @@ const Timetable = () => {
                         </Card>
 
                         {/* Grouped Days Display */}
-                        {timetableData.length > 0 && (
-                            <div id="printable-timetable">
-                                <Title level={4} style={{ color: '#0b1b3d', marginBottom: 16 }}>
-                                    Schedule Overview: Section {sections.find(s => s.id === selectedSection)?.name}
-                                </Title>
-                                <Row gutter={[16, 16]}>
-                                    {Object.keys(groupedTimetableData).map(day => {
-                                        const entries = groupedTimetableData[day];
-                                        if (entries.length === 0) return null;
-                                        return (
-                                            <Col xs={24} sm={12} md={8} key={day}>
-                                                <Card size="small" className="apex-card" title={<Text strong style={{ color: '#0b1b3d' }}>{day}</Text>} style={{ height: '100%' }}>
-                                                    {entries.map(e => (
-                                                        <div key={e.id} style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                                            <Text strong style={{ color: '#1e3a8a', display: 'block' }}>{e.subject_name}</Text>
-                                                            <Text style={{ fontSize: 12, color: '#64748b' }}>{formatTimeDisplay(e.start_time)} - {formatTimeDisplay(e.end_time)} | Room {e.room_number || 'N/A'}</Text>
-                                                        </div>
-                                                    ))}
-                                                </Card>
-                                            </Col>
-                                        );
-                                    })}
-                                </Row>
-                            </div>
-                        )}
+                        {/* Grouped Days Display */}
+                            {timetableData.length > 0 && (
+                                <div id="printable-timetable">
+                                    <Title level={4} style={{ color: '#0b1b3d', marginBottom: 16 }}>
+                                        Schedule Overview: Section {sections.find(s => s.id === selectedSection)?.name}
+                                    </Title>
+                                    <Row gutter={[16, 16]}>
+                                        {Object.keys(groupedTimetableData).map(day => {
+                                            const entries = groupedTimetableData[day];
+                                            if (entries.length === 0) return null;
+                                            return (
+                                                <Col xs={24} sm={12} md={8} key={day}>
+                                                    <Card size="small" className="apex-card" title={<Text strong style={{ color: '#0b1b3d' }}>{day}</Text>} style={{ height: '100%' }}>
+                                                        {entries.map(e => (
+                                                            <div key={e.id} style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <Text strong style={{ color: '#1e3a8a', display: 'block' }}>{e.subject_name}</Text>
+                                                                    <Text style={{ fontSize: 12, color: '#64748b' }}>{formatTimeDisplay(e.start_time)} - {formatTimeDisplay(e.end_time)} | Room {e.room_number || 'N/A'}</Text>
+                                                                </div>
+                                                                <Space size={4}>
+                                                                    <Button
+                                                                        type="text"
+                                                                        icon={<EditOutlined style={{ color: '#1e3a8a' }} />}
+                                                                        size="small"
+                                                                        onClick={() => handleEditClick(e)}
+                                                                    />
+                                                                    <Popconfirm
+                                                                        title="Delete Entry"
+                                                                        description="Are you sure you want to delete this schedule entry?"
+                                                                        onConfirm={() => handleDeleteClick(e.id)}
+                                                                        okText="Yes"
+                                                                        cancelText="No"
+                                                                        okButtonProps={{ danger: true }}
+                                                                    >
+                                                                        <Button
+                                                                            type="text"
+                                                                            danger
+                                                                            icon={<DeleteOutlined />}
+                                                                            size="small"
+                                                                        />
+                                                                    </Popconfirm>
+                                                                </Space>
+                                                            </div>
+                                                        ))}
+                                                    </Card>
+                                                </Col>
+                                            );
+                                        })}
+                                    </Row>
+                                </div>
+                            )}
                     </>
                 )}
             </Card>
