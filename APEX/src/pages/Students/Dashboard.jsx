@@ -222,17 +222,17 @@ const StudentDashboard = () => {
             style={{ height: '100%' }}
             bodyStyle={{ padding: 24 }}
           >
-            <Link to="/student/exams" style={{ textDecoration: 'none' }}>
+            <Link to="/student/announcement" style={{ textDecoration: 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <Text style={{ color: '#64748b', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Financials
+                    Bulletin
                   </Text>
                   <Title level={3} style={{ margin: '6px 0 0 0', color: '#0b1b3d', fontWeight: 800 }}>
-                    Fee Dues
+                    Announcements
                   </Title>
                   <Text style={{ color: '#d4af37', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
-                    View Ledger <ArrowRightOutlined />
+                    View Notice <ArrowRightOutlined />
                   </Text>
                 </div>
                 <div className="apex-stat-icon" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #b8860b 100%)', color: '#ffffff', boxShadow: '0 8px 16px rgba(212, 175, 55, 0.25)' }}>

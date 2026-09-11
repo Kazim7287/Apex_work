@@ -1,22 +1,16 @@
-// src/components/Unauthorized.jsx
-import { Result, Button } from 'antd';
 import { Link } from 'react-router-dom';
 
-const Unauthorized = () => {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <Result
-        status="403"
-        title="403"
-        subTitle="Sorry, you are not authorized to access this page."
-        extra={
-          <Link to="/">
-            <Button type="primary">Back Home</Button>
-          </Link>
-        }
-      />
-    </div>
-  );
-};
+const Unauthorized = () => (
+  <header className="page-hero">
+    <p className="kicker">403</p>
+    <h1>Access denied</h1>
+    <p className="font-serif" style={{ marginTop: '1rem' }}>
+      You are not authorised to open this page.
+    </p>
+    <Link to="/" className="btn-gold" style={{ marginTop: '1.5rem' }}>
+      Back to home
+    </Link>
+  </header>
+);
 
 export default Unauthorized;

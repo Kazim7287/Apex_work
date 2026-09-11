@@ -136,12 +136,12 @@ const Sidebar = ({
       label: "Applications",
       description: "Submit & track student requests",
     },
-    {
-      key: "/student/exams",
-      icon: <DollarOutlined />,
-      label: "Fee Dues",
-      description: "View fee balances & payment history",
-    },
+    // {
+    //   key: "/student/exams",
+    //   icon: <DollarOutlined />,
+    //   label: "Fee Dues",
+    //   description: "View fee balances & payment history",
+    // },
     {
       key: "/student/performance",
       icon: <LineChartOutlined />,
@@ -166,12 +166,12 @@ const Sidebar = ({
       label: "Announcements",
       description: "Notices, timetable & campus alerts",
     },
-    {
-      key: "/student/term/list",
-      icon: <ScheduleOutlined />,
-      label: "Exam Schedule",
-      description: "Term exam dates & time slots",
-    },
+    // {
+    //   key: "/student/term/list",
+    //   icon: <ScheduleOutlined />,
+    //   label: "Exam Schedule",
+    //   description: "Term exam dates & time slots",
+    // },
     {
       key: "/student/profile",
       icon: <UserOutlined />,

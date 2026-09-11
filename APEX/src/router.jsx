@@ -2,18 +2,25 @@ import { createBrowserRouter } from "react-router-dom";
 import Layout from "../src/components/Layout"; // 👈 Import layout
 import StudentLayout from "../src/components/StudentLayout";
 
-// Public components
+import SiteLayout from "../src/components/site/SiteLayout";
+import Home from "../src/components/Home";
+import About from "../src/components/Home/About";
+import Contact from "../src/components/Home/FeedBack";
+import ProgramsPage from "../src/components/site/ProgramsPage";
+import AdmissionsPage from "../src/components/site/AdmissionsPage";
+import CampusPage from "../src/components/site/CampusPage";
+import GalleryPage from "../src/components/site/GalleryPage";
+import NewsPage from "../src/components/site/NewsPage";
+import ChooseUser from "../src/components/ChooseUser";
+import Unauthorized from "../src/components/Unauthorized";
+
+// Admin CMS (protected — do not move)
 import AboutManagement from "../src/pages/Admin/AboutManagement";
 import FeedbackManagement from "../src/pages/Admin/FeedbackManagement";
-import About from "../src/components/Home/About"; 
-import Contact from "../src/components/Home/FeedBack";
-import Home from "../src/components/Home";
 import AdminRegister from "../src/components/AdminRegister";
-import ChooseUser from "../src/components/ChooseUser";
 import StudentSignin from "../src/components/StudentsSignin";
 import TeacherSignin from "../src/components/TeacherSignin";
 import AdminSignin from "../src/components/AdminSignin";
-import Unauthorized from "../src/components/Unauthorized";
 
 // Admin components
 import AdminManagement from "../src/pages/Admin/AdminManagement";
@@ -69,17 +76,26 @@ import AssignmentList from "./pages/Students/AssignmentList";
 import PerformanceList from "./pages/Students/PerformanceList";
 
 export const router = createBrowserRouter([
-  // Public routes
-  { path: "/", element: <Home /> },
-  { path: "/about", element: <About /> },
-  { path: "/contact", element: <Contact /> },
-  { path: "/choose-user", element: <ChooseUser /> },
-  { path: "/unauthorized", element: <Unauthorized /> },
+  {
+    element: <SiteLayout />,
+    children: [
+      { path: "/", element: <Home /> },
+      { path: "/about", element: <About /> },
+      { path: "/contact", element: <Contact /> },
+      { path: "/programs", element: <ProgramsPage /> },
+      { path: "/admissions", element: <AdmissionsPage /> },
+      { path: "/campus", element: <CampusPage /> },
+      { path: "/gallery", element: <GalleryPage /> },
+      { path: "/news", element: <NewsPage /> },
+      { path: "/choose-user", element: <ChooseUser /> },
+      { path: "/unauthorized", element: <Unauthorized /> },
+      { path: "/admin-signIn", element: <AdminSignin /> },
+      { path: "/teacher-signIn", element: <TeacherSignin /> },
+      { path: "/student-signIn", element: <StudentSignin /> },
+      { path: "*", element: <Home /> },
+    ],
+  },
 
-  // Auth routes
-  { path: "/admin-signIn", element: <AdminSignin /> },
-  { path: "/teacher-signIn", element: <TeacherSignin /> },
-  { path: "/student-signIn", element: <StudentSignin /> },
   { path: "/admin/register", element: <AdminRegister /> },
 
   // Admin section
@@ -152,13 +168,6 @@ export const router = createBrowserRouter([
     { path: "class/list", element: <ClassList /> },
   ],
 },
-
-
-  // Fallback route for 404
-  {
-    path: "*",
-    element: <Home />,
-  },
 ], {
   future: {
     v7_startTransition: true,
