@@ -10,6 +10,10 @@ const AREAS = [
   { title: 'Classrooms', src: CAMPUS_PHOTOS.classroom },
   { title: 'Sports', src: CAMPUS_PHOTOS.sports },
   { title: 'Corridors', src: CAMPUS_PHOTOS.corridor },
+  { title: 'Science labs', src: CAMPUS_PHOTOS.scienceLab },
+  { title: 'Computer lab', src: CAMPUS_PHOTOS.computerLab },
+  { title: 'Library', src: CAMPUS_PHOTOS.library },
+  { title: 'Classrooms', src: CAMPUS_PHOTOS.classroom },
 ];
 
 export default function CampusPage() {

@@ -127,10 +127,11 @@ const StudentSignin = () => {
             <p>Section {studentData.section_name || 'Assigned'} · #{studentData.studentId}</p>
             <div className="hero__row" style={{ marginTop: '1.2rem' }}>
               <button className="btn btn--gold" type="button" onClick={() => navigate('/student/dashboard')}>
-                Dashboard
+                Dashboard 
               </button>
+              <br></br>
               <button className="btn btn--ink" type="button" onClick={handleLogout}>
-                Sign out
+                  Sign In
               </button>
             </div>
           </div>
