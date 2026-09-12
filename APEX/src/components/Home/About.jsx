@@ -74,7 +74,7 @@ export default function About() {
       </section>
 
       <section className="split" data-nav-theme="dark">
-        <RevealImage src="/engrnaveed.jpeg" alt="Eng. Naveed Ahmad, Managing Director" />
+        <RevealImage src="/MD.png" alt="Eng. Naveed Ahmad, Managing Director" />
         <div className="split-copy ink-panel">
           <p className="kicker">Leadership</p>
           <div>
